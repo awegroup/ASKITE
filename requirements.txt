@@ -1,0 +1,4 @@
+numpy>=1.23.5,<2
+plotly>=5.11.0,<6
+sklearn
+pandas>=1.5.2,<2
