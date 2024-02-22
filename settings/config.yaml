@@ -34,7 +34,7 @@ AeroConfig:
   error_limit: !!float 1.0e-5
   # used to be: 1e-5
   relax_factor: !!float 3.0e-2
-  n_splits: !!int 2
+  n_splits: !!int 5
   # drag-coefficients
   cd_cylinder: !!float 1.1
   cd_shear_cylinder: !!float 0.02

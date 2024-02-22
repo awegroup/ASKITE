@@ -217,6 +217,9 @@ def run_aerostructural_solver(
             coord_L,
             coord_refined,
         ) = VSM.calculate_force_aero_wing_VSM(points_left_to_right, vel_app, input_VSM)
+
+        # Distributing VSM-output chordwise
+
         # Aero --> struc
         force_aero_wing = coupling_aero2struc.aero2struc(
             points,
