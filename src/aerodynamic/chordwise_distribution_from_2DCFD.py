@@ -28,3 +28,4 @@ plt.grid(True)
 plt.show()
 
 print_interpolated_distribution(distribution)
+print(f"Sum of % distribution (should be 1): {np.sum(distribution):.2f}")
