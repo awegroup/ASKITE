@@ -23,6 +23,10 @@ This code is a design-tool, to be used in the kite-design process for finding pe
 | test           | Attempt at writing test functions. |
 | venv_phd       | Virtual environment files. |
 
+
+## More details per folder
+[data](data/doc/README.md)
+
 ## Detailed List for `src` Directory
 The `src` directory contains various Python packages involved in the project:
 <!-- - [coconut](doc/coconut.md) - Description or purpose of the `coconut` package. -->
