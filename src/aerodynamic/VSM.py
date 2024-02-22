@@ -10,6 +10,7 @@ import seaborn as sns
 
 # %% MATHEMATICAL FUNCTIONS
 
+
 def interp1d(xnew, xarray, yarray):
     """
     Interpolate a 1D array
@@ -2930,12 +2931,12 @@ def calculate_force_aero_wing_VSM(points_left_to_right, vel_app, input_VSM):
         input_VSM.is_canopy_max_height_dimensionless,
     )
 
-    ## aritificially increasing the drag #TODO: should be removed
-    cd_multiplier = input_VSM.cd_multiplier
     Niterations = input_VSM.n_iter
     errorlimit = input_VSM.error_limit
     ConvWeight = input_VSM.relax_factor
 
+    # artificially increasing the drag
+    cd_multiplier = input_VSM.cd_multiplier
     for i, aoa_point in enumerate(data_airf):
         for j, cd_value in enumerate(aoa_point[2]):
             data_airf[i, 2, j] = cd_value * cd_multiplier

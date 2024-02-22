@@ -2,7 +2,7 @@
 kite_name: !!str "V3_25"
 
 # Conditions
-vel_wind: !!seq [20,0,2]
+vel_wind: !!seq [17,0,2]
 vel_kite: !!seq [0, 0, 0]
 acc_kite: !!seq [0, 0, 0]
 
@@ -34,7 +34,8 @@ AeroConfig:
   error_limit: !!float 1.0e-5
   # used to be: 1e-5
   relax_factor: !!float 3.0e-2
-  n_splits: !!int 2
+  n_splits: !!int 5
+  n_chordwise_aero_nodes: !!int 50
   # drag-coefficients
   cd_cylinder: !!float 1.1
   cd_shear_cylinder: !!float 0.02
@@ -98,6 +99,8 @@ bridle_initial_compression_factor:
   # multiplication with initial length
 # divides initial geometry by this factor  
 geometric_scaling_factor: !!float 1
+# choose either: 'NN', 'MSc_Oriol'
+coupling_method: !!str "NN"
 
 #TODO: these are now hardcoded in "solver_utils"
 ## crosswind flight settings

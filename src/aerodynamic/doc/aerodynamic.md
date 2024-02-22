@@ -17,3 +17,5 @@ Please replace "Description or purpose of `file_name`" with the actual descripti
 # Variable Structures
 
 - Wingpanels, stored as a array where each entry is a panel, arange from left-to-right. Each entry, representing a panel, is saved as a dict where the keys are: 'p1','p2','p3','p4' and the corresponding values the coordinates saved as np.array([x,y,z]). The points are arange counter-clockwise; 'p1' is the left point on the LE, 'p2' the right point on the LE, 'p3' the right point on the TE, 'p4' the left point on the TE.
+
+<img src="wing_panel_structure.png" alt="Wing Panel Structure" width="200">

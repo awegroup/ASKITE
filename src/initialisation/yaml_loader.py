@@ -40,6 +40,7 @@ class AeroConfig:
     # used to be: 1e-5
     relax_factor: float
     n_splits: int
+    n_chordwise_aero_nodes: int
     cd_cylinder: float
     cd_shear_cylinder: float
     cd_multiplier: float
@@ -345,6 +346,7 @@ class Config:
     is_with_aero_tether: bool
     bridle_initial_compression_factor: float
     geometric_scaling_factor: float
+    coupling_method: str
 
     ## crosswind flight
     tol_fx_ratio_to_fz: float
@@ -386,6 +388,7 @@ aero_config = AeroConfig(
     error_limit=config_data["AeroConfig"]["error_limit"],
     relax_factor=config_data["AeroConfig"]["relax_factor"],
     n_splits=config_data["AeroConfig"]["n_splits"],
+    n_chordwise_aero_nodes=config_data["AeroConfig"]["n_chordwise_aero_nodes"],
     cd_cylinder=config_data["AeroConfig"]["cd_cylinder"],
     cd_shear_cylinder=config_data["AeroConfig"]["cd_shear_cylinder"],
     cd_multiplier=config_data["AeroConfig"]["cd_multiplier"],
@@ -743,6 +746,7 @@ config = Config(
     is_with_plotly_plot=config_data["is_with_plotly_plot"],
     is_with_aero_geometry=config_data["is_with_aero_geometry"],
     output_path=folder_path_output,
+    # simulation settings
     is_from_filename=config_data["is_from_filename"],
     is_billowing_on=config_data["is_billowing_on"],
     is_with_gravity=config_data["is_with_gravity"],
@@ -750,6 +754,8 @@ config = Config(
     is_with_aero_tether=config_data["is_with_aero_tether"],
     bridle_initial_compression_factor=config_data["bridle_initial_compression_factor"],
     geometric_scaling_factor=config_data["geometric_scaling_factor"],
+    coupling_method=config_data["coupling_method"],
+    # constants
     grav_constant=grav_constant,
     rho=config_data["rho"],
     mu=config_data["mu"],

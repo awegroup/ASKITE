@@ -23,16 +23,20 @@ This code is a design-tool, to be used in the kite-design process for finding pe
 | test           | Attempt at writing test functions. |
 | venv_phd       | Virtual environment files. |
 
+
+## More details per folder
+[data](data/doc/README.md)
+
 ## Detailed List for `src` Directory
 The `src` directory contains various Python packages involved in the project:
-- [aerodynamic](doc/markdown_files/src/aerodynamic.md) - Description or purpose of the `aerodynamic` package.
-- [coconut](doc/markdown_files/src/coconut.md) - Description or purpose of the `coconut` package.
-- [coupling](doc/markdown_files/src/coupling.md) - Description or purpose of the `coupling` package.
-- [initialisation](doc/markdown_files/src/initialisation.md) - Description or purpose of the `initialisation` package.
-- [particleSystem](doc/markdown_files/src/particleSystem.md) - Description or purpose of the `particleSystem` package.
-- [post_processing](doc/markdown_files/src/post_processing.md) - Description or purpose of the `post_processing` package.
-- [solver](doc/markdown_files/src/solver.md) - Description or purpose of the `solver` package.
-- [structural](doc/markdown_files/src/structural.md) - Description or purpose of the `structural` package.
+<!-- - [coconut](doc/coconut.md) - Description or purpose of the `coconut` package. -->
+- [aerodynamic](src/aerodynamic/doc/aerodynamic.md) - Description or purpose of the `aerodynamic` package.
+- [coupling](src/coupling.doc/coupling.md) - Description or purpose of the `coupling` package.
+- [initialisation](src/initialisation/doc/initialisation.md) - Description or purpose of the `initialisation` package.
+- [particleSystem](src/particleSystem/doc/particleSystem.md) - Description or purpose of the `particleSystem` package.
+- [post_processing](src/post_processing/doc/post_processing.md) - Description or purpose of the `post_processing` package.
+- [solver](src/solver/doc/solver.md) - Description or purpose of the `solver` package.
+- [structural](src/structural/doc/structural.md) - Description or purpose of the `structural` package.
 
 # Performing a simulation
 

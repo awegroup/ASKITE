@@ -134,6 +134,21 @@ def run_aerostructural_solver(
         length_tether = 200.0  # TODO: should come from config
         mass_points = config.kite.mass_points
 
+    ## coupling initialisation here
+    (
+        points_wing_segment_corners_aero_orderded,
+        index_transformation_struc_to_aero,
+    ) = coupling_struc2aero.extract_wingpanel_corners_aero_orderded(
+        points, config.kite.connectivity.plate_point_indices
+    )
+    points_old_method = points_wing_segment_corners_aero_orderded
+    points_new_method = points[index_transformation_struc_to_aero]
+    print(f"If true its great! {np.allclose(points_old_method, points_new_method)}")
+    # creating a dict with key value pairs, to transform from aero to struc
+    index_transformation_aero_to_struc_dict = {}
+    for i, value in enumerate(index_transformation_struc_to_aero):
+        index_transformation_aero_to_struc_dict[value] = i
+
     ##TODO: should also initialize difference in V_a here!
     ## for which you need to alter the VSM code, to be able to run with a V_a vector instead of one-number
 
@@ -201,10 +216,43 @@ def run_aerostructural_solver(
                 is_print_intermediate_results,
             )
 
+        ### OLD COUPLING ALGORITHM pre-2024/02
+        # # Struc --> aero
+        # points_left_to_right = coupling_struc2aero.order_struc_nodes_right_to_left(
+        #     points, config.kite.connectivity.plate_point_indices
+        # )
+        # # Wing Aerodynamic
+        # (
+        #     force_aero_wing_VSM,
+        #     moment_aero_wing_VSM,
+        #     F_rel,
+        #     ringvec,
+        #     controlpoints,
+        #     wingpanels,
+        #     rings,
+        #     coord_L,
+        #     coord_refined,
+        # ) = VSM.calculate_force_aero_wing_VSM(points_left_to_right, vel_app, input_VSM)
+
+        # # Distributing VSM-output chordwise
+
+        # # Aero --> struc
+        # force_aero_wing = coupling_aero2struc.aero2struc(
+        #     points,
+        #     config.kite.connectivity.wing_ci,
+        #     config.kite.connectivity.wing_cj,
+        #     config.kite.connectivity.plate_point_indices,
+        #     force_aero_wing_VSM,
+        #     moment_aero_wing_VSM,
+        #     ringvec,
+        #     controlpoints,
+        # )  # Put in the new positions of the points
+
+        ### NEW COUPLING ALGORITHM post-2024/02
         # Struc --> aero
-        points_left_to_right = coupling_struc2aero.order_struc_nodes_right_to_left(
-            points, config.kite.connectivity.plate_point_indices
-        )
+        points_wing_segment_corners_aero_orderded = points[
+            index_transformation_struc_to_aero
+        ]
         # Wing Aerodynamic
         (
             force_aero_wing_VSM,
@@ -216,18 +264,32 @@ def run_aerostructural_solver(
             rings,
             coord_L,
             coord_refined,
-        ) = VSM.calculate_force_aero_wing_VSM(points_left_to_right, vel_app, input_VSM)
+        ) = VSM.calculate_force_aero_wing_VSM(
+            points_wing_segment_corners_aero_orderded, vel_app, input_VSM
+        )
         # Aero --> struc
-        force_aero_wing = coupling_aero2struc.aero2struc(
-            points,
-            config.kite.connectivity.wing_ci,
-            config.kite.connectivity.wing_cj,
-            config.kite.connectivity.plate_point_indices,
-            force_aero_wing_VSM,
-            moment_aero_wing_VSM,
-            ringvec,
-            controlpoints,
-        )  # Put in the new positions of the points
+        if config.coupling_method == "NN":
+            force_aero_wing = coupling_aero2struc.aero2struc_NN(
+                config.aero.n_chordwise_aero_nodes,
+                wingpanels,
+                force_aero_wing_VSM,
+                points_wing_segment_corners_aero_orderded,
+                index_transformation_aero_to_struc_dict,
+                points,
+            )
+        elif config.coupling_method == "MSc_Oriol":
+            force_aero_wing = coupling_aero2struc.aero2struc(
+                points,
+                config.kite.connectivity.wing_ci,
+                config.kite.connectivity.wing_cj,
+                config.kite.connectivity.plate_point_indices,
+                force_aero_wing_VSM,
+                moment_aero_wing_VSM,
+                ringvec,
+                controlpoints,
+            )
+        else:
+            raise ValueError("Coupling method not recognized; wrong name or typo")
 
         # Bridle Aerodynamics
         if config.is_with_aero_bridle:
