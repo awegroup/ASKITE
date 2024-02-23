@@ -129,6 +129,7 @@ def run_aerostructural_solver(
 
     ## circular initialisation
     force_centrifugal = np.zeros(points.shape)
+    r_ratio_array = None
     if is_circular_case:
         r_0 = 100.0  # initializing r_0 TODO: should come from config
         length_tether = 200.0  # TODO: should come from config
@@ -201,54 +202,27 @@ def run_aerostructural_solver(
 
         # Centrifugal
         if is_circular_case:
-            (
-                force_centrifugal,
-                r_0,
-                v_k_i_array,
-                center_of_gravity,
-            ) = solver_utils.calculate_force_centrifugal_distribution_with_tether_tension(
-                r_0,
-                force_aero,
-                mass_points,
-                vel_app,
-                points,
-                0.90 * length_tether,  # TODO: remove hardcode, 90% is also just random
-                is_print_intermediate_results,
+            (force_centrifugal, r_0, v_k_i_array, center_of_gravity, r_k) = (
+                solver_utils.calculate_force_centrifugal_distribution_with_tether_tension(
+                    r_0,
+                    force_aero,
+                    mass_points,
+                    vel_app,
+                    points,
+                    0.90
+                    * length_tether,  # TODO: remove hardcode, 90% is also just random
+                    is_print_intermediate_results,
+                )
             )
+            # Computing the turning-radius ratio of the aerodynamic panels
+            # r_ratio_i = (r_0 + y_i) / r_k
+            # The 1/4chord control point locations are used taken from controlpoints
+            # Therefore it can only be computed after the first iteration
+            if i > 1 and config.is_with_varying_va:
+                r_ratio_array = [
+                    (r_0 + cp["coordinates"][1]) / r_k for cp in controlpoints.values()
+                ]
 
-        ### OLD COUPLING ALGORITHM pre-2024/02
-        # # Struc --> aero
-        # points_left_to_right = coupling_struc2aero.order_struc_nodes_right_to_left(
-        #     points, config.kite.connectivity.plate_point_indices
-        # )
-        # # Wing Aerodynamic
-        # (
-        #     force_aero_wing_VSM,
-        #     moment_aero_wing_VSM,
-        #     F_rel,
-        #     ringvec,
-        #     controlpoints,
-        #     wingpanels,
-        #     rings,
-        #     coord_L,
-        #     coord_refined,
-        # ) = VSM.calculate_force_aero_wing_VSM(points_left_to_right, vel_app, input_VSM)
-
-        # # Distributing VSM-output chordwise
-
-        # # Aero --> struc
-        # force_aero_wing = coupling_aero2struc.aero2struc(
-        #     points,
-        #     config.kite.connectivity.wing_ci,
-        #     config.kite.connectivity.wing_cj,
-        #     config.kite.connectivity.plate_point_indices,
-        #     force_aero_wing_VSM,
-        #     moment_aero_wing_VSM,
-        #     ringvec,
-        #     controlpoints,
-        # )  # Put in the new positions of the points
-
-        ### NEW COUPLING ALGORITHM post-2024/02
         # Struc --> aero
         points_wing_segment_corners_aero_orderded = points[
             index_transformation_struc_to_aero
@@ -264,6 +238,7 @@ def run_aerostructural_solver(
             rings,
             coord_L,
             coord_refined,
+            r_ratio_array,
         ) = VSM.calculate_force_aero_wing_VSM(
             points_wing_segment_corners_aero_orderded, vel_app, input_VSM
         )

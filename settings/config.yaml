@@ -101,6 +101,7 @@ bridle_initial_compression_factor:
 geometric_scaling_factor: !!float 1
 # choose either: 'NN', 'MSc_Oriol'
 coupling_method: !!str "NN"
+is_with_varying_va: !!bool true
 
 #TODO: these are now hardcoded in "solver_utils"
 ## crosswind flight settings

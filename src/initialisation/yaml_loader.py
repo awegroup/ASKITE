@@ -347,6 +347,7 @@ class Config:
     bridle_initial_compression_factor: float
     geometric_scaling_factor: float
     coupling_method: str
+    is_with_varying_va: bool
 
     ## crosswind flight
     tol_fx_ratio_to_fz: float
@@ -755,6 +756,7 @@ config = Config(
     bridle_initial_compression_factor=config_data["bridle_initial_compression_factor"],
     geometric_scaling_factor=config_data["geometric_scaling_factor"],
     coupling_method=config_data["coupling_method"],
+    is_with_varying_va=config_data["is_with_varying_va"],
     # constants
     grav_constant=grav_constant,
     rho=config_data["rho"],
