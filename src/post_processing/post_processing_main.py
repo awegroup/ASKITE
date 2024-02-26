@@ -44,6 +44,7 @@ def print_results(
         aero_structural_total_time,
     )
     functions_print.print_settings(vel_app, config)
+    functions_print.print_initial_kite_dimensions(config)
     functions_print.print_forces(
         f_internal,
         f_external,

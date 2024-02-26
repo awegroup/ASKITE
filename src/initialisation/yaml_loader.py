@@ -259,7 +259,6 @@ class KiteConfig:
 
     # mass distributed over all the nodes
     mass_points: np.ndarray
-    force_gravity: np.ndarray
 
     ## Child classes
     bridle: BridleConfig
@@ -311,53 +310,67 @@ class Config:
         kite (KiteConfig): Kite configuration settings.
     """
 
-    # Kite name
+    # KITE NAME
     kite_name: str
 
-    # Conditions
+    # CONDITIONS
     vel_wind: np.ndarray
     vel_kite: np.ndarray
     acc_kite: np.ndarray
 
-    ## Actuation
-    # depower
+    # ACTUATION
+    ## depower
     u_p: float
     depower_tape_extension_percentage: float
-    # steering
+    ## steering
     delta_ls_ini: float
+    ## new in meters
     depower_tape_extension_step: float
     depower_tape_final_extension: float
     steering_tape_extension_step: float
     steering_tape_final_extension: float
 
-    # Output settings
+    # OUTPUT SETTINGS
     is_print_mid_results: bool
     is_with_initial_plot: bool
+    is_with_initial_point_velocity: bool
     is_with_plotly_plot: bool
     is_with_aero_geometry: bool
     output_path: str
 
-    # Simulation settings
+    # SIMULATION SETTINGS
+    ## initialisation
     is_from_filename: bool
-    is_with_initial_point_velocity: bool
+    bridle_initial_compression_factor: float
+    geometric_scaling_factor: float
+    n_vel_intialisation_steps: int
+    ## physics
     is_billowing_on: bool
     is_with_gravity: bool
     is_with_aero_bridle: bool
     is_with_aero_tether: bool
-    bridle_initial_compression_factor: float
-    geometric_scaling_factor: float
     coupling_method: str
     is_with_varying_va: bool
+    r_0_initial: float
 
-    ## crosswind flight
+    # CASES
+    ## reel-in symmetric straight
+    n_vel_initialisation_steps: int
+    vel_app_initial: np.ndarray
+    ## crosswind flight settings
     tol_fx_ratio_to_fz: float
+    tol_vk_optimization: float
+    vk_x_initial_guess_factor_of_vw: float
+    ## circular flight settings
+    is_with_varying_va: bool
+    r_0_initial: 200.0
 
-    # Physical constants
+    # PHYSICAL CONSTANTS
     grav_constant: np.ndarray
     rho: float
     mu: float
 
-    # Child Classes
+    # CHILD CLASSES
     aero: AeroConfig
     solver: SolverConfig
     aero_structural: AeroStructuralConfig
@@ -618,12 +631,6 @@ mass_points = mass_distribution.new_calculate_mass_distribution(
     config_data_kite["pulley"]["mass"],
 )
 
-## Calculating the force_gravity vector
-grav_constant = np.array(config_data["grav_constant"])
-force_gravity = np.array(
-    [mass_points[i] * grav_constant for i in range(len(points_ini))]
-)
-
 ## Calculating reference distance
 ref_chord_calculated = max(points_ini[:, 0]) - min(points_ini[:, 0])
 
@@ -673,7 +680,6 @@ kite_config = KiteConfig(
     wing_rest_lengths_initial=wing_rest_lengths_initial,
     bridle_rest_lengths_initial=bridle_rest_lengths_initial,
     mass_points=mass_points,
-    force_gravity=force_gravity,
     ## Child classes
     bridle=BridleConfig(
         diameter=bridle_data["diameter"],
@@ -730,10 +736,13 @@ kite_config = KiteConfig(
 
 # Initialize the overarching Config object
 config = Config(
+    # KITE NAME
     kite_name=config_data["kite_name"],
+    # CONDITIONS
     vel_wind=np.array([float(i) for i in config_data["vel_wind"]]),
     vel_kite=np.array([float(i) for i in config_data["vel_kite"]]),
     acc_kite=np.array([float(i) for i in config_data["acc_kite"]]),
+    # ACTUATION
     u_p=config_data["u_p"],
     depower_tape_extension_percentage=config_data["depower_tape_extension_percentage"],
     delta_ls_ini=config_data["delta_ls_ini"],
@@ -741,28 +750,44 @@ config = Config(
     depower_tape_final_extension=config_data["depower_tape_final_extension"],
     steering_tape_extension_step=config_data["steering_tape_extension_step"],
     steering_tape_final_extension=config_data["steering_tape_final_extension"],
+    # OUTPUT SETTINGS
     is_print_mid_results=config_data["is_print_mid_results"],
     is_with_initial_plot=config_data["is_with_initial_plot"],
     is_with_initial_point_velocity=config_data["is_with_initial_point_velocity"],
     is_with_plotly_plot=config_data["is_with_plotly_plot"],
     is_with_aero_geometry=config_data["is_with_aero_geometry"],
     output_path=folder_path_output,
-    # simulation settings
+    # SIMULATION SETTINGS
+    ## initialisation
     is_from_filename=config_data["is_from_filename"],
+    bridle_initial_compression_factor=config_data["bridle_initial_compression_factor"],
+    geometric_scaling_factor=config_data["geometric_scaling_factor"],
+    n_vel_intialisation_steps=config_data["n_vel_intialisation_steps"],
+    ## physics
     is_billowing_on=config_data["is_billowing_on"],
     is_with_gravity=config_data["is_with_gravity"],
     is_with_aero_bridle=config_data["is_with_aero_bridle"],
     is_with_aero_tether=config_data["is_with_aero_tether"],
-    bridle_initial_compression_factor=config_data["bridle_initial_compression_factor"],
-    geometric_scaling_factor=config_data["geometric_scaling_factor"],
     coupling_method=config_data["coupling_method"],
     is_with_varying_va=config_data["is_with_varying_va"],
-    # constants
-    grav_constant=grav_constant,
+    r_0_initial=config_data["r_0_initial"],
+    # CASES
+    ## reel-in symmetric straight
+    n_vel_initialisation_steps=config_data["n_vel_initialisation_steps"],
+    vel_app_initial=np.array(config_data["vel_app_initial"]),
+    ## crosswind flight settings
+    tol_fx_ratio_to_fz=config_data["tol_fx_ratio_to_fz"],
+    tol_vk_optimization=config_data["tol_vk_optimization"],
+    vk_x_initial_guess_factor_of_vw=config_data["vk_x_initial_guess_factor_of_vw"],
+    ## circular flight settings
+    is_with_varying_va=config_data["is_with_varying_va"],
+    r_0_initial=config_data["r_0_initial"],
+    # PHYSICAL CONSTANTS
+    grav_constant=config_data["grav_constant"],
     rho=config_data["rho"],
     mu=config_data["mu"],
     tol_fx_ratio_to_fz=config_data["tol_fx_ratio_to_fz"],
-    # Child Classes
+    # CHILD CLASSES
     aero=aero_config,
     solver=solver_config,
     aero_structural=aero_structural_config,

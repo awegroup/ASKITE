@@ -2739,7 +2739,7 @@ def solve_lifting_line_system_matrix_approach_semiinfinite_new_varying_vel_app(
     errorlimit,
     ConvWeight,
     model,
-    r_ratio_array,
+    vel_app_distributed,
 ):
     """
     Solve the VSM or LLM by finding the distribution of Gamma
@@ -2847,8 +2847,8 @@ def solve_lifting_line_system_matrix_approach_semiinfinite_new_varying_vel_app(
 
             # Calculate relative velocity and angle of attack
             ##TODO: Added Uinf_local for varying velocity approach
-            Uinf_local = Uinf * r_ratio_array[icp][0]
-            Urel = [Uinf_local * [0] + u, Uinf_local[1] + v, Uinf_local[2] + w]
+            Uinf_local = vel_app_distributed[icp]
+            Urel = [Uinf_local[0] + u, Uinf_local[1] + v, Uinf_local[2] + w]
             vn = dot_product(norm_airf, Urel)
             vtan = dot_product(tan_airf, Urel)
             alpha[icp] = np.arctan(vn / vtan)
@@ -2935,7 +2935,7 @@ def solve_lifting_line_system_matrix_approach_semiinfinite_new_varying_vel_app(
             z_airf = airf_coord[icp][:, 2]
 
             ##TODO: Added Uinf_local for varying velocity approach
-            Uinf_local = Uinf * r_ratio_array[icp][0]
+            Uinf_local = vel_app_distributed[icp]
             Urel = [Uinf_local[0] + u, Uinf_local[1] + v, Uinf_local[2] + w]
             vn = np.dot(norm_airf, Urel)
             vtan = np.dot(tan_airf, Urel)
@@ -3150,7 +3150,7 @@ def calculate_polar_lookup_table(
 
 
 def calculate_force_aero_wing_VSM(
-    points_left_to_right, vel_app, input_VSM, r_ratio_array=None
+    points_left_to_right, vel_app, input_VSM, vel_app_distributed=None
 ):
     """
     input; 2d ARRAY [[x1,y1,z1],[x2,y2,z2],...]]]
@@ -3207,7 +3207,7 @@ def calculate_force_aero_wing_VSM(
 
     # solve
     # (split-up for runtimes reasons, better than if-statements in the iteration loop)
-    if r_ratio_array is not None:  # if with velocity changes
+    if vel_app_distributed is not None:  # if with velocity changes
         (
             force_aero_wing_VSM,
             moment_aero_wing_VSM,
@@ -3222,7 +3222,7 @@ def calculate_force_aero_wing_VSM(
             errorlimit,
             ConvWeight,
             model,
-            r_ratio_array,
+            vel_app_distributed,
         )
     else:  # if without velocity changes
         (
