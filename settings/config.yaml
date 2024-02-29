@@ -1,5 +1,5 @@
 # KITE NAME
-kite_name: !!str "V9_60C"
+kite_name: !!str "V3_25"
 # CONDITIONS
 vel_wind: !!seq [0,0,6]
 vel_kite: !!seq [-22, 0, 0]
@@ -41,7 +41,7 @@ bridle_initial_compression_factor:
   # multiplication with initial length
 # divides initial geometry by this factor  
 geometric_scaling_factor: !!float 1
-n_vel_intialisation_steps: !!int 10
+n_vel_initialisation_steps: !!int 10
 
 ## physics
 is_billowing_on: !!bool true
@@ -126,5 +126,3 @@ TetherConfig: # set to zero, if you don't want tether force
   diameter: !!float 0.04
   length: !!float 100.0
   density: !!float 1.0
-
-
