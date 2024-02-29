@@ -784,7 +784,6 @@ config = Config(
     kite=kite_config,
 )
 
-
 # @define
 # class MutableVariables:
 #     vel_app: np.ndarray = field(default=np.zeros(3))
