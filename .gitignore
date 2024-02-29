@@ -169,7 +169,7 @@ pyvenv.cfg
 
 # Ignoring these specific directories
 ## sensitive
-data/input/V9_60C
+# data/input/V9_60C
 ## too big to be online
 data/output
 
