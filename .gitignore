@@ -170,6 +170,15 @@ pyvenv.cfg
 # Ignoring these specific directories
 ## sensitive
 data/input/V9_60C
-## too big to be online
-data/output
+data/output/V9_60C
+
+# Ignore everything in data/input & output directory
+data/input/*
+data/output/*
+
+# But allow V3_25 directory
+!data/input/V3_25
+!data/output/V3_25/points
+!data/output/V3_25/torque_paper
+#this is too big to be online !data/output/V3_25/animation
 
