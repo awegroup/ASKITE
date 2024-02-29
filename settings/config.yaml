@@ -53,7 +53,6 @@ coupling_method: !!str 'NN'
 
 # CASES
 ## reel-in symmetric straight
-n_vel_initialisation_steps: !!int 10
 vel_app_initial: !!seq [10, 0, 0] #initialize as array
 
 ## crosswind flight settings
