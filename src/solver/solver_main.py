@@ -47,7 +47,6 @@ def run_aerostructural_solver(
     start_time = time.time()
     is_convergence = False
     residual_f_list = []
-    force_gravity = config.kite.force_gravity
     f_tether_drag = np.zeros(3)
     is_residual_below_tol = False
     damping_ratio = config.solver.damping_constant
@@ -107,7 +106,7 @@ def run_aerostructural_solver(
         # tolerance for fx, if fx>tol*fz, then update vk_x
         tol_fx_ratio_to_fz = config.tol_fx_ratio_to_fz
         tol_vk_optimization = config.tol_vk_optimization
-        vk_x_initial_guess = config.vk_x_initial_guess * config.vel_wind[2]
+        vk_x_initial_guess = config.vk_x_initial_guess_factor_of_vw * config.vel_wind[2]
         pre_simulation_of_vk = solver_utils.optimalisation_of_vk_for_fx_0(
             vk_x_initial_guess,
             vel_app,

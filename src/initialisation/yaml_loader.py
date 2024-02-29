@@ -343,7 +343,7 @@ class Config:
     is_from_filename: bool
     bridle_initial_compression_factor: float
     geometric_scaling_factor: float
-    n_vel_intialisation_steps: int
+    n_vel_initialisation_steps: int
     ## physics
     is_billowing_on: bool
     is_with_gravity: bool
@@ -384,10 +384,8 @@ class Config:
         return astuple(self).__getitem__(item)
 
 
-## Loading the yaml config file
-# Load the config data from the YAML file
-# TODO: fix the path
-with open((os.getcwd() + "/settings/config.yaml"), "r") as config_file:
+# Loading the yaml config file
+with open(("settings/config.yaml"), "r") as config_file:
     config_data = yaml.load(config_file, Loader=yaml.SafeLoader)
 
 ## Initialize child-classes first
@@ -448,13 +446,11 @@ surfplan_file = None
 
 kite_name = config_data["kite_name"]
 
-with open(f"data/input/{kite_name}/path.yaml", "r") as path_file:
-    path_yaml = yaml.load(path_file, Loader=yaml.SafeLoader)
-
-folder_path_kite = str(path_yaml["folder_path_kite"])
-folder_path_kite_data = str(path_yaml["folder_path_kite_data"])
-folder_path_initialisation = str(path_yaml["folder_path_initialisation"])
-folder_path_output = str(path_yaml["folder_path_output"])
+# Defining paths
+folder_path_kite = f"data/input/{kite_name}"
+folder_path_kite_data = f"{folder_path_kite}/processed_design_files"
+folder_path_initialisation = f"src/initialisation/{kite_name}"
+folder_path_output = f"data/output/{kite_name}"
 
 extract_points_and_connectivity = load_module_from_path(
     kite_name, f"{folder_path_initialisation}/analyze_surfplan.py"
@@ -759,7 +755,7 @@ config = Config(
     is_from_filename=config_data["is_from_filename"],
     bridle_initial_compression_factor=config_data["bridle_initial_compression_factor"],
     geometric_scaling_factor=config_data["geometric_scaling_factor"],
-    n_vel_intialisation_steps=config_data["n_vel_intialisation_steps"],
+    n_vel_initialisation_steps=config_data["n_vel_initialisation_steps"],
     ## physics
     is_billowing_on=config_data["is_billowing_on"],
     is_with_gravity=config_data["is_with_gravity"],
