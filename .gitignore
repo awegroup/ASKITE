@@ -169,7 +169,7 @@ pyvenv.cfg
 
 # Ignoring these directories
 ## Ignore initilisation folder of V9_60C
-src/initilisation/V9_60C
+src/initialisation/V9_60C
 
 ## Ignore everything in data
 data/*
