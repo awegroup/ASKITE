@@ -1,4 +1,6 @@
-numpy>=1.23.5,<2
-plotly>=5.11.0,<6
-sklearn
-pandas>=1.5.2,<2
+numpy>=1.23.5
+plotly>=5.11.0
+sklearn>=1.4.1 #scikit-learn
+pandas>=1.5.2
+ipympl>=0.9.3
+matplotlib>=3.6.2 

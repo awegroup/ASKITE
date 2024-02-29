@@ -1,5 +1,5 @@
 # kite name
-kite_name: !!str "V3_25"
+kite_name: !!str "V9_60C"
 
 # Conditions
 vel_wind: !!seq [17,0,2]

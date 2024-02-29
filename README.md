@@ -81,6 +81,10 @@ The process involves several steps:
 
 </details>
 
+# Installation instructions
+
+...
+Should contain instructions about how to get this as a pip package and for the developers, how to run the pip package in developer mode.
 
 ## Authors
 J.A.W. Poland
