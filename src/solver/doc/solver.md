@@ -46,3 +46,8 @@ With the external force known on the structural nodes, the displacement is calcu
 ### Finalizing
 - If necessary, the kite velocity is once more optimized
 - the post-processing variables are defined
+
+# Special Cases
+
+## Circular turning-flight
+[circular turning-flight](circular_turning_flight.md)

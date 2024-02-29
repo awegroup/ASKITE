@@ -91,9 +91,9 @@ def print_settings(vel_app, config):
     points_mass = config.kite.mass_points
 
     print(f" ")
-    print(f"------------------------------------------")
+    print(f"------------------------------------------------------------")
     print(f"    SETTINGS")
-    print(f"---------------------------")
+    print(f"------------------------------------------------------------")
     print(
         f"GENERAL --> U_P: {U_P}, vel_app_norm: {np.linalg.norm(vel_app):.2f} m/s, AeroStructural tol: {AEROSTRUCTURAL_TOL:.5f} mm, kite mass: {np.sum(points_mass):.2f} kg"
     )
@@ -102,6 +102,22 @@ def print_settings(vel_app, config):
     )
     print(
         f"STRUC   --> Tol: {str(STRUCTURAL_TOL)}, Integration Method: {STRUCTURAL_INTEGRATION_METHOD}"
+    )
+
+
+def print_initial_kite_dimensions(config):
+    print(f" ")
+    print(f"------------------------------------------------------------")
+    print(f"    INITIAL KITE DIMENSIONS")
+    print(f"------------------------------------------------------------")
+    print(f"scaling-factor: {config.geometric_scaling_factor}")
+    print(f"ref_chord: {config.kite.ref_chord:.2f}m")
+    print(f"wing_span: {config.kite.span:.2f}m")
+    print(f"wing height: {config.kite.height:.2f}m")
+    print(f"wing area: {config.kite.area_surface:.2f}m2")
+    print(f"projected_area: {config.kite.area_projected:.2f}m")
+    print(
+        f"At 25m/s --> Reynolds number: {1e-6*(1.225*25*config.kite.ref_chord)/(1.8e-5):.2f}e6"
     )
 
 
@@ -196,11 +212,11 @@ def print_structural(
         dL_wing_slack_lst = [0]
 
     print(f"")
-    print(f"------------------------------------------")
+    print(f"------------------------------------------------------------")
     print(
-        f"  STRUCTURAL DEFORMATIONS in mm (BRIDLE STIFFNESS: {bridle_stiffness:.2f} kN/m)"
+        f"  STRUCTURAL DEFORMATIONS in mm (BRIDLE STIFFNESS: {bridle_stiffness/1e3:.2f} kN/m)"
     )
-    print(f"------------------------------------------")
+    print(f"------------------------------------------------------------")
     print(
         f"Depower tape length  --> Diff {np.round(np.linalg.norm(points[22]-points[21]) - bridle_rest_lengths[1],2)}   | New: {np.round(np.linalg.norm(points[22]-points[21]),2)} | Initial: {np.round(bridle_rest_lengths[1],2)}, u_p: {U_P}"
     )
@@ -330,9 +346,9 @@ def print_forces(
     points,
 ):
     print(f" ")
-    print(f"------------------------------------------")
+    print(f"------------------------------------------------------------")
     print(f"    FORCES")
-    print(f"------------------------------------------")
+    print(f"------------------------------------------------------------")
     print(
         f"F_aero                          : Fx: {np.sum(force_aero[:,0]):.2f}N, Fy: {np.sum(force_aero[:,1]):.2f}N, Fz: {np.sum(force_aero[:,2]):.2f}N"
     )
@@ -446,13 +462,34 @@ def print_aero(points, vel_app, force_aero_wing, force_aero_bridle, config):
     force_drag_kcu = force_drag - (force_drag_bridle + force_drag_wing)
     force_side_kcu = force_side - (force_side_bridle + force_side_wing)
 
+    ## CALCULATING MOMENTS
+    # Full Wing Moments
+    points_wing = np.copy(points)
+    evaluation_point = np.array([max(points_wing[:, 0]) / 2, 0, max(points_wing[:, 2])])
+    evaluation_point = np.zeros(3)
+    for i, point in enumerate(points_wing):
+        points_wing[i] = point - evaluation_point
+        if i not in config.kite.connectivity.plate_point_indices:
+            points_wing[i] = np.array([0, 0, 0])
+            force_aero[i] = np.array([0, 0, 0])
+
+    moments_wing = np.cross(points_wing, force_aero)
+
+    # Half Wing Moments
+    for i, point in enumerate(points_wing):
+        if points_wing[i][1] > 0:  # taking only the right wing
+            points_wing[i] = np.array([0, 0, 0])
+            force_aero[i] = np.array([0, 0, 0])
+
+    moments_half_wing = np.cross(points_wing, force_aero)
+
     ##TODO: max_chord is now hardcoded should be something like np.max(springL_wing)
     print(f" ")
-    print(f"------------------------------------------")
+    print(f"------------------------------------------------------------")
     print(
-        f"  AERODYNAMICS -{MODEL}- ( Va: {vel_app}, N_splits:{N_SPLITS}, Rey: {1e-6*(RHO*np.linalg.norm(vel_app*(REF_CHORD))/MU):.2f}e6, ring_geo: {RING_GEOMETRY})"
+        f"  AERODYNAMICS -{MODEL}- ( Va: {vel_app} |{np.linalg.norm(vel_app):.2f}|, N_splits:{N_SPLITS}, Rey: {1e-6*(RHO*np.linalg.norm(vel_app*(REF_CHORD))/MU):.2f}e6, ring_geo: {RING_GEOMETRY})"
     )
-    print(f"------------------------------------------")
+    print(f"------------------------------------------------------------")
     # print(
     #     f"Aero Force   --> Fx {np.sum(force_aero_wing[:,0]):.2f} N, Fy {np.sum(force_aero_wing[:,1]):.2f} N, Fz {np.sum(force_aero_wing[:,2]):.2f} N"
     # )
@@ -471,7 +508,12 @@ def print_aero(points, vel_app, force_aero_wing, force_aero_bridle, config):
     print(
         f"Side-Force   --> {force_side:.2f} N (Wing: {force_side_wing:.2f}N, Bridle: {force_side_bridle:.2f}N, KCU: {force_side_kcu:.2f}N)"
     )  # (Half-wing: {np.max(F_side_half):.2f} N)')
-
+    print(
+        f"Moments Full Wing on mid-span, mid-chord point --> Mx: {moments_wing[:,0].sum():.3f} My: {moments_wing[:,1].sum():.3f} Mz: {moments_wing[:,2].sum():.2f}"
+    )
+    print(
+        f"Moments Half Right Wing on mid-span, mid-chord point --> Mx: {moments_half_wing[:,0].sum():.3f} My: {moments_half_wing[:,1].sum():.3f} Mz: {moments_half_wing[:,2].sum():.2f}"
+    )
     return
 
 

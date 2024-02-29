@@ -272,7 +272,7 @@ def calculate_force_centrifugal_distribution_with_tether_tension(
     mass_points,
     vel_app,
     points,
-    length_tether=200,
+    length_tether,
     is_print_intermediate_results=True,
 ):
     """calculates the centrifugal force distribution, i.e. the force on each node Fc,i"""
@@ -348,7 +348,7 @@ def calculate_force_centrifugal_distribution_with_tether_tension(
     #         f"Mx: {Ma_side+Mc_side:.1f}Nm (Ma_side: {Ma_side:.1f}Nm, Mc_side: {Mc_side:.1f}Nm)"
     #     )
 
-    return force_centrifugal, r_0, v_k_i_array, center_of_gravity
+    return force_centrifugal, r_0, v_k_i_array, center_of_gravity, r_k
 
 
 def calculate_moment(distance_array, force_array):

@@ -28,8 +28,10 @@ def run_aerostructural_solver(
     sim_name="straight_symmetric",
     is_with_velocity_initialization=False,
 ):
-    # general initialisation
-    # setting up the dataframe
+    """Runs the aero-structural solver for the given input parameters"""
+
+    # GENERAL INITIALIZATION
+    ## setting up the position-dataframe
     t_vector = np.linspace(
         params["dt"], params["t_steps"] * params["dt"], params["t_steps"]
     )
@@ -41,7 +43,7 @@ def run_aerostructural_solver(
 
     position = pd.DataFrame(index=t_vector, columns=x)
 
-    # parameters
+    ## parameters
     start_time = time.time()
     is_convergence = False
     residual_f_list = []
@@ -50,30 +52,17 @@ def run_aerostructural_solver(
     is_residual_below_tol = False
     damping_ratio = config.solver.damping_constant
 
-    ## actuation initialisiation
+    # INITIALISATION OF VARIABLES
 
-    # TODO: below has been removed, and currently the actuation tape changes are just done in meters
-    # inside the simulation loop, such that one only gradually changes the actuation after convergence
-    # if (
-    #     config.kite_name == "V3_25"
-    # ):  # TODO: Should be generated/imported from the surfplan file instead
-    #     # ACTUATION
-    #     depower_tape_extension = actuation_relations.up_to_ld(
-    #         config.u_p, config.depower_tape_extension_percentage
-    #     )  # [mm] depower-tape extension
-    #     # bridle_rest_lengths[1] corresponds to the depower tape
-    #     bridle_rest_lengths[
-
-    # depower tape
+    ## actuation
+    ### depower tape
     index_fixed_node = config.kite.bridle.bridle_point_index
     len_wing_rest_length = len(config.kite.wing_rest_lengths_initial)
     index_depower_tape = len_wing_rest_length + config.kite.bridle.depower_tape_index
     initial_length_depower_tape = params["l0"][index_depower_tape]
     depower_tape_extension_step = config.depower_tape_extension_step
-
-    # TODO: fix this, you are now incorrectly treating the u_p input as meters
     depower_tape_final_extension = config.depower_tape_final_extension
-    # steering tape
+    ### steering tape
     index_steering_tape_left = (
         len_wing_rest_length + config.kite.bridle.left_steering_tape_index
     )
@@ -83,7 +72,7 @@ def run_aerostructural_solver(
     initial_length_steering_tape_right = params["l0"][index_steering_tape_right]
     steering_tape_extension_step = config.steering_tape_extension_step
     steering_tape_final_extension = config.steering_tape_final_extension
-    # printing initial lengths
+    ### printing initial lengths
     print(
         f"Initial depower tape length: {psystem.extract_rest_length[index_depower_tape]:.3f}m"
     )
@@ -96,25 +85,29 @@ def run_aerostructural_solver(
     print(
         f"Desired steering tape length right: {initial_length_steering_tape_right + steering_tape_final_extension:.3f}m"
     )
-    # gravity
-    force_gravity = np.zeros(points.shape)
-    if is_with_gravity:
-        force_gravity = config.kite.force_gravity
 
-    ## symmetric, #TODO: remove hardcode to config
-    n_vel_steps = 10
+    ## gravity
+    mass_points = config.kite.mass_points
+    if is_with_gravity:
+        force_gravity = mass_points * config.grav_constant
+    else:
+        force_gravity = np.zeros(points.shape)
+
+    ## velocity initialisation
+    n_vel_initialisation_steps = config.n_vel_initialisation_steps
     if is_with_velocity_initialization:
         # set the velocity to a lower value, to initialize the simulation and get rid of velocity induces shock
-        vel_app_final = np.copy(vel_app)
-        vel_app_initial = np.array([10.0, 0.0, 0.0])
-        vel_app_linspace = np.linspace(vel_app_initial, vel_app_final, n_vel_steps)
-        vel_app = np.copy(vel_app_initial)
+        vel_app_linspace = np.linspace(
+            config.vel_app_initial, np.copy(vel_app), n_vel_initialisation_steps
+        )
+        vel_app = np.copy(config.vel_app_initial)
 
     ## crosswind initialisation
     if is_with_vk_optimization:
-        tol_fx_ratio_to_fz = 0.005  # tolerance for fx, if fx>tol*fz, then update vk_x
-        tol_vk_optimization = 1e-1
-        vk_x_initial_guess = -3.0 * config.vel_wind[2]
+        # tolerance for fx, if fx>tol*fz, then update vk_x
+        tol_fx_ratio_to_fz = config.tol_fx_ratio_to_fz
+        tol_vk_optimization = config.tol_vk_optimization
+        vk_x_initial_guess = config.vk_x_initial_guess * config.vel_wind[2]
         pre_simulation_of_vk = solver_utils.optimalisation_of_vk_for_fx_0(
             vk_x_initial_guess,
             vel_app,
@@ -129,34 +122,41 @@ def run_aerostructural_solver(
 
     ## circular initialisation
     force_centrifugal = np.zeros(points.shape)
+    vel_app_distributed = None
     if is_circular_case:
-        r_0 = 100.0  # initializing r_0 TODO: should come from config
-        length_tether = 200.0  # TODO: should come from config
-        mass_points = config.kite.mass_points
+        r_0 = config.r_0_initial
+        length_tether = config.tether.length
 
-    ## coupling initialisation here
+        # determining sign of the centrifugal force
+        ## steering_tape_final_extension is the right-one
+        ## contraction is right-turn
+        if steering_tape_final_extension < 0:
+            centrifugal_force_sign = 1
+        ## extension is left-turn
+        elif steering_tape_final_extension > 0:
+            centrifugal_force_sign = -1
+        else:
+            raise ValueError(
+                "steering_tape_final_extension is zero, this is not allowed in a circular case"
+            )
+
+    ## coupling initialisation
     (
         points_wing_segment_corners_aero_orderded,
         index_transformation_struc_to_aero,
     ) = coupling_struc2aero.extract_wingpanel_corners_aero_orderded(
         points, config.kite.connectivity.plate_point_indices
     )
-    points_old_method = points_wing_segment_corners_aero_orderded
-    points_new_method = points[index_transformation_struc_to_aero]
-    print(f"If true its great! {np.allclose(points_old_method, points_new_method)}")
-    # creating a dict with key value pairs, to transform from aero to struc
+    ### creating a dict with key value pairs, to transform from aero to struc
     index_transformation_aero_to_struc_dict = {}
     for i, value in enumerate(index_transformation_struc_to_aero):
         index_transformation_aero_to_struc_dict[value] = i
 
-    ##TODO: should also initialize difference in V_a here!
-    ## for which you need to alter the VSM code, to be able to run with a V_a vector instead of one-number
-
     print(f" ")
     print(f"Running aero-structural simulation")
     print(f"----------------------------------- ")
-    # The simulation loop
-    # propagating the simulation for each timestep and saving results
+    # SIMULATION LOOP
+    ## propagating the simulation for each timestep and saving results
     for i, step in enumerate(t_vector):
         if is_with_vk_optimization:
             # TODO: the func. below re-runs, the aero analysis. can be done more efficient
@@ -201,54 +201,31 @@ def run_aerostructural_solver(
 
         # Centrifugal
         if is_circular_case:
-            (
-                force_centrifugal,
-                r_0,
-                v_k_i_array,
-                center_of_gravity,
-            ) = solver_utils.calculate_force_centrifugal_distribution_with_tether_tension(
-                r_0,
-                force_aero,
-                mass_points,
-                vel_app,
-                points,
-                0.90 * length_tether,  # TODO: remove hardcode, 90% is also just random
-                is_print_intermediate_results,
+            (force_centrifugal, r_0, v_k_i_array, center_of_gravity, r_k) = (
+                solver_utils.calculate_force_centrifugal_distribution_with_tether_tension(
+                    r_0,
+                    force_aero,
+                    mass_points,
+                    vel_app,
+                    points,
+                    length_tether,
+                    is_print_intermediate_results,
+                )
             )
+            force_centrifugal *= centrifugal_force_sign
 
-        ### OLD COUPLING ALGORITHM pre-2024/02
-        # # Struc --> aero
-        # points_left_to_right = coupling_struc2aero.order_struc_nodes_right_to_left(
-        #     points, config.kite.connectivity.plate_point_indices
-        # )
-        # # Wing Aerodynamic
-        # (
-        #     force_aero_wing_VSM,
-        #     moment_aero_wing_VSM,
-        #     F_rel,
-        #     ringvec,
-        #     controlpoints,
-        #     wingpanels,
-        #     rings,
-        #     coord_L,
-        #     coord_refined,
-        # ) = VSM.calculate_force_aero_wing_VSM(points_left_to_right, vel_app, input_VSM)
+            # Computing the apparant wind speed distribution
+            # Using the turning-radius ratios of the aerodynamic panels to kite
+            # v_a_i = v_w - v_k_i | v_k_i = v_k * (r_0 + y_i) / r_k
+            # The 1/4chord control point locations are used as y_i,
+            # Obtained from the controlpoints dict, only defined after first iteration
+            if i > 0 and config.is_with_varying_va:
+                vel_kite = config.vel_wind - vel_app
+                vel_app_distributed = [
+                    config.vel_wind - (vel_kite * (r_0 + cp["coordinates"][1]) / r_k)
+                    for cp in controlpoints
+                ]
 
-        # # Distributing VSM-output chordwise
-
-        # # Aero --> struc
-        # force_aero_wing = coupling_aero2struc.aero2struc(
-        #     points,
-        #     config.kite.connectivity.wing_ci,
-        #     config.kite.connectivity.wing_cj,
-        #     config.kite.connectivity.plate_point_indices,
-        #     force_aero_wing_VSM,
-        #     moment_aero_wing_VSM,
-        #     ringvec,
-        #     controlpoints,
-        # )  # Put in the new positions of the points
-
-        ### NEW COUPLING ALGORITHM post-2024/02
         # Struc --> aero
         points_wing_segment_corners_aero_orderded = points[
             index_transformation_struc_to_aero
@@ -265,7 +242,10 @@ def run_aerostructural_solver(
             coord_L,
             coord_refined,
         ) = VSM.calculate_force_aero_wing_VSM(
-            points_wing_segment_corners_aero_orderded, vel_app, input_VSM
+            points_wing_segment_corners_aero_orderded,
+            vel_app,
+            input_VSM,
+            vel_app_distributed,
         )
         # Aero --> struc
         if config.coupling_method == "NN":
@@ -305,7 +285,7 @@ def run_aerostructural_solver(
         ## summing up
         force_external = force_aero + force_gravity + force_centrifugal
         # force_external[0:3] += f_tether_drag  # TODO: remove hard-code?
-        # f_external is flat, and force_external is 2D, ##TODO: could add this to the name?
+        ### f_external is flat, and force_external is 2D, ##TODO: could add this to the name?
         f_external = force_external.flatten()
         end_time_f_ext = time.time()
 
@@ -420,7 +400,7 @@ def run_aerostructural_solver(
 
         ### Update order - velocity - depower tape - steering tape
         ## if vel not yet at real value, update vel
-        if is_with_velocity_initialization and i < n_vel_steps:
+        if is_with_velocity_initialization and i < n_vel_initialisation_steps:
             vel_app = vel_app_linspace[i]
             print(f"||--- update vel_app: {vel_app}")
 
@@ -529,158 +509,155 @@ def run_aerostructural_solver(
     return points, print_data, plot_data, animation_data
 
 
-# %% Old solver (Non Alex framework)
-def calculate_total_force(
-    x,
-    bridle_rest_lengths,
-    wing_rest_lengths,
-    force_aero,
-    input_calculate_total_force,
-    is_calculated_total_force_flattened=False,
-):
-    """Defines the iter_differential equations for the coupled spring-mass system."""
-    ## unpacking the input
-    bridle_point_index = input_calculate_total_force.bridle_point_index
-    acc_kite = input_calculate_total_force.acc_kite
-    if input_calculate_total_force.is_with_gravity:
-        grav_constant = np.array([0, 0, -input_calculate_total_force.grav_constant])
-    else:
-        grav_constant = np.array([0, 0, 0])
-    mass_points = input_calculate_total_force.mass_points
+# # %% Old solver (Non Alex framework)
+# def calculate_total_force(
+#     x,
+#     bridle_rest_lengths,
+#     wing_rest_lengths,
+#     force_aero,
+#     input_calculate_total_force,
+#     is_calculated_total_force_flattened=False,
+# ):
+#     """Defines the iter_differential equations for the coupled spring-mass system."""
+#     ## unpacking the input
+#     bridle_point_index = input_calculate_total_force.bridle_point_index
+#     acc_kite = input_calculate_total_force.acc_kite
+#     if input_calculate_total_force.is_with_gravity:
+#         grav_constant = np.array([0, 0, -input_calculate_total_force.grav_constant])
+#     else:
+#         grav_constant = np.array([0, 0, 0])
+#     mass_points = input_calculate_total_force.mass_points
 
-    points_local = x.reshape(force_aero.shape)  # Renaming for consistency
-    # points_local = structural_mesher.make_symmetrical(points_ini,points_local)
+#     points_local = x.reshape(force_aero.shape)  # Renaming for consistency
+#     # points_local = structural_mesher.make_symmetrical(points_ini,points_local)
 
-    ## Getting the force_aero ##TODO: making strong-coupled an option
+#     ## Getting the force_aero ##TODO: making strong-coupled an option
 
-    ## Getting the force_spring
-    input_calculate_force_spring = (
-        input_calculate_total_force.INPUT_calculate_force_spring
-    )
-    force_spring = structural_model.calculate_force_spring(
-        points_local,
-        bridle_rest_lengths,
-        wing_rest_lengths,
-        input_calculate_force_spring,
-    )
+#     ## Getting the force_spring
+#     input_calculate_force_spring = (
+#         input_calculate_total_force.INPUT_calculate_force_spring
+#     )
+#     force_spring = structural_model.calculate_force_spring(
+#         points_local,
+#         bridle_rest_lengths,
+#         wing_rest_lengths,
+#         input_calculate_force_spring,
+#     )
 
-    ### Filling the vector f = Function that fills equation representation of vector w = [vel1_x,points1_x,vel1_y,points1_y,...,veln_z,pointsn_z]
-    force = np.zeros(
-        force_spring.shape
-    )  ##TODO: make this an array and fill appropriately?
-    for i, (force_spring_i, force_aero_i, mass_i) in enumerate(
-        zip(force_spring, force_aero, mass_points)
-    ):
-        # forces --> internal: spring-force | external: aero and inertial
-        force[i][0] = (
-            force_spring_i[0]
-            + force_aero_i[0]
-            + mass_i * (-acc_kite[0] + grav_constant[0])
-        )  # F in x-direction
-        force[i][1] = (
-            force_spring_i[1]
-            + force_aero_i[1]
-            + mass_i * (-acc_kite[1] + grav_constant[1])
-        )  # F in y-direction
-        force[i][2] = (
-            force_spring_i[2]
-            + force_aero_i[2]
-            + mass_i * (-acc_kite[2] + grav_constant[2])
-        )  # F in z-direction
+#     ### Filling the vector f = Function that fills equation representation of vector w = [vel1_x,points1_x,vel1_y,points1_y,...,veln_z,pointsn_z]
+#     force = np.zeros(
+#         force_spring.shape
+#     )  ##TODO: make this an array and fill appropriately?
+#     for i, (force_spring_i, force_aero_i, mass_i) in enumerate(
+#         zip(force_spring, force_aero, mass_points)
+#     ):
+#         # forces --> internal: spring-force | external: aero and inertial
+#         force[i][0] = (
+#             force_spring_i[0]
+#             + force_aero_i[0]
+#             + mass_i * (-acc_kite[0] + grav_constant[0])
+#         )  # F in x-direction
+#         force[i][1] = (
+#             force_spring_i[1]
+#             + force_aero_i[1]
+#             + mass_i * (-acc_kite[1] + grav_constant[1])
+#         )  # F in y-direction
+#         force[i][2] = (
+#             force_spring_i[2]
+#             + force_aero_i[2]
+#             + mass_i * (-acc_kite[2] + grav_constant[2])
+#         )  # F in z-direction
 
-    ## Enforcing ball-joint constraint / (dirichlet) boundary-condition
-    force[bridle_point_index] = np.zeros(3)
+#     ## Enforcing ball-joint constraint / (dirichlet) boundary-condition
+#     force[bridle_point_index] = np.zeros(3)
 
-    if is_calculated_total_force_flattened:
-        force = np.ndarray.tolist(np.ndarray.flatten(force))
+#     if is_calculated_total_force_flattened:
+#         force = np.ndarray.tolist(np.ndarray.flatten(force))
 
-    return force
-
-
-def calculate_points_new(
-    points, bridle_rest_lengths, wing_rest_lengths, force_aero, input_structural_solver
-):
-    """calculates the new positions, given the old positions and the force_aero"""
-
-    input_calculate_total_force = input_structural_solver.INPUT_calculate_total_force
-
-    ## Solver ##TODO: figure out if solver indeed requires a list, ideally could work with np.array
-    if input_structural_solver.method == "root":
-        is_calculated_total_force_flattened = False
-        result = scipy.optimize.root(
-            calculate_total_force,
-            np.ndarray.tolist(np.ndarray.flatten(points)),
-            method="df-sane",  # SOLVER_CONFIG['INTEGRATION_METHOD'],
-            # fatol=SOLVER_CONFIG['TOL_root'],
-            # tol=SOLVER_CONFIG['TOL_root'],
-            args=(
-                bridle_rest_lengths,
-                wing_rest_lengths,
-                force_aero,
-                input_calculate_total_force,
-                is_calculated_total_force_flattened,
-            ),
-            options={"maxfev": input_structural_solver.max_fev},
-            #  'fatol:': SOLVER_CONFIG['TOL_root']}
-        )
-        solver_max_error = np.abs(result.fun).max()
-        points_flat = result.x  # reading out solution
-        points_new = np.array(points_flat.reshape(force_aero.shape))
-
-    elif input_structural_solver.method == "newton":
-        is_calculated_total_force_flattened = True
-        result = scipy.optimize.newton(
-            calculate_total_force,
-            np.ndarray.tolist(np.ndarray.flatten(points)),
-            # tol=SOLVER_CONFIG['TOL'],
-            # rtol = SOLVER_CONFIG['RTOL_newton'],
-            full_output=False,
-            args=(
-                bridle_rest_lengths,
-                wing_rest_lengths,
-                force_aero,
-                input_calculate_total_force,
-                is_calculated_total_force_flattened,
-            ),
-            maxiter=input_structural_solver.newton_max_fev,
-            disp=False,
-        )
-
-        points_new = np.array(result.reshape(force_aero.shape))
-        solver_max_error = np.abs(
-            calculate_total_force(
-                points_new,
-                bridle_rest_lengths,
-                wing_rest_lengths,
-                force_aero,
-                input_calculate_total_force,
-            )
-        ).max()
-
-    # elif SOLVER_CONFIG['METHOD'] == 'odeint':
-    #     is_calculated_total_force_flattened = True
-    #     t_final = 1000.  # A large time interval to approximate steady state
-    #     num_time_points = 1000  # Number of time points (optional)
-
-    #     # Generate the time points (optional)
-    #     t = np.linspace(0, t_final, num_time_points)
-    #     y_solution = scipy.integrate.ode(calculate_total_force,
-    #                                      t,
-    #                                     np.ndarray.tolist(np.ndarray.flatten(points)),
-    #                                     # args=(solver_arguments,force_aero,is_calculated_total_force_flattened),
-    #                                     set_integrator='vode',
-    #                                     options={'method': 'bdf'}
-    #                                     )
-
-    #     points_new = np.array(y_solution[-1].reshape(force_aero.shape))
-    #
-
-    else:
-        raise Exception(
-            "SOLVER_CONFIG['METHOD'] not recognized, should be: 'root' or 'newton' "
-        )
-
-    return points_new, solver_max_error
+#     return force
 
 
-# %%
+# def calculate_points_new(
+#     points, bridle_rest_lengths, wing_rest_lengths, force_aero, input_structural_solver
+# ):
+#     """calculates the new positions, given the old positions and the force_aero"""
+
+#     input_calculate_total_force = input_structural_solver.INPUT_calculate_total_force
+
+#     ## Solver ##TODO: figure out if solver indeed requires a list, ideally could work with np.array
+#     if input_structural_solver.method == "root":
+#         is_calculated_total_force_flattened = False
+#         result = scipy.optimize.root(
+#             calculate_total_force,
+#             np.ndarray.tolist(np.ndarray.flatten(points)),
+#             method="df-sane",  # SOLVER_CONFIG['INTEGRATION_METHOD'],
+#             # fatol=SOLVER_CONFIG['TOL_root'],
+#             # tol=SOLVER_CONFIG['TOL_root'],
+#             args=(
+#                 bridle_rest_lengths,
+#                 wing_rest_lengths,
+#                 force_aero,
+#                 input_calculate_total_force,
+#                 is_calculated_total_force_flattened,
+#             ),
+#             options={"maxfev": input_structural_solver.max_fev},
+#             #  'fatol:': SOLVER_CONFIG['TOL_root']}
+#         )
+#         solver_max_error = np.abs(result.fun).max()
+#         points_flat = result.x  # reading out solution
+#         points_new = np.array(points_flat.reshape(force_aero.shape))
+
+#     elif input_structural_solver.method == "newton":
+#         is_calculated_total_force_flattened = True
+#         result = scipy.optimize.newton(
+#             calculate_total_force,
+#             np.ndarray.tolist(np.ndarray.flatten(points)),
+#             # tol=SOLVER_CONFIG['TOL'],
+#             # rtol = SOLVER_CONFIG['RTOL_newton'],
+#             full_output=False,
+#             args=(
+#                 bridle_rest_lengths,
+#                 wing_rest_lengths,
+#                 force_aero,
+#                 input_calculate_total_force,
+#                 is_calculated_total_force_flattened,
+#             ),
+#             maxiter=input_structural_solver.newton_max_fev,
+#             disp=False,
+#         )
+
+#         points_new = np.array(result.reshape(force_aero.shape))
+#         solver_max_error = np.abs(
+#             calculate_total_force(
+#                 points_new,
+#                 bridle_rest_lengths,
+#                 wing_rest_lengths,
+#                 force_aero,
+#                 input_calculate_total_force,
+#             )
+#         ).max()
+
+#     # elif SOLVER_CONFIG['METHOD'] == 'odeint':
+#     #     is_calculated_total_force_flattened = True
+#     #     t_final = 1000.  # A large time interval to approximate steady state
+#     #     num_time_points = 1000  # Number of time points (optional)
+
+#     #     # Generate the time points (optional)
+#     #     t = np.linspace(0, t_final, num_time_points)
+#     #     y_solution = scipy.integrate.ode(calculate_total_force,
+#     #                                      t,
+#     #                                     np.ndarray.tolist(np.ndarray.flatten(points)),
+#     #                                     # args=(solver_arguments,force_aero,is_calculated_total_force_flattened),
+#     #                                     set_integrator='vode',
+#     #                                     options={'method': 'bdf'}
+#     #                                     )
+
+#     #     points_new = np.array(y_solution[-1].reshape(force_aero.shape))
+#     #
+
+#     else:
+#         raise Exception(
+#             "SOLVER_CONFIG['METHOD'] not recognized, should be: 'root' or 'newton' "
+#         )
+
+#     return points_new, solver_max_error
