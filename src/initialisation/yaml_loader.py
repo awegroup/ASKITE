@@ -350,12 +350,9 @@ class Config:
     is_with_aero_bridle: bool
     is_with_aero_tether: bool
     coupling_method: str
-    is_with_varying_va: bool
-    r_0_initial: float
 
     # CASES
     ## reel-in symmetric straight
-    n_vel_initialisation_steps: int
     vel_app_initial: np.ndarray
     ## crosswind flight settings
     tol_fx_ratio_to_fz: float
@@ -769,11 +766,8 @@ config = Config(
     is_with_aero_bridle=config_data["is_with_aero_bridle"],
     is_with_aero_tether=config_data["is_with_aero_tether"],
     coupling_method=config_data["coupling_method"],
-    is_with_varying_va=config_data["is_with_varying_va"],
-    r_0_initial=config_data["r_0_initial"],
     # CASES
     ## reel-in symmetric straight
-    n_vel_initialisation_steps=config_data["n_vel_initialisation_steps"],
     vel_app_initial=np.array(config_data["vel_app_initial"]),
     ## crosswind flight settings
     tol_fx_ratio_to_fz=config_data["tol_fx_ratio_to_fz"],
@@ -786,7 +780,6 @@ config = Config(
     grav_constant=config_data["grav_constant"],
     rho=config_data["rho"],
     mu=config_data["mu"],
-    tol_fx_ratio_to_fz=config_data["tol_fx_ratio_to_fz"],
     # CHILD CLASSES
     aero=aero_config,
     solver=solver_config,
