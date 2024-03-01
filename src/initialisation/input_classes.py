@@ -107,6 +107,7 @@ class InputStructuralSolver:
     INPUT_calculate_total_force: InputCalculateTotalForce
 
 
+##TODO: looks like this is not used?
 input_structural_solver = InputStructuralSolver(
     method=config.solver.method,
     max_fev=config.solver.max_fev,

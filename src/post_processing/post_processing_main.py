@@ -150,13 +150,14 @@ def plot(
         # functions_plot.plot_kite([plot_points],[plot_lines_new],f"Light-grey: surfplan, Purple: simulation",[plot_surface_new])
 
 
-def animate(animation_data, vel_app, operating_condition, config, input_VSM):
+def animate(animation_data, vel_app, config, input_VSM):
     # Unpacking animation_data
     position, num_of_iterations, wing_rest_lengths, bridle_rest_lengths = animation_data
 
     n = len(config.kite.points_ini)
     num_frames = num_of_iterations
     print(f"Number of frames: {num_frames}")
+    vel_app_norm = np.linalg.norm(vel_app)
 
     # Generate each frame
     for frame in range(num_frames):
@@ -226,10 +227,10 @@ def animate(animation_data, vel_app, operating_condition, config, input_VSM):
         for frame in range(num_frames)
     ]
 
-    # images[0].save(f"results/{config.kite_name}/animation/{operating_condition}_animation_1.gif", save_all=True, append_images=images[1:], duration=100, loop=0)
+    # images[0].save(f"results/{config.kite_name}/animation/{config.sim_name}_animation_1.gif", save_all=True, append_images=images[1:], duration=100, loop=0)
 
     # Assuming images is a list of PIL Image objects
     imageio.mimsave(
-        f"{output_path}/animation/{operating_condition}_animation_1.mp4",
+        f"{output_path}/animation/{config.sim_name}_animation_va_{vel_app_norm:.1f}.mp4",
         images,
     )

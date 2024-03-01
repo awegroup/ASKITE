@@ -7,7 +7,7 @@ from src.post_processing import functions_plot
 from src.particleSystem.ParticleSystem import ParticleSystem
 
 
-def get_variables():
+def get_mutable_variables():
 
     ## Mutable variables
     # Initializing Mutable Variables
@@ -42,18 +42,16 @@ def get_variables():
             points_between_dict, config
         )
         # first do the struts
-        k_bend_strut = 1e10
         params_dict = particles_with_rotational_resistance.initialize_bending_spring(
-            k_bend_strut,
+            config.kite.stiffness.k_bend_strut,
             initial_conditions,
             params_dict,
             connectivity_matrix,
             strut_rotational_resistance_dict,
         )
         # secondly do the leading-edge
-        k_bend_leadingedge = 1e4
         params_dict = particles_with_rotational_resistance.initialize_bending_spring(
-            k_bend_leadingedge,
+            config.kite.stiffness.k_bend_leading_edge,
             initial_conditions,
             params_dict,
             connectivity_matrix,
@@ -66,7 +64,5 @@ def get_variables():
         points,
         vel_app,
         params_dict,
-        initial_conditions,
-        points_between_dict,
         psystem,
     )

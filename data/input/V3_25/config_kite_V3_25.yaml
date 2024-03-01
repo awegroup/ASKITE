@@ -11,13 +11,13 @@ wing_mass: !!float 11.0 #kg
 area_surface: !!float 25 #m2
 
 # stiffnesses
-# va ~10 5e5
+# va ~10 1e4 #2024/03/24
 # va ~20 5e4 #2024/02/24
 # va ~30 6e5
 # va ~40 6.5e5
-stiffness_bridle: !!float 5e4
-stiffness_tube: !!float 5e4
-stiffness_trailing_edge: !!float 5e4
+stiffness_bridle: !!float 4e4
+stiffness_tube: !!float 4e4
+stiffness_trailing_edge: !!float 4e4
 stiffness_canopy: !!float 1e3
 
 # structural settings

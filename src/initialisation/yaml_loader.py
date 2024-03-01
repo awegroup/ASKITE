@@ -204,6 +204,9 @@ class StiffnessConfig:
     tube: float
     trailing_edge: float
     canopy: float
+    # rotational
+    k_bend_strut: float
+    k_bend_leading_edge: float
 
 
 @frozen
@@ -313,7 +316,16 @@ class Config:
     # KITE NAME
     kite_name: str
 
-    # CONDITIONS
+    # CASE SETTINGS
+    sim_name: str
+    is_with_vk_optimization: bool
+    is_circular_case: bool
+    is_run_only_1_time_step: bool
+    is_print_intermediate_results: bool
+    is_with_gravity: bool
+    is_with_velocity_initialization: bool
+
+    # INFLOW CONDITIONS
     vel_wind: np.ndarray
     vel_kite: np.ndarray
     acc_kite: np.ndarray
@@ -331,6 +343,10 @@ class Config:
     steering_tape_final_extension: float
 
     # OUTPUT SETTINGS
+    is_with_printing: bool
+    is_with_plotting: bool
+    is_with_animation: bool
+    is_with_save: bool
     is_print_mid_results: bool
     is_with_initial_plot: bool
     is_with_initial_point_velocity: bool
@@ -346,7 +362,6 @@ class Config:
     n_vel_initialisation_steps: int
     ## physics
     is_billowing_on: bool
-    is_with_gravity: bool
     is_with_aero_bridle: bool
     is_with_aero_tether: bool
     coupling_method: str
@@ -543,6 +558,10 @@ if kite_name == "V3_25":
     kcu_data["index"] = config_data_kite["kcu"]["index"]
     kcu_data["extra"] = {}
 
+    ## stiffness rotational ##TODO: can this be done cleaner?
+    stiffness_bend_strut = 0
+    stiffness_bend_leading_edge = 0
+
 elif kite_name == "V9_60C":
     # TODO: Should be generated/imported directly from the surfplan file instead
 
@@ -601,6 +620,11 @@ elif kite_name == "V9_60C":
             f"{folder_path_kite_data}/kcu_plate_indices.npy", allow_pickle=True
         ),
     }
+
+    ## rotational stiffness
+    stiffness_bend_strut = config_data_kite["stiffness_bend_strut"]
+    stiffness_bend_leading_edge = config_data_kite["stiffness_bend_leading_edge"]
+
 
 # get additional pulley_data
 extract_pulley_connectivity = importlib.import_module(
@@ -724,6 +748,9 @@ kite_config = KiteConfig(
         tube=config_data_kite["stiffness_tube"],
         trailing_edge=config_data_kite["stiffness_trailing_edge"],
         canopy=config_data_kite["stiffness_canopy"],
+        # rotational
+        k_bend_strut=stiffness_bend_strut,
+        k_bend_leading_edge=stiffness_bend_leading_edge,
     ),
 )
 
@@ -731,7 +758,15 @@ kite_config = KiteConfig(
 config = Config(
     # KITE NAME
     kite_name=config_data["kite_name"],
-    # CONDITIONS
+    # CASE SETTINGS
+    sim_name=config_data["sim_name"],
+    is_with_vk_optimization=config_data["is_with_vk_optimization"],
+    is_circular_case=config_data["is_circular_case"],
+    is_run_only_1_time_step=config_data["is_run_only_1_time_step"],
+    is_print_intermediate_results=config_data["is_print_intermediate_results"],
+    is_with_gravity=config_data["is_with_gravity"],
+    is_with_velocity_initialization=config_data["is_with_velocity_initialization"],
+    # INFLOW CONDITIONS
     vel_wind=np.array([float(i) for i in config_data["vel_wind"]]),
     vel_kite=np.array([float(i) for i in config_data["vel_kite"]]),
     acc_kite=np.array([float(i) for i in config_data["acc_kite"]]),
@@ -744,6 +779,10 @@ config = Config(
     steering_tape_extension_step=config_data["steering_tape_extension_step"],
     steering_tape_final_extension=config_data["steering_tape_final_extension"],
     # OUTPUT SETTINGS
+    is_with_printing=config_data["is_with_printing"],
+    is_with_plotting=config_data["is_with_plotting"],
+    is_with_animation=config_data["is_with_animation"],
+    is_with_save=config_data["is_with_save"],
     is_print_mid_results=config_data["is_print_mid_results"],
     is_with_initial_plot=config_data["is_with_initial_plot"],
     is_with_initial_point_velocity=config_data["is_with_initial_point_velocity"],
@@ -758,7 +797,6 @@ config = Config(
     n_vel_initialisation_steps=config_data["n_vel_initialisation_steps"],
     ## physics
     is_billowing_on=config_data["is_billowing_on"],
-    is_with_gravity=config_data["is_with_gravity"],
     is_with_aero_bridle=config_data["is_with_aero_bridle"],
     is_with_aero_tether=config_data["is_with_aero_tether"],
     coupling_method=config_data["coupling_method"],
@@ -773,7 +811,7 @@ config = Config(
     is_with_varying_va=config_data["is_with_varying_va"],
     r_0_initial=config_data["r_0_initial"],
     # PHYSICAL CONSTANTS
-    grav_constant=config_data["grav_constant"],
+    grav_constant=np.array(config_data["grav_constant"]),
     rho=config_data["rho"],
     mu=config_data["mu"],
     # CHILD CLASSES

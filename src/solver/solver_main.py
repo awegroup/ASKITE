@@ -20,17 +20,18 @@ def run_aerostructural_solver(
     config,
     input_VSM,
     input_bridle_aero,
-    is_with_vk_optimization=False,
-    is_circular_case=False,
-    is_run_only_1_time_step=False,
-    is_print_intermediate_results=True,
-    is_with_gravity=True,
-    sim_name="straight_symmetric",
-    is_with_velocity_initialization=False,
 ):
     """Runs the aero-structural solver for the given input parameters"""
-
     # GENERAL INITIALIZATION
+    ## case settings
+    sim_name = config.sim_name
+    is_with_vk_optimization = config.is_with_vk_optimization
+    is_circular_case = config.is_circular_case
+    is_run_only_1_time_step = config.is_run_only_1_time_step
+    is_print_intermediate_results = config.is_print_intermediate_results
+    is_with_gravity = config.is_with_gravity
+    is_with_velocity_initialization = config.is_with_velocity_initialization
+
     ## setting up the position-dataframe
     t_vector = np.linspace(
         params["dt"], params["t_steps"] * params["dt"], params["t_steps"]
@@ -88,7 +89,9 @@ def run_aerostructural_solver(
     ## gravity
     mass_points = config.kite.mass_points
     if is_with_gravity:
-        force_gravity = mass_points * config.grav_constant
+        force_gravity = np.array(
+            [np.array(config.grav_constant) * m_pt for m_pt in mass_points]
+        )
     else:
         force_gravity = np.zeros(points.shape)
 
@@ -481,7 +484,7 @@ def run_aerostructural_solver(
         f_external,
         [force_aero, force_aero_wing, force_aero_bridle],
         f_tether_drag,
-        config.kite.force_gravity,
+        force_gravity,
         wing_rest_lengths,
         bridle_rest_lengths,
     ]
