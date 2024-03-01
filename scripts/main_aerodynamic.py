@@ -32,25 +32,9 @@ sys.path.append(project_root)  # Needed for running in terminal
 os.chdir(project_root)  # Needed for running in interactive python environment
 
 # Import modules
-from src.initialisation import (
-    load_surfplan,
-    pulley_connectivity,
-    input_classes,
-    input_particleSystem,
-    particles_with_rotational_resistance,
-    actuation_relations,
-    yaml_loader,
-)
-from src.initialisation.input_classes import (
-    input_VSM,
-    input_bridle_aero,
-    input_structural_solver,
-)
+from src.initialisation.input_classes import input_VSM, input_bridle_aero
 from src.initialisation.yaml_loader import config
-from src.particleSystem import ParticleSystem
 from src.coupling import coupling_aero2struc, coupling_struc2aero
-from src.structural import structural_model, structural_mesher
-from src.solver import solver_main, solver_utils
 from src.post_processing import (
     functions_print,
     functions_plot,
@@ -66,7 +50,7 @@ from src.aerodynamic import (
 )
 
 # Get mutable variables
-from src.initialisation.mutable_variables import get_variables
+from src.initialisation.mutable_variables import get_mutable_variables
 
 
 def run_aerodynamic(points, vel_app, input_VSM, input_bridle_aero, config):
@@ -77,7 +61,7 @@ def run_aerodynamic(points, vel_app, input_VSM, input_bridle_aero, config):
         points_wing_segment_corners_aero_orderded,
         index_transformation_struc_to_aero,
     ) = coupling_struc2aero.extract_wingpanel_corners_aero_orderded(
-        points, yaml_loader.config.kite.connectivity.plate_point_indices
+        points, config.kite.connectivity.plate_point_indices
     )
     # creating a dict with key value pairs, to transform from aero to struc
     index_transformation_aero_to_struc_dict = {}
@@ -153,7 +137,7 @@ def main():
     """main function"""
 
     # initialisation of mutable variables
-    points, vel_app, params_dict, initial_conditions, psystem = get_variables()
+    points, vel_app, params_dict, psystem = get_mutable_variables()
     # Running the aerodynamic calculations
     (
         force_aero_wing,
