@@ -168,6 +168,7 @@ def main():
         vel_app,
         config,
     )
+    plt.show()
 
 
 if __name__ == "__main__":
