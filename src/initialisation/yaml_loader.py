@@ -5,9 +5,9 @@ import os
 import importlib
 
 from attrs import define, frozen, field, Factory
-from src.structural import structural_mesher
-from src.initialisation.path_functions import load_module_from_path
-from src.initialisation import mass_distribution
+from ..structural import structural_mesher
+from ..initialisation.path_functions import load_module_from_path
+from ..initialisation import mass_distribution
 from scipy.spatial import ConvexHull
 
 # attrs has slots as a default, meaning there is only a limited #attributes -immutable

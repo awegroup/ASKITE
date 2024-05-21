@@ -1,7 +1,6 @@
 # %% reads out the surfplan file and if not found, raises an error
-import numpy as np
-import sys
 import os
+import numpy as np
 
 
 ### Getting the connectivity of the nodes

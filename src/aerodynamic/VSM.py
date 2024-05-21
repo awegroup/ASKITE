@@ -1,12 +1,9 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from matplotlib.patches import FancyArrowPatch
 from mpl_toolkits.mplot3d.proj3d import proj_transform
 from mpl_toolkits.mplot3d.axes3d import Axes3D
 from matplotlib.lines import Line2D
-import time
 from scipy.optimize import newton
-import seaborn as sns
 
 # %% MATHEMATICAL FUNCTIONS
 

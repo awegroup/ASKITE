@@ -1,14 +1,11 @@
-from src.post_processing import functions_print, functions_plot
-from src.post_processing import post_processing_utils as post_processing_utils
-from src.coupling import coupling_struc2aero, coupling_aero2struc
-from src.aerodynamic import VSM, bridle_line_system_aero
-from src.solver import solver_main
-from src.structural import structural_model
-from src.initialisation.yaml_loader import config
-from src.initialisation.path_functions import load_module_from_path
 import numpy as np
 import imageio
 from PIL import Image
+
+from . import functions_print, functions_plot
+from ..post_processing import post_processing_utils as post_processing_utils
+from ..coupling import coupling_struc2aero
+from ..aerodynamic import VSM
 
 
 def print_results(

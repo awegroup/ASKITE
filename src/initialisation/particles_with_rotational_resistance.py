@@ -1,4 +1,4 @@
-from src.structural import structural_model
+from ..structural import structural_model
 import numpy as np
 
 

@@ -1,7 +1,8 @@
 """
 Child Class 'Particle', for particle objects to be instantiated in ParticleSystem
 """
-from src.particleSystem.SystemObject import SystemObject
+
+from .SystemObject import SystemObject
 import numpy as np
 import numpy.typing as npt
 
@@ -17,9 +18,11 @@ class Particle(SystemObject):
         return
 
     def __str__(self):
-        return f"Particle Object, position [m]: [{self.__x[0]}, {self.__x[1]}, {self.__x[2]}], " \
-               f"velocity [m/s]: [{self.__v[0]}, {self.__v[1]}, {self.__v[2]}], mass [kg]: {self.__m}" \
-               f", fixed: {self.__fixed}"
+        return (
+            f"Particle Object, position [m]: [{self.__x[0]}, {self.__x[1]}, {self.__x[2]}], "
+            f"velocity [m/s]: [{self.__v[0]}, {self.__v[1]}, {self.__v[2]}], mass [kg]: {self.__m}"
+            f", fixed: {self.__fixed}"
+        )
 
     def update_pos(self, new_pos: npt.ArrayLike):
         if not self.__fixed:

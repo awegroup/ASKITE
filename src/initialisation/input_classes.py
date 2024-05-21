@@ -1,6 +1,6 @@
 import numpy as np
 from attrs import define, frozen, field, Factory
-from src.initialisation.yaml_loader import config
+from .yaml_loader import config
 
 ## Defining the immutable input classes seperately
 # Such that it uses less arguments to speed up the calculations.

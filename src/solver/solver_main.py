@@ -1,15 +1,13 @@
 # %% Defing the spring-damper system function
 # defining function for the spring-damper system
 
-import numpy as np
-from src.structural import structural_model
-from src.aerodynamic import VSM, bridle_line_system_aero
-from src.coupling import coupling_struc2aero, coupling_aero2struc
-from src.solver import solver_utils
-from src.aerodynamic import tether_aero, VSM, bridle_line_system_aero
-import scipy
 import time
+import numpy as np
 import pandas as pd
+from ..aerodynamic import VSM, bridle_line_system_aero
+from ..coupling import coupling_struc2aero, coupling_aero2struc
+from ..solver import solver_utils
+from ..aerodynamic import tether_aero, VSM, bridle_line_system_aero
 
 
 def run_aerostructural_solver(

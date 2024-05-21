@@ -1,9 +1,11 @@
 """
 Child Class 'SpringDamper', for spring-damper objects to be instantiated in ParticleSystem
 """
-from src.particleSystem.ImplicitForce import ImplicitForce
-from src.particleSystem.Particle import Particle
+
 import numpy as np
+
+from .ImplicitForce import ImplicitForce
+from .Particle import Particle
 
 
 class SpringDamper(ImplicitForce):

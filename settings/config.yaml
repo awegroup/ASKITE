@@ -4,37 +4,37 @@ kite_name: "V3_25"
 #####################
 ### CASE SETTINGS ###
 #####################
-# # STRAIGHT 
-# sim_name: "straight"
-# is_from_filename: !!bool false
-# is_with_vk_optimization: false
-# is_circular_case: false
-# is_run_only_1_time_step: false
-# is_print_intermediate_results: true
-# is_with_gravity: false
-# is_with_velocity_initialization: false
-# ### inflow conditions
-# vel_wind: !!seq [12, 0, 2]
-# vel_kite: !!seq [0, 0, 0]
-# acc_kite: !!seq [0, 0, 0]
+# STRAIGHT 
+sim_name: "straight"
+is_from_filename: !!bool false
+is_with_vk_optimization: false
+is_circular_case: false
+is_run_only_1_time_step: false
+is_print_intermediate_results: true
+is_with_gravity: false
+is_with_velocity_initialization: false
+### inflow conditions
+vel_wind: !!seq [12, 0, 2]
+vel_kite: !!seq [0, 0, 0]
+acc_kite: !!seq [0, 0, 0]
 ### other
 vel_app_initial: !!seq [10, 0, 0] #initialize as array
 n_vel_initialisation_steps: !!int 10
 
 # CROSSWIND
-sim_name: "crosswind"
-#TODO: shouldn't this also start from filename? starting with actuating first in straight flight?
-is_from_filename: !!bool false
-is_with_vk_optimization: true
-is_circular_case: false
-is_run_only_1_time_step: false
-is_print_intermediate_results: false
-is_with_gravity: false
-is_with_velocity_initialization: false
-### inflow conditions
-vel_wind: !!seq [0,0,4]
-vel_kite: !!seq [-25, 0, 0]
-acc_kite: !!seq [0, 0, 0]
+# sim_name: "crosswind"
+# #TODO: shouldn't this also start from filename? starting with actuating first in straight flight?
+# is_from_filename: !!bool false
+# is_with_vk_optimization: true
+# is_circular_case: false
+# is_run_only_1_time_step: false
+# is_print_intermediate_results: false
+# is_with_gravity: false
+# is_with_velocity_initialization: false
+# ### inflow conditions
+# vel_wind: !!seq [0,0,4]
+# vel_kite: !!seq [-25, 0, 0]
+# acc_kite: !!seq [0, 0, 0]
 ### other
 tol_fx_ratio_to_fz: !!float 0.005
 tol_vk_optimization: !!float 0.1
@@ -76,7 +76,7 @@ steering_tape_final_extension: !!float -0.2 #0.03
 # OUTPUT SETTINGS
 is_with_printing: !!bool true
 is_with_plotting: !!bool true
-is_with_animation: !!bool true
+is_with_animation: !!bool false
 is_with_save: !!bool false
 is_print_mid_results: !!bool true
 is_with_initial_plot: !!bool false
@@ -150,7 +150,7 @@ SolverConfig:
 AeroStructuralConfig:
   max_iter: !!int 2500
   it_check: !!int 5
-  tol: !!float 10
+  tol: !!float 25 #TODO: should be 10
   # 1e-3 this is <5mm, later change to 1e-4/e-5
   crosswind_max_iter: !!int 50
   crosswind_tol: !!float 1.0e-2

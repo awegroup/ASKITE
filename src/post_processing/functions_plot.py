@@ -25,10 +25,6 @@ import plotly.graph_objects as go
 import plotly.offline as offline
 import matplotlib
 
-# own functions
-from src.post_processing import post_processing_utils
-from src.structural import structural_model
-
 
 # %% Useful functions
 def _arrow3D(ax, x, y, z, dx, dy, dz, *args, **kwargs):
