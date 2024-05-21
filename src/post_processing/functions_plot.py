@@ -1747,6 +1747,7 @@ def plot_aero(
     plt.style.use(style)
     # height = 0.7 * max(points[:, 2])
     width = 1.0 * max(config.kite.points_ini[:, 1])
+    width = np.round(width, 0)
     fig = plt.figure(figsize=(width, width))
     # fig = plt.figure()
     # ax = fig.add_subplot(1, 1, 1, projection="3d")
@@ -2162,7 +2163,7 @@ def plot_kite_matplotlib(
     legend_elements = [
         Line2D([0], [0], color="#00000080", lw=0.5),
         Line2D([0], [0], color="#1CEFCC", lw=0.5),
-        Line2D([0], [0], color="#FFBD19", lw=0.5)
+        Line2D([0], [0], color="#FFBD19", lw=0.5),
         # Line2D([0], [0], color='#EF1CEC', lw=0.5)
     ]
     ax.legend(

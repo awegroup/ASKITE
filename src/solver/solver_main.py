@@ -216,12 +216,17 @@ def run_aerostructural_solver(
             )
             force_centrifugal *= centrifugal_force_sign
 
+            ##TODO: remove hard-coding ONLY apply non-zero Fc after 25 iterations
+            n_turn_initialisation_iterations = 100
+            if i < n_turn_initialisation_iterations:
+                force_centrifugal = np.zeros(points.shape)
+
             # Computing the apparant wind speed distribution
             # Using the turning-radius ratios of the aerodynamic panels to kite
             # v_a_i = v_w - v_k_i | v_k_i = v_k * (r_0 + y_i) / r_k
             # The 1/4chord control point locations are used as y_i,
             # Obtained from the controlpoints dict, only defined after first iteration
-            if i > 0 and config.is_with_varying_va:
+            if i > n_turn_initialisation_iterations and config.is_with_varying_va:
                 vel_kite = config.vel_wind - vel_app
                 vel_app_distributed = [
                     config.vel_wind - (vel_kite * (r_0 + cp["coordinates"][1]) / r_k)
@@ -323,15 +328,16 @@ def run_aerostructural_solver(
             print(
                 f"r_0: {r_0:.2f}m (r_k: {(r_0+center_of_gravity[1]):.2f}m, cg_side: {center_of_gravity[1]:.2f}m)"
             )
+
             # Should be negative (oriented in negative-side/y direction)
             force_aero_sum = np.sum(force_aero, axis=0)
             f_aero_side = force_aero_sum[1]
             f_tether_side = -force_aero_sum[2] * np.tan(np.arcsin(r_0 / length_tether))
             # Should be positive (oriented in positive-side/y direction)
             f_centrifugal_side = np.sum(mass_points) * (-vel_app[0] ** 2 / r_0)
-            # print(
-            #     f"Fa_side: {f_aero_side:.3f}N, Ft_side: {f_tether_side:.3f}N, Fc_side: {f_centrifugal_side:.3f}N"
-            # )
+            print(
+                f"Fa_side: {f_aero_side:.3f}N, Ft_side: {f_tether_side:.3f}N, Fc_side: {f_centrifugal_side:.3f}N"
+            )
 
             # # print(
             # #     f"SUM (Fc+Fa+Ft): {f_aero_side+f_tether_side+f_centrifugal_side:.3f}N (should be close to zero)"
@@ -361,6 +367,32 @@ def run_aerostructural_solver(
             - initial_length_steering_tape_right
         )
 
+        ##TODO:REMOVE
+        ## if convergenced and not yet at desired steering-tape length
+        if (
+            i > 10
+            and is_circular_case
+            and np.abs(delta_steering_tape_right)
+            <= np.abs(steering_tape_final_extension)
+        ):
+
+            # update lenghts, positive extension means left tape shorter, right longer
+            ##TODO: changed this, check textual understanding
+            psystem.update_rest_length(
+                index_steering_tape_left, steering_tape_extension_step
+            )
+            psystem.update_rest_length(
+                index_steering_tape_right, -steering_tape_extension_step
+            )
+            delta_steering_tape_right = (
+                psystem.extract_rest_length[index_steering_tape_right]
+                - initial_length_steering_tape_right
+            )
+            print(
+                f"||--- delta l_s: {delta_steering_tape_right:.3f}m | new l_s right: {psystem.extract_rest_length[index_steering_tape_right]:.3f} (& left: {psystem.extract_rest_length[index_steering_tape_left]:.3f}) m"
+            )
+            is_residual_below_tol = False
+
         ## Increasing damping by 0.005 after x iterations
         # if i > 200: #and i < 300:
         #     damping_ratio += -0.0001 #-0.00125
@@ -373,6 +405,10 @@ def run_aerostructural_solver(
         # if convergence (residual below set tolerance)
         if np.linalg.norm(residual_f) <= params["aerostructural_tol"]:
             is_residual_below_tol = True
+        if np.linalg.norm(residual_f) <= params["aerostructural_tol"] and i > 50:
+            is_residual_below_tol = True
+            is_convergence = True
+
         # if residual forces are NaN
         elif np.isnan(np.linalg.norm(residual_f)):
             is_convergence = False
@@ -427,6 +463,7 @@ def run_aerostructural_solver(
             and delta_steering_tape_right <= steering_tape_final_extension
         ):
             # update lenghts, positive extension means left tape shorter, right longer
+            ##TODO: changed this, check textual understanding
             psystem.update_rest_length(
                 index_steering_tape_left, -steering_tape_extension_step
             )
@@ -444,13 +481,19 @@ def run_aerostructural_solver(
 
         ## if convergenced and all changes are made
         elif is_residual_below_tol:
-            if not is_circular_case:
-                is_convergence = True
-                break
-            # TODO: remove
-            elif is_circular_case and i > 100:
-                is_convergence = True
-                break
+            is_convergence = True
+            # if not is_circular_case:
+            #     is_convergence = True
+            #     break
+            # elif is_circular_case and i > 100:
+            #     is_convergence = True
+            #     break
+
+        if is_convergence:
+            break
+    print(
+        f"delta_steering_tape_right = {(psystem.extract_rest_length[index_steering_tape_right]- initial_length_steering_tape_right)}"
+    )
 
     # ------------------------------------------------------
     # Running Vk_x solver again

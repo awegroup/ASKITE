@@ -400,7 +400,9 @@ class Config:
 
 
 # Loading the yaml config file
-with open(("settings/config.yaml"), "r") as config_file:
+with open(
+    ("settings/config.yaml"), "r"
+) as config_file:
     config_data = yaml.load(config_file, Loader=yaml.SafeLoader)
 
 ## Initialize child-classes first
@@ -484,10 +486,16 @@ extract_points_and_connectivity = load_module_from_path(
 
 # points
 if config_data["is_from_filename"]:
-    # if there is a file defined
-    points_ini = np.load(
-        f'{folder_path_output}/points/points_up_{int(config_data["u_p"]*100)}.npy'
-    )
+
+    # Check if directory exists
+    directory = f"data/output/{kite_name}/points/{config_data['loading_sim_name']}_power_{1e3*config_data['depower_tape_final_extension']:.0f}_steer_{1e3*np.abs(config_data['steering_tape_final_extension']):.0f}.npy"
+    if os.path.exists(directory):
+        print("File exists, loading from file: ", directory)
+        points_ini = np.load(directory)
+    else:
+        print("ERROR! File does not exist, loading CAD structure instead.")
+        points_ini = np.copy(points_struc)
+
 else:
     points_ini = np.copy(points_struc)  # if no initial file is defined, use surfplan
 points_ini = np.array(points_ini) / config_data["geometric_scaling_factor"]

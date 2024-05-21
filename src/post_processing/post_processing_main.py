@@ -210,7 +210,7 @@ def animate(animation_data, vel_app, config, input_VSM):
             F_rel,
             config,
             elev=10,
-            azim=230,
+            azim=-90,  # 230,
             it_number=frame,
         )
 
