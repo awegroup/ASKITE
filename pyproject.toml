@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kitesim"
+version = "0.1.0"
+dependencies = [
+    "numpy",
+    "matplotlib",
+    "scipy",
+    "pandas",
+    "matplotlib",
+    "scikit-learn",
+    "attrs",
+    "pytest",
+    "Imageio",
+    "opencv-python",
+    "dill",
+    "pyyaml",    
+]
+requires-python = ">=3.8"
+authors = [
+  {name = "Jelle Poland"},
+]
+maintainers = [
+  {name = "Jelle Poland"}
+]
+description = "A package for simulating kites in the atmosphere"
+readme = "README.md"
+keywords = ["Airborne Wind Energy", "Kites", "Simulation", "Fluid-Structure Interaction", "Kite Design"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python",
+    "Intended Audience :: Kite Designers, Developers",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    ]
+
+[project.urls]
+Repository = "https://github.com/jellepoland/kitesim.git"

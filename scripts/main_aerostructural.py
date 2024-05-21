@@ -19,12 +19,14 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.optimize
-import yaml
+
+# import yaml
 import importlib
 import pytest
 import pandas as pd
 import dill
-from IPython.display import display, Latex
+
+# from IPython.display import display, Latex
 
 # Define the right path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -32,11 +34,11 @@ sys.path.append(f"{project_root}")  # Needed for running in terminal
 sys.path.insert(0, f"{project_root}")  # Needed for running in terminal
 os.chdir(f"{project_root}")  # Needed for running in interactive python environment
 
-from src.initialisation.input_classes import input_VSM, input_bridle_aero
-from src.initialisation.yaml_loader import config
-from src.initialisation.mutable_variables import get_mutable_variables
-from src.solver import solver_main
-from src.post_processing import post_processing_main
+from kitesim.initialisation.input_classes import input_VSM, input_bridle_aero
+from kitesim.initialisation.yaml_loader import config
+from kitesim.initialisation.mutable_variables import get_mutable_variables
+from kitesim.solver import solver_main
+from kitesim.post_processing import post_processing_main
 
 
 # Import modulesgit

@@ -103,7 +103,27 @@ Poland JAW, Schmehl R. Modelling Aero-Structural Deformation of Flexible Membran
 should show a sort of important message 
 
 ## Installation Instructions
-`﻿Here we could enter some cool looking-code` 
+
+### Developer
+Create a new venv with the following command:
+```bash
+python -m venv venv
+```
+
+Activate the venv with the following command:
+```bash
+source venv/bin/activate
+```
+
+Execute the following command in the root directory of the repository:
+```bash
+pip install -e .[dev]
+```
+
+The venv can be deactivated with the following command:
+```bash
+deactivate
+```
 
 ### Depencies and their versions
 ## Questions

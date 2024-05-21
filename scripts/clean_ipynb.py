@@ -1,4 +1,4 @@
-# This script seves to clean the output of all .ipynb
+# This script serves to clean the output of all .ipynb
 # as they might contain sensitive information.
 # the .gitattributes file is configured to run this script
 # using: *.ipynb filter=clean_ipynb
