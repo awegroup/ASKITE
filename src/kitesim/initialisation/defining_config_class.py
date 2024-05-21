@@ -7,22 +7,23 @@ from attr import attrs, define, frozen
 # dataclasses doesn't have slot as a default
 
 
-# child-classes, inherent the from_yaml loader functionality.
-class BaseConfig:
-    def create_from_dict(self, config_data: dict):
-        """Find keys in the yaml file and assign them to the class attributes."""
-        for key, value in config_data.items():
-            if hasattr(self, key):
-                setattr(self, key, value)
-            else:
-                raise AttributeError(
-                    f"Attribute {key} not found in class {self.__class__.__name__})"
-                )
+# TODO: figure out how to do it like this, instead of writing boilerplate code
+# # child-classes, inherent the from_yaml loader functionality.
+# class BaseConfig:
+#     def create_from_dict(self, config_data: dict):
+#         """Find keys in the yaml file and assign them to the class attributes."""
+#         for key, value in config_data.items():
+#             if hasattr(self, key):
+#                 setattr(self, key, value)
+#             else:
+#                 raise AttributeError(
+#                     f"Attribute {key} not found in class {self.__class__.__name__})"
+#                 )
 
 
 # Child Classes
 @frozen
-class AeroConfig(BaseConfig):
+class AeroConfig:
     """
     Configuration settings related to aerodynamics.
 

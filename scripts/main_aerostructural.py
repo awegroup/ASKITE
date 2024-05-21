@@ -34,48 +34,62 @@ sys.path.append(f"{project_root}")  # Needed for running in terminal
 sys.path.insert(0, f"{project_root}")  # Needed for running in terminal
 os.chdir(f"{project_root}")  # Needed for running in interactive python environment
 
-from kitesim.initialisation.input_classes import input_VSM, input_bridle_aero
-from kitesim.initialisation.yaml_loader import config
+from kitesim.initialisation.input_classes import InputVSM, InputBridleAero
+from kitesim.initialisation.yaml_loader import setup_config
 from kitesim.initialisation.mutable_variables import get_mutable_variables
 from kitesim.solver import solver_main
 from kitesim.post_processing import post_processing_main
 
 
-# Import modulesgit
+# Import modules
 def main():
     """Main function"""
 
-    ##TODO: stream-line this better Data loading from another run
-    date = "2024_04_25"
-    folder_name = f"data/output/V3_25/torque_paper/{date}_v1/"
-    data_names = [
-        "points",
-        "psystem",
-        "print_data",
-        "plot_data",
-        "animation_data",
-        "config",
-        "vel_app",
-        "sim_name",
-        "input_VSM",
-    ]
-    loaded_data = {}
-    for name in data_names:
-        with open(f"{folder_name}/{name}.pkl", "rb") as f:
-            loaded_data[name] = dill.load(f)
+    kite_name = "V3_25"
 
-    points = loaded_data["points"]
-    psystem = loaded_data["psystem"]
-    print_data = loaded_data["print_data"]
-    plot_data = loaded_data["plot_data"]
-    animation_data = loaded_data["animation_data"]
-    # config = loaded_data["config"]
-    vel_app = loaded_data["vel_app"]
-    sim_name = loaded_data["sim_name"]
-    input_VSM = loaded_data["input_VSM"]
+    # loading immutable variables
+    config_path = "settings/config.yaml"
+    folder_output_path = f"data/output/{kite_name}"
+    folder_path_kite = f"data/input/{kite_name}"
+    folder_path_kite_data = f"data/input/{kite_name}/processed_design_files"
+
+    config = setup_config(
+        config_path, folder_output_path, folder_path_kite, folder_path_kite_data
+    )
+    input_VSM = InputVSM.create(config)
+    input_bridle_aero = InputBridleAero.create(config)
+
+    # ##TODO: stream-line this better Data loading from another run
+    # date = "2024_04_25"
+    # folder_name = f"data/output/V3_25/torque_paper/{date}_v1/"
+    # data_names = [
+    #     "points",
+    #     "psystem",
+    #     "print_data",
+    #     "plot_data",
+    #     "animation_data",
+    #     "config",
+    #     "vel_app",
+    #     "sim_name",
+    #     "input_VSM",
+    # ]
+    # loaded_data = {}
+    # for name in data_names:
+    #     with open(f"{folder_name}/{name}.pkl", "rb") as f:
+    #         loaded_data[name] = dill.load(f)
+
+    # points = loaded_data["points"]
+    # psystem = loaded_data["psystem"]
+    # print_data = loaded_data["print_data"]
+    # plot_data = loaded_data["plot_data"]
+    # animation_data = loaded_data["animation_data"]
+    # # config = loaded_data["config"]
+    # vel_app = loaded_data["vel_app"]
+    # sim_name = loaded_data["sim_name"]
+    # input_VSM = loaded_data["input_VSM"]
 
     # Get mutable variables
-    points, vel_app, params_dict, psystem = get_mutable_variables()
+    points, vel_app, params_dict, psystem = get_mutable_variables(config)
 
     # AeroStructural Simulation
     points, print_data, plot_data, animation_data = (

@@ -1,6 +1,4 @@
 import numpy as np
-from attrs import define, frozen, field, Factory
-from .yaml_loader import config
 
 
 def define_connectivity_matrix(config):

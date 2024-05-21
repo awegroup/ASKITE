@@ -11,20 +11,17 @@ Functions to plot the VSM-PSM in various styles
 
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.patches import FancyArrowPatch
+
 from mpl_toolkits.mplot3d.proj3d import proj_transform
 from mpl_toolkits.mplot3d.axes3d import Axes3D
-from matplotlib.lines import Line2D
-from matplotlib.patches import FancyArrowPatch
-from mpl_toolkits.mplot3d.proj3d import proj_transform
-from mpl_toolkits.mplot3d.axes3d import Axes3D
-from matplotlib.lines import Line2D
-import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-import plotly.graph_objects as go
-import plotly.offline as offline
+
+from matplotlib.lines import Line2D
+from matplotlib.patches import FancyArrowPatch
 import matplotlib
 
+import plotly.graph_objects as go
+import plotly.offline as offline
 
 # %% Useful functions
 def _arrow3D(ax, x, y, z, dx, dy, dz, *args, **kwargs):
@@ -1094,7 +1091,7 @@ def plot_particle_system_model(points, elongation_values, fig, ax, config):
     # bounds = [-1, -0.5, 0.5, 1]
 
     ## dark mode
-    colourmap = matplotlib.cm.get_cmap("viridis")
+    colourmap = matplotlib.colormaps.get_cmap("viridis")
     bounds = [-2.5, -2.0, -1.5, -0.5, 0.5, 1.5, 2.0, 2.5]
     bounds = [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5]
     norm = matplotlib.colors.BoundaryNorm(bounds, colourmap.N)
@@ -2158,7 +2155,7 @@ def plot_kite_matplotlib(
     legend_elements = [
         Line2D([0], [0], color="#00000080", lw=0.5),
         Line2D([0], [0], color="#1CEFCC", lw=0.5),
-        Line2D([0], [0], color="#FFBD19", lw=0.5)
+        Line2D([0], [0], color="#FFBD19", lw=0.5),
         # Line2D([0], [0], color='#EF1CEC', lw=0.5)
     ]
     ax.legend(
@@ -2416,7 +2413,6 @@ def plot_kite_matplotlib_pretty(
     ax.set_xlim3d([x_middle - plot_radius, x_middle + plot_radius])
     ax.set_ylim3d([y_middle - plot_radius, y_middle + plot_radius])
     ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
-    from matplotlib.lines import Line2D
 
     legend_elements = [
         Line2D([0], [0], color=col_kite, lw=width * 5),

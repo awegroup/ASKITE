@@ -17,7 +17,9 @@ dependencies = [
     "Imageio",
     "opencv-python",
     "dill",
-    "pyyaml",    
+    "pyyaml",
+    "plotly",
+    "pillow",
 ]
 requires-python = ">=3.8"
 authors = [

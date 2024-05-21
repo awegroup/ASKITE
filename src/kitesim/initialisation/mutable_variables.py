@@ -1,4 +1,3 @@
-from .yaml_loader import config
 from . import (
     input_particleSystem,
     particles_with_rotational_resistance,
@@ -7,7 +6,7 @@ from ..post_processing import functions_plot
 from ..particleSystem.ParticleSystem import ParticleSystem
 
 
-def get_mutable_variables():
+def get_mutable_variables(config):
 
     ## Mutable variables
     # Initializing Mutable Variables
