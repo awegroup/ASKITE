@@ -2,10 +2,10 @@ import numpy as np
 import imageio
 from PIL import Image
 
-from . import functions_print, functions_plot
-from ..post_processing import post_processing_utils as post_processing_utils
-from ..coupling import coupling_struc2aero
-from ..aerodynamic import VSM
+from kitesim.post_processing import functions_print, functions_plot
+from kitesim.post_processing import post_processing_utils as post_processing_utils
+from kitesim.coupling import coupling_struc2aero
+from kitesim.aerodynamic import VSM
 
 
 def print_results(

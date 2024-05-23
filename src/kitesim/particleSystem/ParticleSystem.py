@@ -2,12 +2,13 @@
 ParticleSystem framework
 ...
 """
+
 import copy
 import numpy as np
 import numpy.typing as npt
 from scipy.sparse.linalg import bicgstab
-from .Particle import Particle
-from .SpringDamper import SpringDamper
+from kitesim.particleSystem.Particle import Particle
+from kitesim.particleSystem.SpringDamper import SpringDamper
 
 
 class ParticleSystem:

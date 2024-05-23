@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.optimize
-from ..coupling import coupling_aero2struc, coupling_struc2aero
-from ..aerodynamic import VSM, bridle_line_system_aero, tether_aero
+from kitesim.coupling import coupling_aero2struc, coupling_struc2aero
+from kitesim.aerodynamic import VSM, bridle_line_system_aero, tether_aero
 
 
 def calculate_fx(

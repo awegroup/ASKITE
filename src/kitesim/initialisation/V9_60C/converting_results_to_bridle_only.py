@@ -2,8 +2,8 @@
 import copy
 import numpy as np
 
-from ...post_processing import functions_plot
-from .functions_plotting import *
+from kitesim.post_processing import functions_plot
+from kitesim.initialisation.V9_60C.functions_plotting import *
 
 ## making things autoreload
 %load_ext autoreload

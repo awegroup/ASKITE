@@ -62,10 +62,10 @@ import plotly.graph_objects as go
 import plotly.offline as offline
 
 # functions
-from .functions_wing import *
-from .functions_plotting import *
-from .functions_reading import *
-from .functions_bridles import *
+from kitesim.initialisation.V9_60C.functions_wing import *
+from kitesim.initialisation.V9_60C.functions_plotting import *
+from kitesim.initialisation.V9_60C.functions_reading import *
+from kitesim.initialisation.V9_60C.functions_bridles import *
 
 ### nice if you want to read out the obj file properties, to decide on rest of analysis
 # analyze_obj_file(filepath)

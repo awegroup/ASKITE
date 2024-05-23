@@ -1,5 +1,5 @@
 import numpy as np
-from ..path_functions import load_module_from_path
+from kitesim.initialisation.path_functions import load_module_from_path
 
 # def extract_points(simulation_directory):
 #     # """ reads out the surfplan file and if not found, raises an error """

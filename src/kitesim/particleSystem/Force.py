@@ -3,8 +3,7 @@ Child Abstract Base Class 'Force', for force objects to be instantiated in Parti
 """
 
 from abc import abstractmethod
-
-from .SystemObject import SystemObject
+from kitesim.particleSystem.SystemObject import SystemObject
 
 
 class Force(SystemObject):

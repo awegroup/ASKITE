@@ -2,7 +2,7 @@
 import numpy as np
 
 # own functions
-from . import post_processing_utils
+from kitesim.post_processing import post_processing_utils
 
 
 def calculate_slack_values(

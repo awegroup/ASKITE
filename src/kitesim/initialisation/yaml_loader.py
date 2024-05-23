@@ -3,9 +3,9 @@ import yaml
 import os
 from scipy.spatial import ConvexHull
 
-from ..structural import structural_mesher
-from ..initialisation.path_functions import load_module_from_path
-from ..initialisation import mass_distribution, pulley_connectivity
+from kitesim.structural import structural_mesher
+from kitesim.initialisation.path_functions import load_module_from_path
+from kitesim.initialisation import mass_distribution, pulley_connectivity
 
 from .defining_config_class import (
     Config,

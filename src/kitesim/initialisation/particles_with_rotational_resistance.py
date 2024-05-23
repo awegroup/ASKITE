@@ -1,5 +1,5 @@
-from ..structural import structural_model
 import numpy as np
+from kitesim.structural import structural_model
 
 
 def extract_points_between_dict(config):

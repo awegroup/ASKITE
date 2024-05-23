@@ -2,10 +2,10 @@
 Child Abstract Base Class 'ImplicitForce', for implicit force objects to be instantiated in ParticleSystem
 """
 
-from .Force import Force
-from .Particle import Particle
 from abc import abstractmethod
 from abc import abstractproperty
+from kitesim.particleSystem.Force import Force
+from kitesim.particleSystem.Particle import Particle
 
 
 class ImplicitForce(Force):

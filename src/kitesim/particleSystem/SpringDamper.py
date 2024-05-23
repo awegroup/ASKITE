@@ -4,8 +4,8 @@ Child Class 'SpringDamper', for spring-damper objects to be instantiated in Part
 
 import numpy as np
 
-from .ImplicitForce import ImplicitForce
-from .Particle import Particle
+from kitesim.particleSystem.ImplicitForce import ImplicitForce
+from kitesim.particleSystem.Particle import Particle
 
 
 class SpringDamper(ImplicitForce):

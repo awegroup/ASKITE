@@ -8,7 +8,9 @@ import numpy as np
 import sys
 
 sys.path.append("initialisation/V9_60C/")
-from .functions_plotting import get_3D_plot_N_D_6times_PLUS_2lines
+from kitesim.initialisation.V9_60C.functions_plotting import (
+    get_3D_plot_N_D_6times_PLUS_2lines,
+)
 
 
 # %% LOADING PLOTTING RESULTS

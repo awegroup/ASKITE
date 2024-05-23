@@ -1,5 +1,5 @@
-import importlib.util
 import sys
+import importlib.util
 
 
 def load_module_from_path(module_name, module_path):

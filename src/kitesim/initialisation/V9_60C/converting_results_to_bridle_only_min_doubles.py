@@ -2,7 +2,7 @@
 import numpy as np
 import copy
 
-from ...post_processing import functions_plot
+from kitesim.post_processing import functions_plot
 
 ## making things autoreload
 %load_ext autoreload

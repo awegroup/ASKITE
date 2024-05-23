@@ -1,9 +1,9 @@
-from . import (
+from kitesim.initialisation import (
     input_particleSystem,
     particles_with_rotational_resistance,
 )
-from ..post_processing import functions_plot
-from ..particleSystem.ParticleSystem import ParticleSystem
+from kitesim.post_processing import functions_plot
+from kitesim.particleSystem.ParticleSystem import ParticleSystem
 
 
 def get_mutable_variables(config):
