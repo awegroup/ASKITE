@@ -169,15 +169,28 @@ Pipfile
 pyvenv.cfg
 
 # Ignoring these directories
-## Ignore initilisation folder of V9_60C
-src/initialisation/V9_60C
+# Ignoring all except V3_25
+data/input/*
+!data/input/V3_25/
 
-## Ignore everything in data
-data/*
-## EXCEPT FOR V3_25 directory input and specific outputs
-!data/input/V3_25
-!data/input/V3_25/*
-!data/output/V3_25/points
-!data/output/V3_25/torque_paper
-#this is too big to be online !data/output/V3_25/animation
+data/output/*
+!data/output/V3_25/
+
+data/output/V3_25/animation/
+
+# Specific to the V9_60C directory #TODO: this should be removed at some point
+src/initialisation/V9_60C
+data/output/V9_60C/*
+
+
+# ## EXCEPT FOR V3_25 directory input and specific outputs
+# !data/input/V3_25
+# !data/input/V3_25/processed_design_files
+
+# !data/output/V3_25
+# !data/output/V3_25/points
+# !data/output/V3_25/torque_paper
+
+#this is too big to be online 
+# !data/output/V3_25/animation
 
