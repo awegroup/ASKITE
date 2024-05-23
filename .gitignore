@@ -175,7 +175,7 @@ src/initialisation/V9_60C
 ## Ignore everything in data
 data/*
 ## EXCEPT FOR V3_25 directory input and specific outputs
-!data/input/V3_25/
+!data/input/V3_25
 !data/input/V3_25/*
 !data/output/V3_25/points
 !data/output/V3_25/torque_paper
