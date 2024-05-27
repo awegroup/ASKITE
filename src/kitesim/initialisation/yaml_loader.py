@@ -2,6 +2,7 @@ import numpy as np
 import yaml
 import os
 from scipy.spatial import ConvexHull
+import importlib
 
 from kitesim.structural import structural_mesher
 from kitesim.initialisation.path_functions import load_module_from_path
@@ -481,11 +482,33 @@ def ini_config(
 
 
 def setup_config(
-    config_path, folder_path_output, folder_path_kite, folder_path_kite_data
+    config_path,
+    folder_path_output,
+    folder_path_kite,
+    folder_path_kite_data,
+    case_path_folder,
 ):
-    # Loading the yaml config file
+
     with open((config_path), "r") as config_file:
         config_data = yaml.load(config_file, Loader=yaml.SafeLoader)
+
+    case_path = f'{case_path_folder}/{config_data["sim_name"]}.yaml'
+    with open((case_path), "r") as config_file:
+        config_case = yaml.load(config_file, Loader=yaml.SafeLoader)
+
+    # the update method appends a dict to another
+    config_data.update(config_case)
+
+    # TODO: Adding dummy-value, needed because class needs these as input. Resolve this boilerplate
+    # Possible solution is using a factory-function (ask Open-AI)
+    if not config_data["is_with_vk_optimization"]:
+        config_data["tol_fx_ratio_to_fz"] = 0
+        config_data["tol_vk_optimization"] = 0
+        config_data["vk_x_initial_guess_factor_of_vw"] = 0
+    if not config_data["is_circular_case"]:
+        ## circular flight settings
+        config_data["is_with_varying_va"] = False
+        config_data["r_0_initial"] = 0
 
     # TODO: remove boilerplate, and do it like below here
     # # Create subclasses first

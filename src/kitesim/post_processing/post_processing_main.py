@@ -1,11 +1,92 @@
 import numpy as np
 import imageio
+import dill
+import os
 from PIL import Image
+from datetime import datetime
+import matplotlib.pyplot as plt
 
 from kitesim.post_processing import functions_print, functions_plot
 from kitesim.post_processing import post_processing_utils as post_processing_utils
 from kitesim.coupling import coupling_struc2aero
 from kitesim.aerodynamic import VSM
+py
+
+def save_non_interpretable_results(
+    config, 
+    input_VSM,
+    input_bridle_aero,
+    points_ini, 
+    params_dict,
+    psystem,
+    points, 
+    df_position,
+    print_data,
+    plot_data,
+    animation_data,
+    vel_app, 
+    folder_name_results,
+):
+
+    to_be_saved_data = [
+        ## input
+        [config, "config"],
+        [input_VSM,"input_VSM"],
+        [input_bridle_aero, "input_bridle_aero"],
+        [points_ini, "points_ini"],
+        [params_dict,"params_dict"],
+        [psystem,'psystem'],
+        ## output
+        [points, "points"],
+        [df_position, "df_position"],
+        [print_data,"print_data"],
+        [plot_data, "plot_data"],
+        [animation_data, "animation_data"],
+        [vel_app,"vel_app"],
+    ]
+
+    folder_name = (
+        f"{folder_name_results}/{config.kite_name}/{config.sim_name}/{datetime.now().strftime("%Y_%m_%d_%H_%M")}"
+    )
+    # Ensure the folder exists
+    if not os.path.exists(folder_name):
+        os.makedirs(folder_name)
+
+    # Serialize and save all data with dill
+    for item in to_be_saved_data:
+        data, name = item
+        with open(f"{folder_name}/{name}.pkl", "wb") as f:
+            dill.dump(data, f)
+
+    return folder_name
+
+def save_interpretable_results(
+    folder_name
+):
+    if config.is_with_printing:
+        print_results(
+            points,
+            print_data,
+            config,
+        )
+    if config.is_with_plotting:
+        plot(
+            plot_data,
+            points,
+            vel_app,
+            config,
+        )
+    plt.show()
+    if config.is_with_animation:
+        print(f"")
+        print("--> Generating ANIMATION \{*_*}/")
+        animate(
+            animation_data,
+            vel_app,
+            config,
+            input_VSM,
+        )
+
 
 
 def print_results(

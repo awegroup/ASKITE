@@ -506,7 +506,7 @@ def run_aerostructural_solver(
         bridle_rest_lengths,
     ]
 
-    return points, print_data, plot_data, animation_data
+    return points, print_data, plot_data, animation_data, position_without_na
 
 
 # # %% Old solver (Non Alex framework)

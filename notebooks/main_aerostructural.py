@@ -49,23 +49,30 @@ def main():
 
     # loading immutable variables
     config_path = "data/config.yaml"
+    # TODO: Remove the output_path from config?
     folder_output_path = f"results/{kite_name}"
     folder_path_kite = f"processed_data/{kite_name}"
     folder_path_kite_data = f"processed_data/{kite_name}/processed_design_files"
+    case_path_folder = "../kitesim/src/kitesim/cases"
+    folder_name_results = "results/"
 
     config = setup_config(
-        config_path, folder_output_path, folder_path_kite, folder_path_kite_data
+        config_path,
+        folder_output_path,
+        folder_path_kite,
+        folder_path_kite_data,
+        case_path_folder,
     )
     input_VSM = InputVSM.create(config)
     input_bridle_aero = InputBridleAero.create(config)
 
     # Get mutable variables
-    points, vel_app, params_dict, psystem = get_mutable_variables(config)
+    points_ini, vel_app, params_dict, psystem = get_mutable_variables(config)
 
     # AeroStructural Simulation
-    points, print_data, plot_data, animation_data = (
+    points, print_data, plot_data, animation_data, df_position = (
         solver_main.run_aerostructural_solver(
-            points,
+            points_ini,
             vel_app,
             psystem,
             params_dict,
@@ -75,61 +82,32 @@ def main():
         )
     )
 
-    ##TODO:  Data-saving procedure for the torque paper, should be stream-lined
-    date = "2024_04_25"
-    folder_name = f"data/output/{config.kite_name}/torque_paper/{date}_v2/"
-    is_with_save = True
-    if is_with_save:
-        to_be_saved_data = [
-            [points, "points"],
-            [psystem, "psystem"],
-            [print_data, "print_data"],
-            [plot_data, "plot_data"],
-            [animation_data, "animation_data"],
-            [config, "config"],
-            [vel_app, "vel_app"],
-            [config.sim_name, "sim_name"],
-            [input_VSM, "input_VSM"],
-        ]
+    # TODO: Should this be placed inside the solver_main loop?
+    # Saving non-interpretable results
+    folder_name = post_processing_main.save_non_interpretable_results(
+        config,
+        input_VSM,
+        input_bridle_aero,
+        points_ini,
+        params_dict,
+        psystem,
+        points,
+        df_position,
+        print_data,
+        plot_data,
+        animation_data,
+        vel_app,
+        folder_name_results,
+    )
+    # Saving interpretable results (generated from the saved non-interpretable results)
+    post_processing_main.save_interpretable_results(folder_name)
 
-        # Ensure the folder exists
-        if not os.path.exists(folder_name):
-            os.makedirs(folder_name)
-
-        # Serialize and save all data with dill
-        for item in to_be_saved_data:
-            data, name = item
-            with open(f"{folder_name}{name}.pkl", "wb") as f:
-                dill.dump(data, f)
-
+    # TODO: this should not longer be needed?
     # Post-processing output
     np.save(
         f"data/output/{config.kite_name}/points/{config.sim_name}_power_{1e3*config.depower_tape_final_extension:.0f}_steer_{1e3*np.abs(config.steering_tape_final_extension):.0f}.npy",
         points,
     )
-    if config.is_with_printing:
-        post_processing_main.print_results(
-            points,
-            print_data,
-            config,
-        )
-    if config.is_with_plotting:
-        post_processing_main.plot(
-            plot_data,
-            points,
-            vel_app,
-            config,
-        )
-    plt.show()
-    if config.is_with_animation:
-        print(f"")
-        print("--> Generating ANIMATION \{*_*}/")
-        post_processing_main.animate(
-            animation_data,
-            vel_app,
-            config,
-            input_VSM,
-        )
 
 
 if __name__ == "__main__":
