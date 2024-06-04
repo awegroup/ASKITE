@@ -117,17 +117,8 @@ def ini_kite_config(
         tube_line_indices,
     ) = extract_points_and_connectivity(folder_path_kite_data, surfplan_file)
 
-    # points
-    if config_data["is_from_filename"]:
-        # if there is a file defined
-        points_ini = np.load(
-            f'{folder_path_output}/points/points_up_{int(config_data["u_p"]*100)}.npy'
-        )
-    else:
-        points_ini = np.copy(
-            points_struc
-        )  # if no initial file is defined, use surfplan
-    points_ini = np.array(points_ini) / config_data["geometric_scaling_factor"]
+    # scale points if so desired
+    points_ini = np.array(points_struc) / config_data["geometric_scaling_factor"]
 
     bridle_rest_lengths_initial = np.array(
         structural_mesher.calculate_edge_lengths(bridle_ci, bridle_cj, points_ini)
@@ -446,7 +437,6 @@ def ini_config(
         output_path=folder_path_output,
         # SIMULATION SETTINGS
         ## initialisation
-        is_from_filename=config_data["is_from_filename"],
         bridle_initial_compression_factor=config_data[
             "bridle_initial_compression_factor"
         ],

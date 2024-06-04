@@ -466,6 +466,8 @@ def run_aerostructural_solver(
             tol_vk_optimization,
         )
 
+    # TODO: this should be one list, not different ones. You are now sending duplicate info
+
     # defining post_processing_output
     aero_structural_total_time = time.time() - start_time
     num_of_iterations = i
@@ -505,8 +507,14 @@ def run_aerostructural_solver(
         wing_rest_lengths,
         bridle_rest_lengths,
     ]
+    # TODO: this should become a list of seperate variables, now you are saving duplicate data.
+    post_processing_data = {
+        "print_data": print_data,
+        "plot_data": plot_data,
+        "animation_data": animation_data,
+    }
 
-    return points, print_data, plot_data, animation_data, position_without_na
+    return points, position_without_na, post_processing_data
 
 
 # # %% Old solver (Non Alex framework)

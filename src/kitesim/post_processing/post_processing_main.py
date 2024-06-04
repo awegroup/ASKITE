@@ -10,59 +10,55 @@ from kitesim.post_processing import functions_print, functions_plot
 from kitesim.post_processing import post_processing_utils as post_processing_utils
 from kitesim.coupling import coupling_struc2aero
 from kitesim.aerodynamic import VSM
-py
+
 
 def save_non_interpretable_results(
-    config, 
+    config,
     input_VSM,
     input_bridle_aero,
-    points_ini, 
+    points_ini,
+    vel_app,
     params_dict,
     psystem,
-    points, 
+    points,
     df_position,
-    print_data,
-    plot_data,
-    animation_data,
-    vel_app, 
+    post_processing_data,
     folder_name_results,
 ):
 
     to_be_saved_data = [
         ## input
         [config, "config"],
-        [input_VSM,"input_VSM"],
+        [input_VSM, "input_VSM"],
         [input_bridle_aero, "input_bridle_aero"],
         [points_ini, "points_ini"],
-        [params_dict,"params_dict"],
-        [psystem,'psystem'],
+        [vel_app, "vel_app"],
+        [params_dict, "params_dict"],
+        [psystem, "psystem"],
         ## output
         [points, "points"],
         [df_position, "df_position"],
-        [print_data,"print_data"],
-        [plot_data, "plot_data"],
-        [animation_data, "animation_data"],
-        [vel_app,"vel_app"],
+        [post_processing_data, "post_processing_data"],
+        [vel_app, "vel_app"],
     ]
 
-    folder_name = (
-        f"{folder_name_results}/{config.kite_name}/{config.sim_name}/{datetime.now().strftime("%Y_%m_%d_%H_%M")}"
-    )
+    # TODO: could add minutes back
+    results_folder_path = f"{folder_name_results}/{config.kite_name}/{config.sim_name}/{datetime.now().strftime('%Y_%m_%d_%Hh')}"
     # Ensure the folder exists
-    if not os.path.exists(folder_name):
-        os.makedirs(folder_name)
+    if not os.path.exists(results_folder_path):
+        os.makedirs(results_folder_path)
 
     # Serialize and save all data with dill
     for item in to_be_saved_data:
         data, name = item
-        with open(f"{folder_name}/{name}.pkl", "wb") as f:
+        with open(f"{results_folder_path}/{name}.pkl", "wb") as f:
             dill.dump(data, f)
 
-    return folder_name
+    return results_folder_path
 
-def save_interpretable_results(
-    folder_name
-):
+
+def save_interpretable_results(results_folder_path):
+
     if config.is_with_printing:
         print_results(
             points,
@@ -85,8 +81,8 @@ def save_interpretable_results(
             vel_app,
             config,
             input_VSM,
+            results_folder_path,
         )
-
 
 
 def print_results(
@@ -228,7 +224,7 @@ def plot(
         # functions_plot.plot_kite([plot_points],[plot_lines_new],f"Light-grey: surfplan, Purple: simulation",[plot_surface_new])
 
 
-def animate(animation_data, vel_app, config, input_VSM):
+def animate(animation_data, vel_app, config, input_VSM, results_folder_path):
     # Unpacking animation_data
     position, num_of_iterations, wing_rest_lengths, bridle_rest_lengths = animation_data
 
@@ -294,14 +290,12 @@ def animate(animation_data, vel_app, config, input_VSM):
 
     # Use pillow to save all frames as an animation in a gif file
 
-    output_path = config.output_path
-
     # get_centroid = load_module_from_path(
     #     KITE_NAME, f"{folder_path_initialisation}/functions_wing.py"
     #     ).get_centroid
 
     images = [
-        Image.open(f"{output_path}/animation/plot_iteration_{frame}.png")
+        Image.open(f"{results_folder_path}/animation/plot_iteration_{frame}.png")
         for frame in range(num_frames)
     ]
 
@@ -309,6 +303,6 @@ def animate(animation_data, vel_app, config, input_VSM):
 
     # Assuming images is a list of PIL Image objects
     imageio.mimsave(
-        f"{output_path}/animation/{config.sim_name}_animation_va_{vel_app_norm:.1f}.mp4",
+        f"{results_folder_path}/animation/{config.sim_name}_animation_va_{vel_app_norm:.1f}.mp4",
         images,
     )

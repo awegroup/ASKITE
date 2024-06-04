@@ -302,7 +302,6 @@ class Config:
         depower_tape_extension_percentage (float): Depower tape extension percentage.
         is_print_mid_results (bool): Whether to print intermediate results.
         is_with_initial_plot (bool): Whether to plot initial geometry.
-        is_from_filename (bool): Whether to load from a filename.
         is_billowing_on (bool): Whether billowing is enabled.
         is_with_gravity (bool): Whether gravity is enabled.
         is_with_aero_bridle (bool): Whether aero bridle is enabled.
@@ -362,7 +361,6 @@ class Config:
 
     # SIMULATION SETTINGS
     ## initialisation
-    is_from_filename: bool
     bridle_initial_compression_factor: float
     geometric_scaling_factor: float
     n_vel_initialisation_steps: int
