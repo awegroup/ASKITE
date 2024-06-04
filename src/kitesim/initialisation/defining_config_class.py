@@ -351,7 +351,6 @@ class Config:
     is_with_printing: bool
     is_with_plotting: bool
     is_with_animation: bool
-    is_with_save: bool
     is_print_mid_results: bool
     is_with_initial_plot: bool
     is_with_initial_point_velocity: bool

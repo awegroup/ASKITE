@@ -1,10 +1,8 @@
 # Straight case 
 is_with_vk_optimization: false
 is_circular_case: false
-is_run_only_1_time_step: false
 is_print_intermediate_results: true
 is_with_gravity: false
-is_with_velocity_initialization: false
 ### inflow conditions
 vel_wind: !!seq [12, 0, 2]
 vel_kite: !!seq [0, 0, 0]

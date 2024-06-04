@@ -1,11 +1,13 @@
 import numpy as np
 import yaml
 import os
-from scipy.spatial import ConvexHull
 import importlib
 
 from kitesim.structural import structural_mesher
-from kitesim.initialisation.path_functions import load_module_from_path
+from kitesim.initialisation.initialisation_utils import (
+    load_module_from_path,
+    calculate_projected_area,
+)
 from kitesim.initialisation import mass_distribution, pulley_connectivity
 from kitesim.cases import cases_yaml_reader
 
@@ -272,22 +274,9 @@ def ini_kite_config(KiteConfig, config_data, config_data_kite, path_kite_data):
         config_data_kite["pulley"]["mass"],
     )
 
+    ##TODO: This is not the true chord, but only the chord taken from the structural discretization
     ## Calculating reference distance
     ref_chord_calculated = max(points_ini[:, 0]) - min(points_ini[:, 0])
-
-    def calculate_projected_area(points):
-        # Project points onto the x,y plane
-        xy_points = points[:, :2]
-
-        # Find the convex hull
-        hull = ConvexHull(xy_points)
-        hull_points = xy_points[hull.vertices]
-
-        # Using the shoelace formula
-        x = hull_points[:, 0]
-        y = hull_points[:, 1]
-
-        return 0.5 * np.abs(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1)))
 
     wing_connectivity = np.hstack((wing_ci, wing_cj))
     wing_connectivity = np.unique(wing_connectivity)
@@ -422,7 +411,6 @@ def ini_config(
         is_with_printing=config_data["is_with_printing"],
         is_with_plotting=config_data["is_with_plotting"],
         is_with_animation=config_data["is_with_animation"],
-        is_with_save=config_data["is_with_save"],
         is_print_mid_results=config_data["is_print_mid_results"],
         is_with_initial_plot=config_data["is_with_initial_plot"],
         is_with_initial_point_velocity=config_data["is_with_initial_point_velocity"],
