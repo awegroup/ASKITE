@@ -1,4 +1,4 @@
-'''Crosswind case'''
+# Crosswind case
 is_with_vk_optimization: true
 is_circular_case: false
 is_run_only_1_time_step: false

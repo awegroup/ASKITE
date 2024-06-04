@@ -357,7 +357,6 @@ class Config:
     is_with_initial_point_velocity: bool
     is_with_plotly_plot: bool
     is_with_aero_geometry: bool
-    output_path: str
 
     # SIMULATION SETTINGS
     ## initialisation

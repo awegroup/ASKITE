@@ -11,6 +11,7 @@ Functions to plot the VSM-PSM in various styles
 
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
 from mpl_toolkits.mplot3d.proj3d import proj_transform
 from mpl_toolkits.mplot3d.axes3d import Axes3D
@@ -1722,6 +1723,7 @@ def plot_aero(
     coord_L,
     F_rel,
     config,
+    path_run_results_folder,
     elev=10,
     azim=230,
     it_number=00,
@@ -1777,7 +1779,12 @@ def plot_aero(
     # TODO: add an is_with_svg_plot option
     # plt.savefig(f"results/aero_structural_plot{config.kite_name}_idx22.svg", format="svg")
     # TODO: this here is to create an animation, from each simulated frame
-    plt.savefig(f"{config.output_path}/animation/plot_iteration_{it_number}.png")
+
+    path_results_run_animation_folder = f"{path_run_results_folder}/animation/"
+    if not os.path.exists(path_results_run_animation_folder):
+        os.makedirs(path_results_run_animation_folder)
+
+    plt.savefig(f"{path_results_run_animation_folder}/plot_iteration_{it_number}.png")
     if it_number != 00:  # TODO: closing when making animation
         plt.close()
 

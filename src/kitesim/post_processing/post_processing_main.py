@@ -23,7 +23,7 @@ def save_non_interpretable_results(
     points,
     df_position,
     post_processing_data,
-    folder_name_results,
+    path_results_folder,
 ):
 
     to_be_saved_data = [
@@ -43,53 +43,75 @@ def save_non_interpretable_results(
     ]
 
     # TODO: could add minutes back
-    results_folder_path = f"{folder_name_results}/{config.kite_name}/{config.sim_name}/{datetime.now().strftime('%Y_%m_%d_%Hh')}"
+    path_run_results_folder = f"{path_results_folder}/{config.kite_name}/{datetime.now().strftime('%Y_%m_%d_%Hh')}/{config.sim_name}"
     # Ensure the folder exists
-    if not os.path.exists(results_folder_path):
-        os.makedirs(results_folder_path)
+    if not os.path.exists(path_run_results_folder):
+        os.makedirs(path_run_results_folder)
+
+    path_run_results_non_interpretable_folder = (
+        f"{path_run_results_folder}/non_interpretable"
+    )
+    if not os.path.exists(path_run_results_non_interpretable_folder):
+        os.makedirs(path_run_results_non_interpretable_folder)
 
     # Serialize and save all data with dill
     for item in to_be_saved_data:
         data, name = item
-        with open(f"{results_folder_path}/{name}.pkl", "wb") as f:
+        with open(f"{path_run_results_non_interpretable_folder}/{name}.pkl", "wb") as f:
             dill.dump(data, f)
 
-    return results_folder_path
+    return path_run_results_folder
 
 
-def save_interpretable_results(results_folder_path):
+def save_interpretable_results(path_run_results_folder):
+
+    # Load the data from the saved files
+    path_run_results_non_interpretable_folder = (
+        f"{path_run_results_folder}/non_interpretable"
+    )
+    with open(f"{path_run_results_non_interpretable_folder}/config.pkl", "rb") as f:
+        config = dill.load(f)
+    with open(f"{path_run_results_non_interpretable_folder}/points.pkl", "rb") as f:
+        points = dill.load(f)
+    with open(
+        f"{path_run_results_non_interpretable_folder}/post_processing_data.pkl", "rb"
+    ) as f:
+        post_processing_data = dill.load(f)
+    with open(f"{path_run_results_non_interpretable_folder}/vel_app.pkl", "rb") as f:
+        vel_app = dill.load(f)
+    with open(f"{path_run_results_non_interpretable_folder}/input_VSM.pkl", "rb") as f:
+        input_VSM = dill.load(f)
 
     if config.is_with_printing:
         print_results(
             points,
-            print_data,
+            post_processing_data["print_data"],
             config,
         )
     if config.is_with_plotting:
         plot(
-            plot_data,
+            post_processing_data["plot_data"],
             points,
             vel_app,
             config,
+            path_run_results_folder,
         )
     plt.show()
     if config.is_with_animation:
         print(f"")
         print("--> Generating ANIMATION \{*_*}/")
         animate(
-            animation_data,
+            post_processing_data["animation_data"],
             vel_app,
             config,
             input_VSM,
-            results_folder_path,
+            path_run_results_folder,
         )
 
 
 def print_results(
-    # mutables
     points,
     print_data,
-    # immutables
     config,
 ):
     # Unpacking the print_data
@@ -138,12 +160,11 @@ def print_results(
 
 
 def plot(
-    # mutables
     plot_data,
     points,
     vel_app,
-    # immutables
     config,
+    path_run_results_folder,
 ):
     # Unpacking the plot_data
     wingpanels, controlpoints, rings, coord_L, F_rel = plot_data[0]
@@ -168,6 +189,7 @@ def plot(
         coord_L,
         F_rel,
         config,
+        path_run_results_folder,
         elev=9.14,  # 10
         azim=0,  # 230
     )
@@ -224,7 +246,7 @@ def plot(
         # functions_plot.plot_kite([plot_points],[plot_lines_new],f"Light-grey: surfplan, Purple: simulation",[plot_surface_new])
 
 
-def animate(animation_data, vel_app, config, input_VSM, results_folder_path):
+def animate(animation_data, vel_app, config, input_VSM, path_run_results_folder):
     # Unpacking animation_data
     position, num_of_iterations, wing_rest_lengths, bridle_rest_lengths = animation_data
 
@@ -283,6 +305,7 @@ def animate(animation_data, vel_app, config, input_VSM, results_folder_path):
             coord_L,
             F_rel,
             config,
+            path_run_results_folder,
             elev=10,
             azim=-90,  # 230,
             it_number=frame,
@@ -295,7 +318,7 @@ def animate(animation_data, vel_app, config, input_VSM, results_folder_path):
     #     ).get_centroid
 
     images = [
-        Image.open(f"{results_folder_path}/animation/plot_iteration_{frame}.png")
+        Image.open(f"{path_run_results_folder}/animation/plot_iteration_{frame}.png")
         for frame in range(num_frames)
     ]
 
@@ -303,6 +326,6 @@ def animate(animation_data, vel_app, config, input_VSM, results_folder_path):
 
     # Assuming images is a list of PIL Image objects
     imageio.mimsave(
-        f"{results_folder_path}/animation/{config.sim_name}_animation_va_{vel_app_norm:.1f}.mp4",
+        f"{path_run_results_folder}/animation/{config.sim_name}_animation_va_{vel_app_norm:.1f}.mp4",
         images,
     )

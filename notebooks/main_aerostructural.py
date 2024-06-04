@@ -16,7 +16,6 @@ Github: ...
 
 import os
 import sys
-import matplotlib.pyplot as plt
 
 # from IPython.display import display, Latex
 
@@ -34,16 +33,13 @@ from kitesim import parent_adapter
 def main():
     """Main function"""
 
-    kite_name = "V3_25"
-
-    # loading immutable variables
-    config_path = "data/config.yaml"
-    # TODO: Remove the output_path from config?
-    folder_output_path = f"results/{kite_name}"
-    folder_path_kite = f"processed_data/{kite_name}"
-    folder_path_kite_data = f"processed_data/{kite_name}/processed_design_files"
-    case_path_folder = "../kitesim/src/kitesim/cases"
-    folder_name_results = "results/"
+    # defining paths
+    path_config = "data/config.yaml"
+    # underlying mechanism assumes specific folder structure inside processed_data
+    ## kite config files in folder: processed_data/kite_name
+    ## kite data files in folder: processed_data/kite_name/processed_design_files
+    path_processed_data_folder = "processed_data"
+    path_results_folder = "results"
 
     # Importing modules
     (
@@ -56,11 +52,8 @@ def main():
     ) = parent_adapter.module_importer()
 
     config = setup_config(
-        config_path,
-        folder_output_path,
-        folder_path_kite,
-        folder_path_kite_data,
-        case_path_folder,
+        path_config,
+        path_processed_data_folder,
     )
     input_VSM = InputVSM.create(config)
     input_bridle_aero = InputBridleAero.create(config)
@@ -81,7 +74,7 @@ def main():
 
     # TODO: Should this be placed inside the solver_main loop?
     # Saving non-interpretable results
-    folder_name = post_processing_main.save_non_interpretable_results(
+    path_run_results_folder = post_processing_main.save_non_interpretable_results(
         config,
         input_VSM,
         input_bridle_aero,
@@ -92,41 +85,10 @@ def main():
         points,
         df_position,
         post_processing_data,
-        folder_name_results,
+        path_results_folder,
     )
     # Saving interpretable results (generated from the saved non-interpretable results)
-    # post_processing_main.save_interpretable_results(folder_name)
-
-    if config.is_with_printing:
-        post_processing_main.print_results(
-            points,
-            post_processing_data["print_data"],
-            config,
-        )
-    if config.is_with_plotting:
-        post_processing_main.plot(
-            post_processing_data["plot_data"],
-            points,
-            vel_app,
-            config,
-        )
-    plt.show()
-    if config.is_with_animation:
-        print(f"")
-        print("--> Generating ANIMATION \{*_*}/")
-        post_processing_main.animate(
-            post_processing_data["animation_data"],
-            vel_app,
-            config,
-            input_VSM,
-        )
-
-    # TODO: this should not longer be needed?
-    # Post-processing output
-    # np.save(
-    #     f"data/output/{config.kite_name}/points/{config.sim_name}_power_{1e3*config.depower_tape_final_extension:.0f}_steer_{1e3*np.abs(config.steering_tape_final_extension):.0f}.npy",
-    #     points,
-    # )
+    post_processing_main.save_interpretable_results(path_run_results_folder)
 
 
 if __name__ == "__main__":

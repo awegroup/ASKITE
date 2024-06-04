@@ -7,6 +7,7 @@ import importlib
 from kitesim.structural import structural_mesher
 from kitesim.initialisation.path_functions import load_module_from_path
 from kitesim.initialisation import mass_distribution, pulley_connectivity
+from kitesim.cases import cases_yaml_reader
 
 from .defining_config_class import (
     Config,
@@ -88,9 +89,7 @@ def ini_tether_config(TetherConfig, config_data):
 ## Initialize Kite-specific configuration
 
 
-def ini_kite_config(
-    KiteConfig, config_data, folder_path_output, folder_path_kite, folder_path_kite_data
-):
+def ini_kite_config(KiteConfig, config_data, config_data_kite, path_kite_data):
 
     ## Finding the Connectivity
     # Reading out surfplan
@@ -115,7 +114,7 @@ def ini_kite_config(
         wing_cj,
         te_line_indices,
         tube_line_indices,
-    ) = extract_points_and_connectivity(folder_path_kite_data, surfplan_file)
+    ) = extract_points_and_connectivity(path_kite_data, surfplan_file)
 
     # scale points if so desired
     points_ini = np.array(points_struc) / config_data["geometric_scaling_factor"]
@@ -135,10 +134,6 @@ def ini_kite_config(
 
     # number of structural segments
     n_segments = int(len(plate_point_indices))
-
-    ### opening up the kite specific config file
-    with open((f"{folder_path_kite}/config_kite_{kite_name}.yaml"), "r") as config_file:
-        config_data_kite = yaml.load(config_file, Loader=yaml.SafeLoader)
 
     ### Getting additional data
     if kite_name == "V3_25":
@@ -195,7 +190,7 @@ def ini_kite_config(
         # TODO: Should be generated/imported directly from the surfplan file instead
 
         RIB_DB_WHOLE_STRUTS = np.load(
-            f"{folder_path_kite_data}/rib_db_whole_model_struts.npy",
+            f"{path_kite_data}/rib_db_whole_model_struts.npy",
             allow_pickle=True,
         )
         extract_airfoil_geometry_data_from_ribs = load_module_from_path(
@@ -217,7 +212,7 @@ def ini_kite_config(
         bridle_data["diameter"] = config_data_kite["bridle"]["diameter"]
         bridle_data["density"] = config_data_kite["bridle"]["density"]
         bridle_data["bridle_point_index"] = np.load(
-            f"{folder_path_kite_data}/bridlepoint_index.npy", allow_pickle=True
+            f"{path_kite_data}/bridlepoint_index.npy", allow_pickle=True
         )
         # element indices
         bridle_data["depower_tape_index"] = config_data_kite["bridle"][
@@ -233,7 +228,7 @@ def ini_kite_config(
         ## pulley_data
         pulley_data = {}
         pulley_data["point_indices"] = np.load(
-            f"{folder_path_kite_data}/pulley_point_indices.npy", allow_pickle=True
+            f"{path_kite_data}/pulley_point_indices.npy", allow_pickle=True
         )
         pulley_data["mass"] = config_data_kite["pulley"]["mass"]
         pulley_data["number_of_pulleys_in_back_lines"] = config_data_kite["pulley"][
@@ -244,13 +239,13 @@ def ini_kite_config(
         kcu_data = {}
         kcu_data["extra"] = {
             "kcu_point_indices": np.load(
-                f"{folder_path_kite_data}/kcu_point_indices.npy", allow_pickle=True
+                f"{path_kite_data}/kcu_point_indices.npy", allow_pickle=True
             ),
             "kcu_line_indices": np.load(
-                f"{folder_path_kite_data}/kcu_line_indices.npy", allow_pickle=True
+                f"{path_kite_data}/kcu_line_indices.npy", allow_pickle=True
             ),
             "kcu_plate_indices": np.load(
-                f"{folder_path_kite_data}/kcu_plate_indices.npy", allow_pickle=True
+                f"{path_kite_data}/kcu_plate_indices.npy", allow_pickle=True
             ),
         }
 
@@ -396,7 +391,6 @@ def ini_config(
     aero_structural_config,
     tether_config,
     kite_config,
-    folder_path_output,
 ):
     # Initialize the overarching Config object
     config = Config(
@@ -434,7 +428,6 @@ def ini_config(
         is_with_initial_point_velocity=config_data["is_with_initial_point_velocity"],
         is_with_plotly_plot=config_data["is_with_plotly_plot"],
         is_with_aero_geometry=config_data["is_with_aero_geometry"],
-        output_path=folder_path_output,
         # SIMULATION SETTINGS
         ## initialisation
         bridle_initial_compression_factor=config_data[
@@ -472,22 +465,30 @@ def ini_config(
 
 
 def setup_config(
-    config_path,
-    folder_path_output,
-    folder_path_kite,
-    folder_path_kite_data,
-    case_path_folder,
+    path_config,
+    path_processed_data_folder,
 ):
 
-    with open((config_path), "r") as config_file:
+    # Load the settings
+    with open((path_config), "r") as config_file:
         config_data = yaml.load(config_file, Loader=yaml.SafeLoader)
-
-    case_path = f'{case_path_folder}/{config_data["sim_name"]}.yaml'
-    with open((case_path), "r") as config_file:
-        config_case = yaml.load(config_file, Loader=yaml.SafeLoader)
-
-    # the update method appends a dict to another
+    # Load the case specific settings
+    config_case = cases_yaml_reader.read_yaml_file(f"{config_data['sim_name']}.yaml")
+    # Appending the two togeher (the update method appends a dict to another)
     config_data.update(config_case)
+
+    # Loading kite settings
+    kite_name = config_data["kite_name"]
+    path_kite_config = (
+        f"{path_processed_data_folder}/{kite_name}/config_kite_{kite_name}.yaml"
+    )
+    with open((path_kite_config), "r") as config_file:
+        config_data_kite = yaml.load(config_file, Loader=yaml.SafeLoader)
+
+    # TODO: remove is old method
+    # case_path = f'{case_path_folder}/{config_data["sim_name"]}.yaml'
+    # with open((case_path), "r") as config_file:
+    #     config_case = yaml.load(config_file, Loader=yaml.SafeLoader)
 
     # TODO: Adding dummy-value, needed because class needs these as input. Resolve this boilerplate
     # Possible solution is using a factory-function (ask Open-AI)
@@ -514,12 +515,12 @@ def setup_config(
         AeroStructuralConfig, config_data
     )
     tether_config = ini_tether_config(TetherConfig, config_data)
+    path_kite_data = f"{path_processed_data_folder}/{kite_name}/processed_design_files"
     kite_config = ini_kite_config(
         KiteConfig,
         config_data,
-        folder_path_output,
-        folder_path_kite,
-        folder_path_kite_data,
+        config_data_kite,
+        path_kite_data,
     )
 
     # Create Config
@@ -531,7 +532,6 @@ def setup_config(
         aero_structural_config,
         tether_config,
         kite_config,
-        folder_path_output,
     )
 
     return config
