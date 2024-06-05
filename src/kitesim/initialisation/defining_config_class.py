@@ -1,6 +1,6 @@
-from dataclasses import dataclass, astuple
+from dataclasses import astuple
 import numpy as np
-from attr import attrs, define, frozen
+from attr import frozen
 
 # attrs has slots as a default, meaning there is only a limited #attributes -immutable
 # can also make with with @define(slot=False), to allow you to add attributes dynamically in-code!
@@ -377,6 +377,7 @@ class Config:
     vk_x_initial_guess_factor_of_vw: float
     ## circular flight settings
     is_with_varying_va: bool
+    # TODO: what's going over here?!?
     r_0_initial: 200.0
 
     # PHYSICAL CONSTANTS

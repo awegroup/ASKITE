@@ -10,6 +10,7 @@ from kitesim.post_processing import functions_print, functions_plot
 from kitesim.post_processing import post_processing_utils as post_processing_utils
 from kitesim.coupling import coupling_struc2aero
 from kitesim.aerodynamic import VSM
+from pathlib import Path
 
 
 def save_non_interpretable_results(
@@ -43,7 +44,13 @@ def save_non_interpretable_results(
     ]
 
     # TODO: could add minutes back
-    path_run_results_folder = f"{path_results_folder}/{config.kite_name}/{datetime.now().strftime('%Y_%m_%d_%Hh')}/{config.sim_name}"
+    path_run_results_folder = (
+        Path(path_results_folder)
+        / config.kite_name
+        / datetime.now().strftime("%Y_%m_%d_%Hh")
+        / config.sim_name
+    )
+
     # Ensure the folder exists
     if not os.path.exists(path_run_results_folder):
         os.makedirs(path_run_results_folder)
@@ -62,8 +69,13 @@ def save_non_interpretable_results(
 
     return path_run_results_folder
 
+def process_non_interpretable_results():
+    #TODO: combine the load, produce and save functions
+    return
 
-def save_interpretable_results(path_run_results_folder):
+
+
+def load_interpertable_results(path_run_results_folder):
 
     # Load the data from the saved files
     path_run_results_non_interpretable_folder = (
@@ -81,6 +93,11 @@ def save_interpretable_results(path_run_results_folder):
         vel_app = dill.load(f)
     with open(f"{path_run_results_non_interpretable_folder}/input_VSM.pkl", "rb") as f:
         input_VSM = dill.load(f)
+
+    return points, post_processing_data, vel_app, config, input_VSM
+
+def produce_interpretable_results(path_run_results_folder, points, post_processing_data, vel_app, config, input_VSM
+):
 
     if config.is_with_printing:
         print_results(
@@ -107,6 +124,15 @@ def save_interpretable_results(path_run_results_folder):
             input_VSM,
             path_run_results_folder,
         )
+    return 
+
+def save_interpretable_results(
+    path_run_results_folder, points, post_processing_data, vel_app, config, input_VSM
+):
+
+def process_interpretable_results():
+    #TODO: combine the load, produce and save functions
+    return
 
 
 def print_results(

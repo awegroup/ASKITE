@@ -465,6 +465,8 @@ def setup_config(
     # Appending the two togeher (the update method appends a dict to another)
     config_data.update(config_case)
 
+    # TODO: add log-statement, for what is being added to the config. This is important for debugging
+
     # Loading kite settings
     kite_name = config_data["kite_name"]
     path_kite_config = (
@@ -478,6 +480,7 @@ def setup_config(
     # with open((case_path), "r") as config_file:
     #     config_case = yaml.load(config_file, Loader=yaml.SafeLoader)
 
+    # TODO: this will be resolved once you have your default class
     # TODO: Adding dummy-value, needed because class needs these as input. Resolve this boilerplate
     # Possible solution is using a factory-function (ask Open-AI)
     if not config_data["is_with_vk_optimization"]:

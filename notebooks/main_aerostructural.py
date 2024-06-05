@@ -21,35 +21,42 @@ import sys
 
 # TODO: can we remove this?!?
 # Define the right path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-sys.path.append(f"{project_root}")  # Needed for running in terminal
-sys.path.insert(0, f"{project_root}")  # Needed for running in terminal
-os.chdir(f"{project_root}")  # Needed for running in interactive python environment
+# project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+# sys.path.append(f"{project_root}")  # Needed for running in terminal
+# sys.path.insert(0, f"{project_root}")  # Needed for running in terminal
+# os.chdir(f"{project_root}")  # Needed for running in interactive python environment
 
-from kitesim import parent_adapter
+from pathlib import Path
+
+from kitesim.initialisation import (
+    InputVSM,
+    InputBridleAero,
+    setup_config,
+    get_mutable_variables,
+)
+from kitesim.solver import solver_main
+from kitesim.post_processing import post_processing_main
 
 
 # Import modules
 def main():
     """Main function"""
-
+    # Find the root directory of the repository
+    root_dir = os.path.abspath(os.path.dirname(__file__))
+    while not os.path.isfile(os.path.join(root_dir, ".gitignore")):
+        root_dir = os.path.abspath(os.path.join(root_dir, ".."))
+        if root_dir == "/":
+            raise FileNotFoundError(
+                "Could not find the root directory of the repository."
+            )
     # defining paths
-    path_config = "data/config.yaml"
+    # path_config = "../data/config.yaml"
+    path_config = Path(root_dir) / "data" / "config.yaml"
     # underlying mechanism assumes specific folder structure inside processed_data
     ## kite config files in folder: processed_data/kite_name
     ## kite data files in folder: processed_data/kite_name/processed_design_files
-    path_processed_data_folder = "processed_data"
-    path_results_folder = "results"
-
-    # Importing modules
-    (
-        InputVSM,
-        InputBridleAero,
-        setup_config,
-        get_mutable_variables,
-        solver_main,
-        post_processing_main,
-    ) = parent_adapter.module_importer()
+    path_processed_data_folder = Path(root_dir) / "processed_data"
+    path_results_folder = Path(root_dir) / "results"
 
     config = setup_config(
         path_config,
@@ -60,6 +67,8 @@ def main():
 
     # Get mutable variables
     points_ini, vel_app, params_dict, psystem = get_mutable_variables(config)
+
+    # TODO: Save inputs
 
     # AeroStructural Simulation
     points, df_position, post_processing_data = solver_main.run_aerostructural_solver(
@@ -72,6 +81,7 @@ def main():
         input_bridle_aero,
     )
 
+    ## Save outputs (same folder)
     # TODO: Should this be placed inside the solver_main loop?
     # Saving non-interpretable results
     path_run_results_folder = post_processing_main.save_non_interpretable_results(
