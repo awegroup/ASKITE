@@ -23,10 +23,11 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install .[dev]
+        pip install .[dev
+        ]
     - name: Test with pytest and calculate coverage
       run: |
-        pytest --cov-report "xml:coverage.xml"  --cov=.
+        pytest --cov-report "xml:coverage.xml"
     - name: Create Coverage 
       if: ${{ github.event_name == 'pull_request' }}
       uses: orgoro/coverage@v3.1
