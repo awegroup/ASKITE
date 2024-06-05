@@ -36,14 +36,12 @@ classifiers = [
     "Programming Language :: Python",
     "Intended Audience :: Kite Designers, Developers",
 ]
-[tool.pytest.ini_options]
-pythonpath = [
-  "."
-]
 [project.optional-dependencies]
 dev = [
     "pytest",
     "black",
+    "flake8",
+    "pytest-cov",
     ]
 
 [project.urls]
