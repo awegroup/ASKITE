@@ -5,12 +5,140 @@ import os
 from PIL import Image
 from datetime import datetime
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 from kitesim.post_processing import functions_print, functions_plot
 from kitesim.post_processing import post_processing_utils as post_processing_utils
 from kitesim.coupling import coupling_struc2aero
 from kitesim.aerodynamic import VSM
 from pathlib import Path
+
+def create_results_folder(path_results_folder, config):
+    """Create a folder to store the results of the simulation.
+
+    Args:
+        path_results_folder (str): The path to the folder where the results will be stored.
+        config (Config): The configuration object containing the simulation settings.
+
+    Returns:
+        str: The path to the created results folder.
+    """
+    path_results_folder_run = (
+        Path(path_results_folder)
+        / config.kite_name
+        / datetime.now().strftime("%Y_%m_%d_%Hh")
+        / config.sim_name
+    )
+
+    # Ensure the folder exists
+    if not os.path.exists(path_results_folder_run):
+        os.makedirs(path_results_folder_run)
+
+    return path_results_folder_run
+
+
+def saving_input(
+    points_ini,
+    vel_app,
+    psystem,
+    params_dict,
+    config,
+    input_VSM,
+    input_bridle_aero,
+    path_results_folder,
+):  
+    """Save the input data for the simulation.
+
+    This function saves the input data required for the simulation. It creates a results folder, an input folder within the results folder, and saves the input data as pickle files in the input folder.
+
+    Args:
+        points_ini (list): The initial points for the simulation.
+        vel_app (float): The applied velocity for the simulation.
+        psystem (object): The system object for the simulation.
+        params_dict (dict): The parameters dictionary for the simulation.
+        config (object): The configuration object for the simulation.
+        input_VSM (object): The VSM input object for the simulation.
+        input_bridle_aero (object): The bridle aero input object for the simulation.
+        path_results_folder (str): The path to the results folder.
+
+    Returns:
+        str: The path to the results folder.
+
+    """
+    path_results_folder_run = create_results_folder(path_results_folder, config)
+    
+
+    # Create the input folder
+    path_results_folder_run_input= Path(path_results_folder_run) / 'input'
+
+    # Ensure the folder exists
+    if not os.path.exists(path_results_folder_run_input):
+        os.makedirs(path_results_folder_run_input)
+
+    # Create dict to store the data to be saved
+    to_be_saved_data = [
+        [config, "config"],
+        [input_VSM, "input_VSM"],
+        [input_bridle_aero, "input_bridle_aero"],
+        [points_ini, "points_ini"],
+        [vel_app, "vel_app"],
+        [params_dict, "params_dict"],
+        [psystem, "psystem"]
+    ]
+ 
+    # Serialize and save all data with dill
+    for item in to_be_saved_data:
+        data, name = item
+        with open(f"{path_results_folder_run_input}/{name}.pkl", "wb") as f:
+            dill.dump(data, f)
+
+    return path_results_folder_run
+
+def saving_output(points, df_position, post_processing_data, vel_app, path_results_folder_run):
+    """Save the output data for the simulation.
+
+    Args:
+        points (list): List of points.
+        df_position (pandas.DataFrame): DataFrame containing position data.
+        post_processing_data (dict): Dictionary containing post-processing data.
+        vel_app (float): Applied velocity.
+        path_results_folder_run (str): Path to the results folder.
+
+    Returns:
+        None
+
+    Raises:
+        None
+
+    """
+    # Create the output folder
+    path_results_folder_run_output= Path(path_results_folder_run) / 'output'
+
+    # Ensure the folder exists
+    if not os.path.exists(path_results_folder_run_output):
+        os.makedirs(path_results_folder_run_output)
+
+    # Create dict to store the data to be saved
+    to_be_saved_data = [
+        [points, "points"],
+        [df_position, "df_position"],
+        [post_processing_data, "post_processing_data"],
+        [vel_app, "vel_app"],
+    ]
+ 
+    # Serialize and save all data with dill
+    for item in to_be_saved_data:
+        data, name = item
+        with open(f"{path_results_folder_run_output}/{name}.pkl", "wb") as f:
+            dill.dump(data, f)
+
+    return 
+
+
+
+def post_process_to_interpretable_results():
+
+
 
 
 def save_non_interpretable_results(

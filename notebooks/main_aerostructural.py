@@ -35,7 +35,7 @@ from kitesim.initialisation import (
     get_mutable_variables,
 )
 from kitesim.solver import solver_main
-from kitesim.post_processing import post_processing_main
+from kitesim.post_processing import main_post_processing
 
 
 # Import modules
@@ -68,7 +68,17 @@ def main():
     # Get mutable variables
     points_ini, vel_app, params_dict, psystem = get_mutable_variables(config)
 
-    # TODO: Save inputs
+    # Save inputs
+    path_results_folder_run = main_post_processing.saving_input(
+        points_ini,
+        vel_app,
+        psystem,
+        params_dict,
+        config,
+        input_VSM,
+        input_bridle_aero,
+        path_results_folder,
+    )
 
     # AeroStructural Simulation
     points, df_position, post_processing_data = solver_main.run_aerostructural_solver(
@@ -81,10 +91,19 @@ def main():
         input_bridle_aero,
     )
 
-    ## Save outputs (same folder)
+    # Save outputs
+    main_post_processing.saving_output(
+        points,
+        df_position,
+        post_processing_data,
+        path_results_folder_run,
+    )
+
+    ## Left-here at the post_processing
+
     # TODO: Should this be placed inside the solver_main loop?
     # Saving non-interpretable results
-    path_run_results_folder = post_processing_main.save_non_interpretable_results(
+    path_run_results_folder = main.save_non_interpretable_results(
         config,
         input_VSM,
         input_bridle_aero,
@@ -98,7 +117,7 @@ def main():
         path_results_folder,
     )
     # Saving interpretable results (generated from the saved non-interpretable results)
-    post_processing_main.save_interpretable_results(path_run_results_folder)
+    main.save_interpretable_results(path_run_results_folder)
 
 
 if __name__ == "__main__":
