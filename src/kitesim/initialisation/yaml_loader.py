@@ -490,17 +490,17 @@ def setup_config(
     # with open((case_path), "r") as config_file:
     #     config_case = yaml.load(config_file, Loader=yaml.SafeLoader)
 
-    # TODO: this will be resolved once you have your default class
-    # TODO: Adding dummy-value, needed because class needs these as input. Resolve this boilerplate
-    # Possible solution is using a factory-function (ask Open-AI)
-    if not config_data["is_with_vk_optimization"]:
-        config_data["tol_fx_ratio_to_fz"] = 0
-        config_data["tol_vk_optimization"] = 0
-        config_data["vk_x_initial_guess_factor_of_vw"] = 0
-    if not config_data["is_circular_case"]:
-        ## circular flight settings
-        config_data["is_with_varying_va"] = False
-        config_data["r_0_initial"] = 0
+    # # TODO: this will be resolved once you have your default class
+    # # TODO: Adding dummy-value, needed because class needs these as input. Resolve this boilerplate
+    # # Possible solution is using a factory-function (ask Open-AI)
+    # if not config_data["is_with_vk_optimization"]:
+    #     config_data["tol_fx_ratio_to_fz"] = 0
+    #     config_data["tol_vk_optimization"] = 0
+    #     config_data["vk_x_initial_guess_factor_of_vw"] = 0
+    # if not config_data["is_circular_case"]:
+    #     ## circular flight settings
+    #     config_data["is_with_varying_va"] = False
+    #     config_data["r_0_initial"] = 0
 
     # TODO: remove boilerplate, and do it like below here
     # # Create subclasses first
