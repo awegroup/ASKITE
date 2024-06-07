@@ -2,7 +2,7 @@
 import numpy as np
 import copy
 
-from kitesim.post_processing import functions_plot
+from kitesim.post_processing import plot
 
 ## making things autoreload
 %load_ext autoreload
@@ -417,7 +417,7 @@ plot_conn_bridle = [points_bridle,ci_bridle_indexed_on_bridle,cj_bridle_indexed_
 plot_conn_tubular_frame = [points_bridle,conn_wing_i[tube_line_indices],conn_wing_j[tube_line_indices], 'grey',8,[]]
 
 plot_surface_kcu = [True,points_bridle,kcu_plate_indices,'black',1]
-functions_plot.plot_kite([plot_kcu_points,plot_points_bridle,plot_points_tubular_frame,plot_points_ini_model_pulleys],[plot_conn_kcu,plot_conn_wing,plot_conn_bridle,plot_conn_tubular_frame],title='Bridle point added',surface_list=[plot_surface_kcu])
+plot.plot_kite([plot_kcu_points,plot_points_bridle,plot_points_tubular_frame,plot_points_ini_model_pulleys],[plot_conn_kcu,plot_conn_wing,plot_conn_bridle,plot_conn_tubular_frame],title='Bridle point added',surface_list=[plot_surface_kcu])
 
 
 #%% Saving results

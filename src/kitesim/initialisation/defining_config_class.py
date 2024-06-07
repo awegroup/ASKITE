@@ -349,13 +349,25 @@ class Config:
 
     # OUTPUT SETTINGS
     is_with_printing: bool
-    is_with_plotting: bool
-    is_with_animation: bool
     is_print_mid_results: bool
     is_with_initial_plot: bool
     is_with_initial_point_velocity: bool
     is_with_plotly_plot: bool
     is_with_aero_geometry: bool
+
+    # PLOTTING SETTINGS
+    is_with_plotting: bool
+    plot_format: str
+    plot_elev: np.ndarray
+    plot_azim: np.ndarray
+
+    # ANIMATION SETTINGS
+    is_with_animation: bool
+    animation_fps: int
+    animation_dpi: int
+    animation_bitrate: int
+    animation_elev: float
+    animation_azim: float
 
     # SIMULATION SETTINGS
     ## initialisation

@@ -10,15 +10,17 @@ from kitesim.solver import solver_utils
 from kitesim.aerodynamic import tether_aero, VSM, bridle_line_system_aero
 
 
-def run_aerostructural_solver(
-    points,
-    vel_app,
-    psystem,
-    params,
-    config,
-    input_VSM,
-    input_bridle_aero,
-):
+def run_aerostructural_solver(sim_input):
+
+    # Unpacking input_dict
+    points = sim_input["points"]
+    vel_app = sim_input["vel_app"]
+    psystem = sim_input["psystem"]
+    params = sim_input["params"]
+    config = sim_input["config"]
+    input_VSM = sim_input["input_VSM"]
+    input_bridle_aero = sim_input["input_bridle_aero"]
+
     """Runs the aero-structural solver for the given input parameters"""
     # GENERAL INITIALIZATION
     ## case settings
@@ -513,48 +515,97 @@ def run_aerostructural_solver(
 
     # defining post_processing_output
     aero_structural_total_time = time.time() - start_time
-    num_of_iterations = i
     wing_rest_lengths = psystem.extract_rest_length[0:len_wing_rest_length]
     bridle_rest_lengths = psystem.extract_rest_length[len_wing_rest_length:]
-    print_data = [
-        is_convergence,
-        num_of_iterations,
-        aero_structural_total_time,
-        vel_app,
-        residual_f_including_fixed_nodes,
-        residual_f,
-        f_internal,
-        f_external,
-        [force_aero, force_aero_wing, force_aero_bridle],
-        f_tether_drag,
-        force_gravity,
-        wing_rest_lengths,
-        bridle_rest_lengths,
-    ]
-    plot_data = [
-        [wingpanels, controlpoints, rings, coord_L, F_rel],
-        wing_rest_lengths,
-        bridle_rest_lengths,
-    ]
-
-    # TODO: remove this; was an attempt to use df functionality more
     position_without_na = position.dropna(
         how="all",
         subset=position.columns[position.columns.str.contains("[xyz]\d+")],
         axis=0,
     )
     num_of_rows = position_without_na.shape[0]
-    animation_data = [
-        position_without_na,
-        num_of_rows,
-        wing_rest_lengths,
-        bridle_rest_lengths,
-    ]
-    # TODO: this should become a list of seperate variables, now you are saving duplicate data.
-    post_processing_data = {
-        "print_data": print_data,
-        "plot_data": plot_data,
-        "animation_data": animation_data,
+
+    sim_output = {
+        "points": points,
+        "position": position,
+        "aero_structural_total_time": aero_structural_total_time,
+        "num_of_iterations": i,
+        "is_convergence": is_convergence,
+        "wing_rest_lengths": wing_rest_lengths,
+        "bridle_rest_lengths": bridle_rest_lengths,
+        # print data
+        "is_convergence": is_convergence,
+        "num_of_iterations": i,
+        "vel_app": vel_app,
+        ## aero_structural_total_time
+        "residual_f_including_fixed_nodes": residual_f_including_fixed_nodes,
+        "residual_f": residual_f,
+        "f_internal": f_internal,
+        "f_external": f_external,
+        "force_aero": force_aero,
+        "force_aero_wing": force_aero_wing,
+        "force_aero_bridle": force_aero_bridle,
+        "f_tether_drag": f_tether_drag,
+        "force_gravity": force_gravity,
+        ## wing_rest_lengths
+        ## bridle_rest_lengths
+        # plot data
+        "wingpanels": wingpanels,
+        "controlpoints": controlpoints,
+        "rings": rings,
+        "coord_L": coord_L,
+        "F_rel": F_rel,
+        ## wing_rest_lengths
+        ## bridle_rest_lengths
+        # animation data
+        "position_without_na": position_without_na,
+        "num_of_rows": num_of_rows,
+        ## wing_rest_lengths
+        ## bridle_rest_lengths
     }
 
-    return points, position_without_na, post_processing_data
+    # aero_structural_total_time = time.time() - start_time
+    # num_of_iterations = i
+    # wing_rest_lengths = psystem.extract_rest_length[0:len_wing_rest_length]
+    # bridle_rest_lengths = psystem.extract_rest_length[len_wing_rest_length:]
+    # print_data = [
+    #     is_convergence,
+    #     num_of_iterations,
+    #     aero_structural_total_time,
+    #     vel_app,
+    #     residual_f_including_fixed_nodes,
+    #     residual_f,
+    #     f_internal,
+    #     f_external,
+    #     [force_aero, force_aero_wing, force_aero_bridle],
+    #     f_tether_drag,
+    #     force_gravity,
+    #     wing_rest_lengths,
+    #     bridle_rest_lengths,
+    # ]
+    # plot_data = [
+    #     [wingpanels, controlpoints, rings, coord_L, F_rel],
+    #     wing_rest_lengths,
+    #     bridle_rest_lengths,
+    # ]
+
+    # # TODO: remove this; was an attempt to use df functionality more
+    # position_without_na = position.dropna(
+    #     how="all",
+    #     subset=position.columns[position.columns.str.contains("[xyz]\d+")],
+    #     axis=0,
+    # )
+    # num_of_rows = position_without_na.shape[0]
+    # animation_data = [
+    #     position_without_na,
+    #     num_of_rows,
+    #     wing_rest_lengths,
+    #     bridle_rest_lengths,
+    # ]
+    # # TODO: this should become a list of seperate variables, now you are saving duplicate data.
+    # post_processing_data = {
+    #     "print_data": print_data,
+    #     "plot_data": plot_data,
+    #     "animation_data": animation_data,
+    # }
+
+    return sim_output

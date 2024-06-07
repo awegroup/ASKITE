@@ -1,19 +1,15 @@
-import numpy as np
-import imageio
 import dill
 import os
-from PIL import Image
 from datetime import datetime
+from pathlib import Path
 import matplotlib.pyplot as plt
-from pathlib import Path
 
-from kitesim.post_processing import functions_print, functions_plot
-from kitesim.post_processing import post_processing_utils as post_processing_utils
-from kitesim.coupling import coupling_struc2aero
-from kitesim.aerodynamic import VSM
-from pathlib import Path
+from kitesim.post_processing import plotting
+from kitesim.post_processing import printing
+from kitesim.post_processing import animation
 
-def create_results_folder(path_results_folder, config):
+
+def create_results_folder(config, path_results_folder: str) -> str:
     """Create a folder to store the results of the simulation.
 
     Args:
@@ -37,449 +33,92 @@ def create_results_folder(path_results_folder, config):
     return path_results_folder_run
 
 
-def saving_input(
-    points_ini,
-    vel_app,
-    psystem,
-    params_dict,
-    config,
-    input_VSM,
-    input_bridle_aero,
-    path_results_folder,
-):  
-    """Save the input data for the simulation.
-
-    This function saves the input data required for the simulation. It creates a results folder, an input folder within the results folder, and saves the input data as pickle files in the input folder.
-
-    Args:
-        points_ini (list): The initial points for the simulation.
-        vel_app (float): The applied velocity for the simulation.
-        psystem (object): The system object for the simulation.
-        params_dict (dict): The parameters dictionary for the simulation.
-        config (object): The configuration object for the simulation.
-        input_VSM (object): The VSM input object for the simulation.
-        input_bridle_aero (object): The bridle aero input object for the simulation.
-        path_results_folder (str): The path to the results folder.
-
-    Returns:
-        str: The path to the results folder.
-
-    """
-    path_results_folder_run = create_results_folder(path_results_folder, config)
-    
-
-    # Create the input folder
-    path_results_folder_run_input= Path(path_results_folder_run) / 'input'
-
-    # Ensure the folder exists
-    if not os.path.exists(path_results_folder_run_input):
-        os.makedirs(path_results_folder_run_input)
-
-    # Create dict to store the data to be saved
-    to_be_saved_data = [
-        [config, "config"],
-        [input_VSM, "input_VSM"],
-        [input_bridle_aero, "input_bridle_aero"],
-        [points_ini, "points_ini"],
-        [vel_app, "vel_app"],
-        [params_dict, "params_dict"],
-        [psystem, "psystem"]
-    ]
- 
-    # Serialize and save all data with dill
-    for item in to_be_saved_data:
-        data, name = item
-        with open(f"{path_results_folder_run_input}/{name}.pkl", "wb") as f:
-            dill.dump(data, f)
-
-    return path_results_folder_run
-
-def saving_output(points, df_position, post_processing_data, vel_app, path_results_folder_run):
+def saving_all_dict_entries(
+    to_be_saved_dict: dict, sub_folder_name: str, path_results_folder_run: str
+):
     """Save the output data for the simulation.
 
     Args:
-        points (list): List of points.
-        df_position (pandas.DataFrame): DataFrame containing position data.
-        post_processing_data (dict): Dictionary containing post-processing data.
-        vel_app (float): Applied velocity.
+        to_be_saved_dict (dict): Dictionary containing data to be saved.
+        sub_folder_name (str): Extension for the path to save the data.
         path_results_folder_run (str): Path to the results folder.
 
     Returns:
-        None
+        str: The path to the saved output.
 
     Raises:
         None
 
     """
-    # Create the output folder
-    path_results_folder_run_output= Path(path_results_folder_run) / 'output'
+    # Create the path to the folder in which it will be saved
+    path_saved_folder = Path(path_results_folder_run) / sub_folder_name
 
     # Ensure the folder exists
-    if not os.path.exists(path_results_folder_run_output):
-        os.makedirs(path_results_folder_run_output)
-
-    # Create dict to store the data to be saved
-    to_be_saved_data = [
-        [points, "points"],
-        [df_position, "df_position"],
-        [post_processing_data, "post_processing_data"],
-        [vel_app, "vel_app"],
-    ]
- 
-    # Serialize and save all data with dill
-    for item in to_be_saved_data:
-        data, name = item
-        with open(f"{path_results_folder_run_output}/{name}.pkl", "wb") as f:
-            dill.dump(data, f)
-
-    return 
-
-
-
-def post_process_to_interpretable_results():
-
-
-
-
-def save_non_interpretable_results(
-    config,
-    input_VSM,
-    input_bridle_aero,
-    points_ini,
-    vel_app,
-    params_dict,
-    psystem,
-    points,
-    df_position,
-    post_processing_data,
-    path_results_folder,
-):
-
-    to_be_saved_data = [
-        ## input
-        [config, "config"],
-        [input_VSM, "input_VSM"],
-        [input_bridle_aero, "input_bridle_aero"],
-        [points_ini, "points_ini"],
-        [vel_app, "vel_app"],
-        [params_dict, "params_dict"],
-        [psystem, "psystem"],
-        ## output
-        [points, "points"],
-        [df_position, "df_position"],
-        [post_processing_data, "post_processing_data"],
-        [vel_app, "vel_app"],
-    ]
-
-    # TODO: could add minutes back
-    path_run_results_folder = (
-        Path(path_results_folder)
-        / config.kite_name
-        / datetime.now().strftime("%Y_%m_%d_%Hh")
-        / config.sim_name
-    )
-
-    # Ensure the folder exists
-    if not os.path.exists(path_run_results_folder):
-        os.makedirs(path_run_results_folder)
-
-    path_run_results_non_interpretable_folder = (
-        f"{path_run_results_folder}/non_interpretable"
-    )
-    if not os.path.exists(path_run_results_non_interpretable_folder):
-        os.makedirs(path_run_results_non_interpretable_folder)
+    if not os.path.exists(path_saved_folder):
+        os.makedirs(path_saved_folder)
 
     # Serialize and save all data with dill
-    for item in to_be_saved_data:
-        data, name = item
-        with open(f"{path_run_results_non_interpretable_folder}/{name}.pkl", "wb") as f:
+    for name, data in to_be_saved_dict.items():
+        with open(f"{path_saved_folder}/{name}.pkl", "wb") as f:
             dill.dump(data, f)
 
-    return path_run_results_folder
-
-def process_non_interpretable_results():
-    #TODO: combine the load, produce and save functions
     return
 
 
+def load_all_files_from_folder(folder_path: str) -> dict:
+    """Load all .pkl files in the specified folder and return a dictionary with the loaded data.
 
-def load_interpertable_results(path_run_results_folder):
+    Args:
+        folder_path (Path): Path to the folder containing the .pkl files.
 
-    # Load the data from the saved files
-    path_run_results_non_interpretable_folder = (
-        f"{path_run_results_folder}/non_interpretable"
-    )
-    with open(f"{path_run_results_non_interpretable_folder}/config.pkl", "rb") as f:
-        config = dill.load(f)
-    with open(f"{path_run_results_non_interpretable_folder}/points.pkl", "rb") as f:
-        points = dill.load(f)
-    with open(
-        f"{path_run_results_non_interpretable_folder}/post_processing_data.pkl", "rb"
-    ) as f:
-        post_processing_data = dill.load(f)
-    with open(f"{path_run_results_non_interpretable_folder}/vel_app.pkl", "rb") as f:
-        vel_app = dill.load(f)
-    with open(f"{path_run_results_non_interpretable_folder}/input_VSM.pkl", "rb") as f:
-        input_VSM = dill.load(f)
+    Returns:
+        dict: Dictionary containing the loaded data. The keys are the filenames without the extension.
+    """
+    pkl_files = folder_path.glob("*.pkl")
+    data = {}
+    for file in pkl_files:
+        with open(file, "rb") as f:
+            filename = file.stem
+            data[filename] = dill.load(f)
 
-    return points, post_processing_data, vel_app, config, input_VSM
+    return data
 
-def produce_interpretable_results(path_run_results_folder, points, post_processing_data, vel_app, config, input_VSM
-):
 
+def processing_output(path_results_folder_run: str) -> dict:
+    """Process the output data from the simulation.
+
+        First load the data from the saved input and output files.
+        Then print, plot, and animate the results based on the configuration settings.
+
+    Args:
+        path_results_folder_run (str): Path to the results folder.
+
+    Returns:
+        dict: Dictionary containing the results of the simulation.
+
+    """
+    # Load the input and output data
+    path_saved_input = Path(path_results_folder_run) / "input"
+    path_saved_output = Path(path_results_folder_run) / "output"
+    loaded_data_input = load_all_files_from_folder(path_saved_input)
+    loaded_data_output = load_all_files_from_folder(path_saved_output)
+    loaded_data = {**loaded_data_input, **loaded_data_output}
+
+    # Get the configuration settings
+    config = loaded_data["config"]
+
+    # Print, plot, and animate the results based on the configuration settings
     if config.is_with_printing:
-        print_results(
-            points,
-            post_processing_data["print_data"],
-            config,
-        )
+        # TODO: Could think about also saving this as .txt file
+        printing.print_results(loaded_data)
+
     if config.is_with_plotting:
-        plot(
-            post_processing_data["plot_data"],
-            points,
-            vel_app,
-            config,
-            path_run_results_folder,
-        )
-    plt.show()
+        plotting.make_plot(loaded_data, path_results_folder_run)
+        plt.show()
+
     if config.is_with_animation:
         print(f"")
         print("--> Generating ANIMATION \{*_*}/")
-        animate(
-            post_processing_data["animation_data"],
-            vel_app,
-            config,
-            input_VSM,
-            path_run_results_folder,
-        )
-    return 
+        animation.make_animation(loaded_data, path_results_folder_run)
 
-def save_interpretable_results(
-    path_run_results_folder, points, post_processing_data, vel_app, config, input_VSM
-):
-
-def process_interpretable_results():
-    #TODO: combine the load, produce and save functions
     return
-
-
-def print_results(
-    points,
-    print_data,
-    config,
-):
-    # Unpacking the print_data
-    (
-        is_convergence,
-        num_of_iterations,
-        aero_structural_total_time,
-        vel_app,
-        residual_f_including_fixed_nodes,
-        residual_f,
-        f_internal,
-        f_external,
-        aero_force_print_data,
-        f_tether_drag,
-        f_gravity,
-        wing_rest_lengths,
-        bridle_rest_lengths,
-    ) = print_data
-    force_aero, force_aero_wing, force_aero_bridle = aero_force_print_data
-
-    ## Printing out the solution nicely
-    functions_print.print_aerostructural(
-        is_convergence,
-        num_of_iterations,
-        config.aero_structural.max_iter,
-        aero_structural_total_time,
-    )
-    functions_print.print_settings(vel_app, config)
-    functions_print.print_initial_kite_dimensions(config)
-    functions_print.print_forces(
-        f_internal,
-        f_external,
-        force_aero,
-        residual_f_including_fixed_nodes,
-        residual_f,
-        f_tether_drag,
-        f_gravity,
-        points,
-    )
-    functions_print.print_aero(
-        points, vel_app, force_aero_wing, force_aero_bridle, config
-    )
-    functions_print.print_structural(
-        points, bridle_rest_lengths, wing_rest_lengths, config
-    )
-
-
-def plot(
-    plot_data,
-    points,
-    vel_app,
-    config,
-    path_run_results_folder,
-):
-    # Unpacking the plot_data
-    wingpanels, controlpoints, rings, coord_L, F_rel = plot_data[0]
-    wing_rest_lengths = plot_data[1]
-    bridle_rest_lengths = plot_data[2]
-
-    ##TODO: not working, doesn't show elongation
-    ## extracting the elongation values of the bridle lines
-    elongation_values = post_processing_utils.calculate_elongation(
-        points,
-        wing_rest_lengths,
-        bridle_rest_lengths,
-        config,
-    )[2]
-    functions_plot.plot_aero(
-        points,
-        elongation_values,
-        vel_app,
-        wingpanels,
-        controlpoints,
-        rings,
-        coord_L,
-        F_rel,
-        config,
-        path_run_results_folder,
-        elev=9.14,  # 10
-        azim=0,  # 230
-    )
-    # functions_plot.plot_aero(config.vel_wind, config.vel_kite, vel_app, wingpanels, controlpoints, rings, coord_L, config.kite.n_segments, F_rel, elev=0, azim=-90)
-
-    if config.is_with_plotly_plot:
-        # Plotting the solution - offline PLOTLY
-        plot_points_ini = [2, config.kite.points_ini, "black", 2]
-        plot_points = [2, points, "green", 4]
-        plot_lines_old = [
-            config.kite.points_ini,
-            np.concatenate(
-                (config.kite.connectivity.bridle_ci, config.kite.connectivity.wing_ci)
-            ),
-            np.concatenate(
-                (config.kite.connectivity.bridle_cj, config.kite.connectivity.wing_cj)
-            ),
-            "grey",
-            1.5,
-            [],
-        ]
-        plot_lines_new = [
-            points,
-            np.concatenate(
-                (config.kite.connectivity.bridle_ci, config.kite.connectivity.wing_ci)
-            ),
-            np.concatenate(
-                (config.kite.connectivity.bridle_cj, config.kite.connectivity.wing_cj)
-            ),
-            "purple",
-            4,
-            elongation_values,
-        ]
-        plot_surface_old = [
-            True,
-            config.kite.points_ini,
-            config.kite.connectivity.plate_point_indices,
-            "purple",
-            0.0,
-        ]
-        plot_surface_new = [
-            True,
-            points,
-            config.kite.connectivity.plate_point_indices,
-            "lightgrey",
-            0.3,
-        ]
-        functions_plot.plot_kite(
-            [plot_points, plot_points_ini],
-            [plot_lines_new, plot_lines_old],
-            f" ",
-            [plot_surface_new, plot_surface_old],
-        )
-        # functions_plot.plot_kite([plot_points],[plot_lines_new],f"Light-grey: surfplan, Purple: simulation",[plot_surface_new])
-
-
-def animate(animation_data, vel_app, config, input_VSM, path_run_results_folder):
-    # Unpacking animation_data
-    position, num_of_iterations, wing_rest_lengths, bridle_rest_lengths = animation_data
-
-    n = len(config.kite.points_ini)
-    num_frames = num_of_iterations
-    print(f"Number of frames: {num_frames}")
-    vel_app_norm = np.linalg.norm(vel_app)
-
-    # Generate each frame
-    for frame in range(num_frames):
-        points = np.array(
-            [
-                [
-                    position[f"x{n_i + 1}"].iloc[frame],
-                    position[f"y{n_i + 1}"].iloc[frame],
-                    position[f"z{n_i + 1}"].iloc[frame],
-                ]
-                for n_i in range(n)
-            ]
-        )
-
-        # Update the data arguments for your method
-        # This will call your method again with new data
-        # computing the aero-again as its somehow not correctly stored ##TODO: fix-this
-        # Struc --> aero
-        points_left_to_right = coupling_struc2aero.order_struc_nodes_right_to_left(
-            points, config.kite.connectivity.plate_point_indices
-        )
-        # Wing Aerodynamic
-        (
-            force_aero_wing_VSM,
-            moment_aero_wing_VSM,
-            F_rel,
-            ringvec,
-            controlpoints,
-            wingpanels,
-            rings,
-            coord_L,
-            coord_refined,
-        ) = VSM.calculate_force_aero_wing_VSM(points_left_to_right, vel_app, input_VSM)
-
-        elongation_values = post_processing_utils.calculate_elongation(
-            points,
-            wing_rest_lengths,
-            bridle_rest_lengths,
-            config,
-        )[2]
-
-        functions_plot.plot_aero(
-            points,
-            elongation_values,
-            vel_app,
-            wingpanels,
-            controlpoints,
-            rings,
-            coord_L,
-            F_rel,
-            config,
-            path_run_results_folder,
-            elev=10,
-            azim=-90,  # 230,
-            it_number=frame,
-        )
-
-    # Use pillow to save all frames as an animation in a gif file
-
-    # get_centroid = load_module_from_path(
-    #     KITE_NAME, f"{folder_path_initialisation}/functions_wing.py"
-    #     ).get_centroid
-
-    images = [
-        Image.open(f"{path_run_results_folder}/animation/plot_iteration_{frame}.png")
-        for frame in range(num_frames)
-    ]
-
-    # images[0].save(f"results/{config.kite_name}/animation/{config.sim_name}_animation_1.gif", save_all=True, append_images=images[1:], duration=100, loop=0)
-
-    # Assuming images is a list of PIL Image objects
-    imageio.mimsave(
-        f"{path_run_results_folder}/animation/{config.sim_name}_animation_va_{vel_app_norm:.1f}.mp4",
-        images,
-    )

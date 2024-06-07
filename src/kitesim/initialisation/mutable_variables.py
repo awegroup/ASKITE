@@ -2,7 +2,7 @@ from kitesim.initialisation import (
     input_particleSystem,
     particles_with_rotational_resistance,
 )
-from kitesim.post_processing import functions_plot
+from kitesim.post_processing import plotting
 from kitesim.particleSystem.ParticleSystem import ParticleSystem
 
 
@@ -27,7 +27,7 @@ def get_mutable_variables(config):
         particles_with_rotational_resistance.extract_points_between_dict(config)
     )
     if config.is_with_initial_plot:
-        functions_plot.plot_initial_geometry(config, points_between_dict)
+        plotting.plot_initial_geometry(config, points_between_dict)
 
     is_with_rotational_resistance = False
     if config.kite_name == "V9_60C":

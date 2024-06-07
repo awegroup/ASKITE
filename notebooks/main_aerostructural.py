@@ -68,56 +68,41 @@ def main():
     # Get mutable variables
     points_ini, vel_app, params_dict, psystem = get_mutable_variables(config)
 
+    # Defining input_dict
+    sim_input = {
+        "points": points_ini,
+        "vel_app": vel_app,
+        "psystem": psystem,
+        "params": params_dict,
+        "config": config,
+        "input_VSM": input_VSM,
+        "input_bridle_aero": input_bridle_aero,
+    }
+
+    # Create results folder
+    path_results_folder_run = main_post_processing.create_results_folder(
+        config, path_results_folder
+    )
+
     # Save inputs
-    path_results_folder_run = main_post_processing.saving_input(
-        points_ini,
-        vel_app,
-        psystem,
-        params_dict,
-        config,
-        input_VSM,
-        input_bridle_aero,
-        path_results_folder,
+    main_post_processing.saving_all_dict_entries(
+        sim_input, "input", path_results_folder_run
     )
 
     # AeroStructural Simulation
-    points, df_position, post_processing_data = solver_main.run_aerostructural_solver(
-        points_ini,
-        vel_app,
-        psystem,
-        params_dict,
-        config,
-        input_VSM,
-        input_bridle_aero,
+    sim_output = solver_main.run_aerostructural_solver(
+        sim_input,
     )
 
     # Save outputs
-    main_post_processing.saving_output(
-        points,
-        df_position,
-        post_processing_data,
+    main_post_processing.saving_all_dict_entries(
+        sim_output, "output", path_results_folder_run
+    )
+
+    # Create interpretable results
+    main_post_processing.processing_output(
         path_results_folder_run,
     )
-
-    ## Left-here at the post_processing
-
-    # TODO: Should this be placed inside the solver_main loop?
-    # Saving non-interpretable results
-    path_run_results_folder = main.save_non_interpretable_results(
-        config,
-        input_VSM,
-        input_bridle_aero,
-        points_ini,
-        vel_app,
-        params_dict,
-        psystem,
-        points,
-        df_position,
-        post_processing_data,
-        path_results_folder,
-    )
-    # Saving interpretable results (generated from the saved non-interpretable results)
-    main.save_interpretable_results(path_run_results_folder)
 
 
 if __name__ == "__main__":

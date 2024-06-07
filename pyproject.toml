@@ -20,7 +20,7 @@ dependencies = [
     "pyyaml",
     "plotly",
     "pillow",
-    "ipywidgets",
+    "ipywidgets"
 ]
 requires-python = ">=3.8"
 authors = [

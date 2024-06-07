@@ -409,13 +409,23 @@ def ini_config(
         steering_tape_final_extension=config_data["steering_tape_final_extension"],
         # OUTPUT SETTINGS
         is_with_printing=config_data["is_with_printing"],
-        is_with_plotting=config_data["is_with_plotting"],
-        is_with_animation=config_data["is_with_animation"],
         is_print_mid_results=config_data["is_print_mid_results"],
         is_with_initial_plot=config_data["is_with_initial_plot"],
         is_with_initial_point_velocity=config_data["is_with_initial_point_velocity"],
         is_with_plotly_plot=config_data["is_with_plotly_plot"],
         is_with_aero_geometry=config_data["is_with_aero_geometry"],
+        # PLOTTING SETTINGS
+        is_with_plotting=config_data["is_with_plotting"],
+        plot_format=config_data["plot_format"],
+        plot_elev=np.array([float(i) for i in config_data["plot_elev"]]),
+        plot_azim=np.array([float(i) for i in config_data["plot_azim"]]),
+        # ANIMATION SETTINGS
+        is_with_animation=config_data["is_with_animation"],
+        animation_fps=config_data["animation_fps"],
+        animation_dpi=config_data["animation_dpi"],
+        animation_bitrate=config_data["animation_bitrate"],
+        animation_elev=config_data["animation_elev"],
+        animation_azim=config_data["animation_azim"],
         # SIMULATION SETTINGS
         ## initialisation
         bridle_initial_compression_factor=config_data[
