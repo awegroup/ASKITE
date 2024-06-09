@@ -1,1 +1,6 @@
-#TODO: create a default data class, based on the config default
+# settings needed for crosswind & circular case here set to default values
+tol_fx_ratio_to_fz: !!float 0
+tol_vk_optimization: !!float 0
+vk_x_initial_guess_factor_of_vw: !!float 0
+is_with_varying_va: !!bool false
+r_0_initial: !!float 0

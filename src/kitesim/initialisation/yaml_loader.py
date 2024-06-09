@@ -1,7 +1,8 @@
 import numpy as np
-import yaml
 import os
-import importlib
+from pathlib import Path
+import logging
+import attr
 
 from kitesim.structural import structural_mesher
 from kitesim.initialisation.initialisation_utils import (
@@ -25,6 +26,86 @@ from .defining_config_class import (
     AirfoilGeometry,
     StiffnessConfig,
 )
+
+
+## Initialize kite config child-classes
+def ini_bridle_config(BridleConfig, config_data_kite):
+    bridle_config = BridleConfig(
+        diameter=config_data_kite["bridle"]["diameter"],
+        density=config_data_kite["bridle"]["density"],
+        bridle_point_index=config_data_kite["bridle"]["bridle_point_index"],
+        depower_tape_index=config_data_kite["bridle"]["depower_tape_index"],
+        left_steering_tape_index=config_data_kite["bridle"]["left_steering_tape_index"],
+        right_steering_tape_index=config_data_kite["bridle"][
+            "right_steering_tape_index"
+        ],
+    )
+    return bridle_config
+
+
+def ini_pulley_config(PulleyConfig, config_data_kite):
+    pulley_config = PulleyConfig(
+        point_indices=config_data_kite["pulley"]["point_indices"],
+        mass=config_data_kite["pulley"]["mass"],
+        number_of_pulleys_in_back_lines=config_data_kite["pulley"][
+            "number_of_pulleys_in_back_lines"
+        ],
+        line_indices=config_data_kite["pulley"]["line_indices"],
+        line_pair_indices=config_data_kite["pulley"]["line_pair_indices"],
+        ci=config_data_kite["pulley"]["ci"],
+        cj=config_data_kite["pulley"]["cj"],
+        other_line_pair=config_data_kite["pulley"]["other_line_pair"],
+    )
+    return pulley_config
+
+
+def ini_kcu_config(KCUConfig, config_data_kite):
+    kcu_config = KCUConfig(
+        drag_coefficient=config_data_kite["kcu"]["drag_coefficient"],
+        diameter=config_data_kite["kcu"]["diameter"],
+        index=config_data_kite["kcu"]["index"],
+        mass=config_data_kite["kcu"]["mass"],
+    )
+    return kcu_config
+
+
+def ini_connectivity_config(ConnectivityConfig, config_data_kite):
+    connectivity_config = ConnectivityConfig(
+        bridle_ci=config_data_kite["connectivity"]["bridle_ci"],
+        bridle_cj=config_data_kite["connectivity"]["bridle_cj"],
+        plate_point_indices=config_data_kite["connectivity"]["plate_point_indices"],
+        wing_ci=config_data_kite["connectivity"]["wing_ci"],
+        wing_cj=config_data_kite["connectivity"]["wing_cj"],
+        te_line_indices=config_data_kite["connectivity"]["te_line_indices"],
+        tube_line_indices=config_data_kite["connectivity"]["tube_line_indices"],
+    )
+    return connectivity_config
+
+
+def ini_airfoil_geometry_config(AirfoilGeometry, config_data_kite):
+    airfoil_geometry_config = AirfoilGeometry(
+        tube_diameters=config_data_kite["airfoil"]["tube_diameters"],
+        is_tube_diameter_dimensionless=config_data_kite["airfoil"][
+            "is_tube_diameter_dimensionless"
+        ],
+        canopy_max_heights=config_data_kite["airfoil"]["canopy_max_heights"],
+        is_canopy_max_height_dimensionless=config_data_kite["airfoil"][
+            "is_canopy_max_height_dimensionless"
+        ],
+    )
+    return airfoil_geometry_config
+
+
+def ini_stiffness_config(StiffnessConfig, config_data_kite):
+    stiffness_config = StiffnessConfig(
+        bridle=config_data_kite["stiffness"]["bridle"],
+        tube=config_data_kite["stiffness"]["tube"],
+        trailing_edge=config_data_kite["stiffness"]["trailing_edge"],
+        canopy=config_data_kite["stiffness"]["canopy"],
+        k_bend_strut=config_data_kite["stiffness"]["k_bend_strut"],
+        k_bend_leading_edge=config_data_kite["stiffness"]["k_bend_leading_edge"],
+    )
+    return stiffness_config
 
 
 ## Initialize child-classes first
@@ -89,8 +170,6 @@ def ini_tether_config(TetherConfig, config_data):
 
 
 ## Initialize Kite-specific configuration
-
-
 def ini_kite_config(KiteConfig, config_data, config_data_kite, path_kite_data):
 
     ## Finding the Connectivity
@@ -288,81 +367,120 @@ def ini_kite_config(KiteConfig, config_data, config_data_kite, path_kite_data):
     span_calculated = max(wing_nodes[:, 1]) - min(wing_nodes[:, 1])
     height_calculated = max(wing_nodes[:, 2]) - min(wing_nodes[:, 2])
 
-    kite_config = KiteConfig(
-        points_ini=points_ini,
-        n_points=int(len(points_ini)),
-        surfplan_filename=config_data_kite["surfplan_filename"],
-        area_projected=area_projected_calculated,
-        area_surface=area_surface_calculated,
-        ref_chord=ref_chord_calculated,
-        span=span_calculated,
-        height=height_calculated,
-        wing_mass=config_data_kite["wing_mass"],
-        is_with_elongation_limit=config_data_kite["is_with_elongation_limit"],
-        elongation_limit=config_data_kite["elongation_limit"],
-        is_with_compression_limit=config_data_kite["is_with_compression_limit"],
-        compression_limit=config_data_kite["compression_limit"],
-        limit_stiffness_factor=config_data_kite["limit_stiffness_factor"],
-        billowing_angles=BILLOWING_ANGLES,
-        n_segments=n_segments,
-        wing_rest_lengths_initial=wing_rest_lengths_initial,
-        bridle_rest_lengths_initial=bridle_rest_lengths_initial,
-        mass_points=mass_points,
-        ## Child classes
-        bridle=BridleConfig(
-            diameter=bridle_data["diameter"],
-            density=bridle_data["density"],
-            bridle_point_index=bridle_data["bridle_point_index"],
-            depower_tape_index=bridle_data["depower_tape_index"],
-            left_steering_tape_index=bridle_data["left_steering_tape_index"],
-            right_steering_tape_index=bridle_data["right_steering_tape_index"],
-        ),
-        pulley=PulleyConfig(
-            point_indices=np.array(pulley_data["point_indices"]),
-            mass=np.array(pulley_data["mass"]),
-            number_of_pulleys_in_back_lines=np.array(
+    dict_kite_config = {
+        "points_ini": points_ini,
+        "n_points": int(len(points_ini)),
+        "surfplan_filename": config_data_kite["surfplan_filename"],
+        "area_projected": area_projected_calculated,
+        "area_surface": area_surface_calculated,
+        "ref_chord": ref_chord_calculated,
+        "span": span_calculated,
+        "height": height_calculated,
+        "wing_mass": config_data_kite["wing_mass"],
+        "is_with_elongation_limit": config_data_kite["is_with_elongation_limit"],
+        "elongation_limit": config_data_kite["elongation_limit"],
+        "is_with_compression_limit": config_data_kite["is_with_compression_limit"],
+        "compression_limit": config_data_kite["compression_limit"],
+        "limit_stiffness_factor": config_data_kite["limit_stiffness_factor"],
+        "billowing_angles": BILLOWING_ANGLES,
+        "n_segments": n_segments,
+        "wing_rest_lengths_initial": wing_rest_lengths_initial,
+        "bridle_rest_lengths_initial": bridle_rest_lengths_initial,
+        "mass_points": mass_points,
+        "bridle": {
+            "diameter": bridle_data["diameter"],
+            "density": bridle_data["density"],
+            "bridle_point_index": bridle_data["bridle_point_index"],
+            "depower_tape_index": bridle_data["depower_tape_index"],
+            "left_steering_tape_index": bridle_data["left_steering_tape_index"],
+            "right_steering_tape_index": bridle_data["right_steering_tape_index"],
+        },
+        "pulley": {
+            "point_indices": np.array(pulley_data["point_indices"]),
+            "mass": np.array(pulley_data["mass"]),
+            "number_of_pulleys_in_back_lines": np.array(
                 pulley_data["number_of_pulleys_in_back_lines"]
             ),
-            line_indices=np.array(pulley_data["line_indices"]),
-            line_pair_indices=np.array(pulley_data["line_pair_indices"]),
-            ci=np.array(pulley_data["ci"]),
-            cj=np.array(pulley_data["cj"]),
-            other_line_pair=pulley_data["other_line_pair"],
-        ),
-        kcu=KCUConfig(
-            drag_coefficient=config_data_kite["kcu"]["drag_coefficient"],
-            diameter=config_data_kite["kcu"]["diameter"],
-            index=config_data_kite["kcu"]["index"],
-            mass=config_data_kite["kcu"]["mass"],
-        ),
-        connectivity=ConnectivityConfig(
-            bridle_ci=bridle_ci,
-            bridle_cj=bridle_cj,
-            plate_point_indices=plate_point_indices,
-            wing_ci=wing_ci,
-            wing_cj=wing_cj,
-            te_line_indices=te_line_indices,
-            tube_line_indices=tube_line_indices,
-        ),
-        airfoil=AirfoilGeometry(
-            tube_diameters=TUBE_DIAMETERS,
-            is_tube_diameter_dimensionless=config_data_kite[
+            "line_indices": np.array(pulley_data["line_indices"]),
+            "line_pair_indices": np.array(pulley_data["line_pair_indices"]),
+            "ci": np.array(pulley_data["ci"]),
+            "cj": np.array(pulley_data["cj"]),
+            "other_line_pair": pulley_data["other_line_pair"],
+        },
+        "kcu": {
+            "drag_coefficient": config_data_kite["kcu"]["drag_coefficient"],
+            "diameter": config_data_kite["kcu"]["diameter"],
+            "index": config_data_kite["kcu"]["index"],
+            "mass": config_data_kite["kcu"]["mass"],
+        },
+        "connectivity": {
+            "bridle_ci": bridle_ci,
+            "bridle_cj": bridle_cj,
+            "plate_point_indices": plate_point_indices,
+            "wing_ci": wing_ci,
+            "wing_cj": wing_cj,
+            "te_line_indices": te_line_indices,
+            "tube_line_indices": tube_line_indices,
+        },
+        "airfoil": {
+            "tube_diameters": TUBE_DIAMETERS,
+            "is_tube_diameter_dimensionless": config_data_kite[
                 "is_tube_diameter_dimensionless"
             ],
-            canopy_max_heights=CANOPY_MAX_HEIGHTS,
-            is_canopy_max_height_dimensionless=config_data_kite[
+            "canopy_max_heights": CANOPY_MAX_HEIGHTS,
+            "is_canopy_max_height_dimensionless": config_data_kite[
                 "is_canopy_max_height_dimensionless"
             ],
-        ),
-        stiffness=StiffnessConfig(
-            bridle=config_data_kite["stiffness_bridle"],
-            tube=config_data_kite["stiffness_tube"],
-            trailing_edge=config_data_kite["stiffness_trailing_edge"],
-            canopy=config_data_kite["stiffness_canopy"],
+        },
+        "stiffness": {
+            "bridle": config_data_kite["stiffness_bridle"],
+            "tube": config_data_kite["stiffness_tube"],
+            "trailing_edge": config_data_kite["stiffness_trailing_edge"],
+            "canopy": config_data_kite["stiffness_canopy"],
             # rotational
-            k_bend_strut=stiffness_bend_strut,
-            k_bend_leading_edge=stiffness_bend_leading_edge,
-        ),
+            "k_bend_strut": stiffness_bend_strut,
+            "k_bend_leading_edge": stiffness_bend_leading_edge,
+        },
+    }
+    return dict_kite_config
+
+
+def instantiate_kite_config(
+    KiteConfig,
+    BridleConfig,
+    PulleyConfig,
+    KCUConfig,
+    ConnectivityConfig,
+    AirfoilGeometry,
+    StiffnessConfig,
+    dict_kite_config,
+):
+    kite_config = KiteConfig(
+        points_ini=dict_kite_config["points_ini"],
+        n_points=dict_kite_config["n_points"],
+        surfplan_filename=dict_kite_config["surfplan_filename"],
+        area_projected=dict_kite_config["area_projected"],
+        area_surface=dict_kite_config["area_surface"],
+        ref_chord=dict_kite_config["ref_chord"],
+        span=dict_kite_config["span"],
+        height=dict_kite_config["height"],
+        wing_mass=dict_kite_config["wing_mass"],
+        is_with_elongation_limit=dict_kite_config["is_with_elongation_limit"],
+        elongation_limit=dict_kite_config["elongation_limit"],
+        is_with_compression_limit=dict_kite_config["is_with_compression_limit"],
+        compression_limit=dict_kite_config["compression_limit"],
+        limit_stiffness_factor=dict_kite_config["limit_stiffness_factor"],
+        billowing_angles=dict_kite_config["billowing_angles"],
+        n_segments=dict_kite_config["n_segments"],
+        wing_rest_lengths_initial=dict_kite_config["wing_rest_lengths_initial"],
+        bridle_rest_lengths_initial=dict_kite_config["bridle_rest_lengths_initial"],
+        mass_points=dict_kite_config["mass_points"],
+        bridle=ini_bridle_config(BridleConfig, dict_kite_config),
+        pulley=ini_pulley_config(PulleyConfig, dict_kite_config),
+        kcu=ini_kcu_config(KCUConfig, dict_kite_config),
+        connectivity=ini_connectivity_config(ConnectivityConfig, dict_kite_config),
+        airfoil=ini_airfoil_geometry_config(AirfoilGeometry, dict_kite_config),
+        stiffness=ini_stiffness_config(StiffnessConfig, dict_kite_config),
     )
     return kite_config
 
@@ -462,45 +580,47 @@ def ini_config(
     return config
 
 
+def create_attr_class_from_dict(class_name: str, data_dict: dict):
+    """Recursively create an attrs class from a dictionary."""
+    attributes = {}
+    for key, value in data_dict.items():
+        if isinstance(value, dict):
+            # Recursively create a nested attrs class for nested dictionaries
+            nested_class = create_attr_class_from_dict(
+                f"{class_name}_{key.capitalize()}", value
+            )
+            attributes[key] = attr.ib(default=nested_class(**value))
+        else:
+            attributes[key] = attr.ib(default=value)
+    return attr.make_class(class_name, attributes, frozen=True)
+
+
 def setup_config(
     path_config,
     path_processed_data_folder,
 ):
 
-    # Load the settings
-    with open((path_config), "r") as config_file:
-        config_data = yaml.load(config_file, Loader=yaml.SafeLoader)
-    # Load the case specific settings
-    config_case = cases_yaml_reader.read_yaml_file(f"{config_data['sim_name']}.yaml")
-    # Appending the two togeher (the update method appends a dict to another)
-    config_data.update(config_case)
-
-    # TODO: add log-statement, for what is being added to the config. This is important for debugging
-
-    # Loading kite settings
-    kite_name = config_data["kite_name"]
-    path_kite_config = (
-        f"{path_processed_data_folder}/{kite_name}/config_kite_{kite_name}.yaml"
+    # Load the yaml defined settings into dicts
+    config_data = cases_yaml_reader.read_yaml_file(path_config, None)
+    config_data.update(cases_yaml_reader.read_yaml_file(None, "default_case.yaml"))
+    config_data.update(
+        cases_yaml_reader.read_yaml_file(None, f"{config_data['sim_name']}.yaml")
     )
-    with open((path_kite_config), "r") as config_file:
-        config_data_kite = yaml.load(config_file, Loader=yaml.SafeLoader)
+    path_kite_config = (
+        Path(path_processed_data_folder)
+        / config_data["kite_name"]
+        / f"config_kite_{config_data['kite_name']}.yaml"
+    )
+    config_data_kite = cases_yaml_reader.read_yaml_file(path_kite_config, None)
 
-    # TODO: remove is old method
-    # case_path = f'{case_path_folder}/{config_data["sim_name"]}.yaml'
-    # with open((case_path), "r") as config_file:
-    #     config_case = yaml.load(config_file, Loader=yaml.SafeLoader)
-
-    # # TODO: this will be resolved once you have your default class
-    # # TODO: Adding dummy-value, needed because class needs these as input. Resolve this boilerplate
-    # # Possible solution is using a factory-function (ask Open-AI)
-    # if not config_data["is_with_vk_optimization"]:
-    #     config_data["tol_fx_ratio_to_fz"] = 0
-    #     config_data["tol_vk_optimization"] = 0
-    #     config_data["vk_x_initial_guess_factor_of_vw"] = 0
-    # if not config_data["is_circular_case"]:
-    #     ## circular flight settings
-    #     config_data["is_with_varying_va"] = False
-    #     config_data["r_0_initial"] = 0
+    # Log the updates for debugging
+    for key, value in config_data.items():
+        if key in config_data:
+            logging.debug(
+                f"Key {key} in config_data is being updated from {config_data[key]} to {value}"
+            )
+        else:
+            logging.debug(f"Key {key} is being added to config_data with value {value}")
 
     # TODO: remove boilerplate, and do it like below here
     # # Create subclasses first
@@ -516,12 +636,26 @@ def setup_config(
         AeroStructuralConfig, config_data
     )
     tether_config = ini_tether_config(TetherConfig, config_data)
-    path_kite_data = f"{path_processed_data_folder}/{kite_name}/processed_design_files"
-    kite_config = ini_kite_config(
+    path_kite_data = (
+        Path(path_processed_data_folder)
+        / str(config_data["kite_name"])
+        / "processed_design_files"
+    )
+    dict_kite_config = ini_kite_config(
         KiteConfig,
         config_data,
         config_data_kite,
         path_kite_data,
+    )
+    kite_config = instantiate_kite_config(
+        KiteConfig,
+        BridleConfig,
+        PulleyConfig,
+        KCUConfig,
+        ConnectivityConfig,
+        AirfoilGeometry,
+        StiffnessConfig,
+        dict_kite_config,
     )
 
     # Create Config
@@ -534,5 +668,55 @@ def setup_config(
         tether_config,
         kite_config,
     )
+
+    # ## TODO: new method
+    # # Create attrs classes dynamically based on the dictionaries
+    # update confige to include all the child-classe
+    # config_data.update(aero_config)
+    # config_data.update(solver_config)
+    # config_data.update(aero_structural_config)
+    # config_data.update(tether_config)
+    # config_data["kite"] = dict_kite_config
+
+    ##TODO:
+    # (1) create a dict from the yaml files
+    # (2) create extra dicts for some of the child classes
+    # (3) create a big nested dict_config_data with all of these dicts
+    # (4) dynamically create a frozen attrs nested config class from this big dictionary
+
+    # Still to do:
+    # (2) creating the dicts for all of the child classes
+    # (3) creating the big nested dict_config_data
+    # (4) checking if it can handle nests well, if not then update the function to handle nests
+
+    # making np.array for all lists in the dictionary
+    for key, value in config_data.items():
+        if isinstance(value, list):
+            config_data[key] = np.array(value)
+
+    General_Config = create_attr_class_from_dict("General_Config", config_data)
+    # Kite_Config = create_attr_class_from_dict("Kite_Config", dict_kite_config)
+
+    # # Initialize classes with the dictionaries
+    general_configg = General_Config(**config_data)
+    # kite_configg = Kite_Config(**dict_kite_config)
+
+    print("general_configg:", general_configg)
+    print(" ")
+    print("config", config)
+    print(" ")
+    print("----------------------------")
+    # print("kite_config", kite_config)
+    # print(" ")
+    # print("kite_configg:", kite_configg)
+
+    print("---------------------------------")
+    print("---------------------------------")
+    print("Differences between General_Config and config:")
+    print(set(attr.asdict(general_configg)) - set(attr.asdict(config)))
+    print(f" ")
+    print(set(attr.asdict(config)) - set(attr.asdict(general_configg)))
+    print("---------------------------------")
+    print("---------------------------------")
 
     return config

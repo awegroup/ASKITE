@@ -390,8 +390,7 @@ class Config:
     ## circular flight settings
     is_with_varying_va: bool
     # TODO: what's going over here?!?
-    r_0_initial: 200.0
-
+    r_0_initial: float
     # PHYSICAL CONSTANTS
     grav_constant: np.ndarray
     rho: float
