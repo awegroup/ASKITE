@@ -668,7 +668,7 @@ def update_dict_with_instantiated_classes(
     return data_dict
 
 
-def create_attr_class_from_dict(class_name: str, nest0_data_dict: dict) -> any:
+def create_attr_class_from_dict_NEW(class_name: str, nest0_data_dict: dict) -> any:
     """Create an attrs class from a dictionary with up to three levels of nesting."""
     nest0_attributes = {}
     nest1_attributes = {}
