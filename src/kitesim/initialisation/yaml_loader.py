@@ -368,79 +368,81 @@ def ini_kite_config(KiteConfig, config_data, config_data_kite, path_kite_data):
     height_calculated = max(wing_nodes[:, 2]) - min(wing_nodes[:, 2])
 
     dict_kite_config = {
-        "points_ini": points_ini,
-        "n_points": int(len(points_ini)),
-        "surfplan_filename": config_data_kite["surfplan_filename"],
-        "area_projected": area_projected_calculated,
-        "area_surface": area_surface_calculated,
-        "ref_chord": ref_chord_calculated,
-        "span": span_calculated,
-        "height": height_calculated,
-        "wing_mass": config_data_kite["wing_mass"],
-        "is_with_elongation_limit": config_data_kite["is_with_elongation_limit"],
-        "elongation_limit": config_data_kite["elongation_limit"],
-        "is_with_compression_limit": config_data_kite["is_with_compression_limit"],
-        "compression_limit": config_data_kite["compression_limit"],
-        "limit_stiffness_factor": config_data_kite["limit_stiffness_factor"],
-        "billowing_angles": BILLOWING_ANGLES,
-        "n_segments": n_segments,
-        "wing_rest_lengths_initial": wing_rest_lengths_initial,
-        "bridle_rest_lengths_initial": bridle_rest_lengths_initial,
-        "mass_points": mass_points,
-        "bridle": {
-            "diameter": bridle_data["diameter"],
-            "density": bridle_data["density"],
-            "bridle_point_index": bridle_data["bridle_point_index"],
-            "depower_tape_index": bridle_data["depower_tape_index"],
-            "left_steering_tape_index": bridle_data["left_steering_tape_index"],
-            "right_steering_tape_index": bridle_data["right_steering_tape_index"],
-        },
-        "pulley": {
-            "point_indices": np.array(pulley_data["point_indices"]),
-            "mass": np.array(pulley_data["mass"]),
-            "number_of_pulleys_in_back_lines": np.array(
-                pulley_data["number_of_pulleys_in_back_lines"]
-            ),
-            "line_indices": np.array(pulley_data["line_indices"]),
-            "line_pair_indices": np.array(pulley_data["line_pair_indices"]),
-            "ci": np.array(pulley_data["ci"]),
-            "cj": np.array(pulley_data["cj"]),
-            "other_line_pair": pulley_data["other_line_pair"],
-        },
-        "kcu": {
-            "drag_coefficient": config_data_kite["kcu"]["drag_coefficient"],
-            "diameter": config_data_kite["kcu"]["diameter"],
-            "index": config_data_kite["kcu"]["index"],
-            "mass": config_data_kite["kcu"]["mass"],
-        },
-        "connectivity": {
-            "bridle_ci": bridle_ci,
-            "bridle_cj": bridle_cj,
-            "plate_point_indices": plate_point_indices,
-            "wing_ci": wing_ci,
-            "wing_cj": wing_cj,
-            "te_line_indices": te_line_indices,
-            "tube_line_indices": tube_line_indices,
-        },
-        "airfoil": {
-            "tube_diameters": TUBE_DIAMETERS,
-            "is_tube_diameter_dimensionless": config_data_kite[
-                "is_tube_diameter_dimensionless"
-            ],
-            "canopy_max_heights": CANOPY_MAX_HEIGHTS,
-            "is_canopy_max_height_dimensionless": config_data_kite[
-                "is_canopy_max_height_dimensionless"
-            ],
-        },
-        "stiffness": {
-            "bridle": config_data_kite["stiffness_bridle"],
-            "tube": config_data_kite["stiffness_tube"],
-            "trailing_edge": config_data_kite["stiffness_trailing_edge"],
-            "canopy": config_data_kite["stiffness_canopy"],
-            # rotational
-            "k_bend_strut": stiffness_bend_strut,
-            "k_bend_leading_edge": stiffness_bend_leading_edge,
-        },
+        "kite": {
+            "points_ini": points_ini,
+            "n_points": int(len(points_ini)),
+            "surfplan_filename": config_data_kite["surfplan_filename"],
+            "area_projected": area_projected_calculated,
+            "area_surface": area_surface_calculated,
+            "ref_chord": ref_chord_calculated,
+            "span": span_calculated,
+            "height": height_calculated,
+            "wing_mass": config_data_kite["wing_mass"],
+            "is_with_elongation_limit": config_data_kite["is_with_elongation_limit"],
+            "elongation_limit": config_data_kite["elongation_limit"],
+            "is_with_compression_limit": config_data_kite["is_with_compression_limit"],
+            "compression_limit": config_data_kite["compression_limit"],
+            "limit_stiffness_factor": config_data_kite["limit_stiffness_factor"],
+            "billowing_angles": BILLOWING_ANGLES,
+            "n_segments": n_segments,
+            "wing_rest_lengths_initial": wing_rest_lengths_initial,
+            "bridle_rest_lengths_initial": bridle_rest_lengths_initial,
+            "mass_points": mass_points,
+            "bridle": {
+                "diameter": bridle_data["diameter"],
+                "density": bridle_data["density"],
+                "bridle_point_index": bridle_data["bridle_point_index"],
+                "depower_tape_index": bridle_data["depower_tape_index"],
+                "left_steering_tape_index": bridle_data["left_steering_tape_index"],
+                "right_steering_tape_index": bridle_data["right_steering_tape_index"],
+            },
+            "pulley": {
+                "point_indices": np.array(pulley_data["point_indices"]),
+                "mass": np.array(pulley_data["mass"]),
+                "number_of_pulleys_in_back_lines": np.array(
+                    pulley_data["number_of_pulleys_in_back_lines"]
+                ),
+                "line_indices": np.array(pulley_data["line_indices"]),
+                "line_pair_indices": np.array(pulley_data["line_pair_indices"]),
+                "ci": np.array(pulley_data["ci"]),
+                "cj": np.array(pulley_data["cj"]),
+                "other_line_pair": pulley_data["other_line_pair"],
+            },
+            "kcu": {
+                "drag_coefficient": config_data_kite["kcu"]["drag_coefficient"],
+                "diameter": config_data_kite["kcu"]["diameter"],
+                "index": config_data_kite["kcu"]["index"],
+                "mass": config_data_kite["kcu"]["mass"],
+            },
+            "connectivity": {
+                "bridle_ci": bridle_ci,
+                "bridle_cj": bridle_cj,
+                "plate_point_indices": plate_point_indices,
+                "wing_ci": wing_ci,
+                "wing_cj": wing_cj,
+                "te_line_indices": te_line_indices,
+                "tube_line_indices": tube_line_indices,
+            },
+            "airfoil": {
+                "tube_diameters": TUBE_DIAMETERS,
+                "is_tube_diameter_dimensionless": config_data_kite[
+                    "is_tube_diameter_dimensionless"
+                ],
+                "canopy_max_heights": CANOPY_MAX_HEIGHTS,
+                "is_canopy_max_height_dimensionless": config_data_kite[
+                    "is_canopy_max_height_dimensionless"
+                ],
+            },
+            "stiffness": {
+                "bridle": config_data_kite["stiffness_bridle"],
+                "tube": config_data_kite["stiffness_tube"],
+                "trailing_edge": config_data_kite["stiffness_trailing_edge"],
+                "canopy": config_data_kite["stiffness_canopy"],
+                # rotational
+                "k_bend_strut": stiffness_bend_strut,
+                "k_bend_leading_edge": stiffness_bend_leading_edge,
+            },
+        }
     }
     return dict_kite_config
 
@@ -580,25 +582,159 @@ def ini_config(
     return config
 
 
+# def create_attr_class_from_dict(class_name: str, data_dict: dict):
+#     """Recursively create an attrs class from a dictionary."""
+#     attributes = {}
+#     child_classses = []
+#     for key, value in data_dict.items():
+#         # if value is a dictionary, that means we need to create a nested attrs class
+#         if isinstance(value, dict):
+#             # Use the key, that indicates the nest, as the class name
+#             child_class_name = f"{key}"
+#             child_attributes = {}
+#             # loop through all the nested dict items and create attributes
+#             for key, value in value.items():
+#                 child_attributes[key] = attr.ib(default=value)
+#             # make the class
+#             ChildClass = attr.make_class(
+#                 child_class_name, child_attributes, frozen=True
+#             )
+
+#             # Create class object
+#             child_class_object = ChildClass(**value)
+
+#             # # Initialize classes with the dictionaries
+#             general_configg = General_Config(**config_data)
+#             # kite_configg = Kite_Config(**dict_kite_config)
+
+#             # # Recursively create a nested attrs class for nested dictionaries
+#             # nested_class = create_attr_class_from_dict(
+#             #     f"{class_name}_{key.capitalize()}", value
+#             # )
+#             # attributes[key] = attr.ib(default=nested_class(**value))
+#         else:
+#             attributes[key] = attr.ib(default=value)
+
+#     # append the child classes to the attributes
+#     for child_class in child_classses:
+#         attributes[child_class.__name__] = attr.ib(default=child_class)
+
+#     return attr.make_class(class_name, attributes, frozen=True)
+
+
 def create_attr_class_from_dict(class_name: str, data_dict: dict):
     """Recursively create an attrs class from a dictionary."""
     attributes = {}
+    child_classes = []
     for key, value in data_dict.items():
+        # if nested item in dictionary, create a nested class
         if isinstance(value, dict):
-            # Recursively create a nested attrs class for nested dictionaries
-            nested_class = create_attr_class_from_dict(
-                f"{class_name}_{key.capitalize()}", value
+            # Use the key to name the child class
+            child_class_name = f"{class_name}_{key.capitalize()}"
+            child_attributes = {}
+            # Loop through the nested dictionary items and create attributes
+            for nested_key, nested_value in value.items():
+                if isinstance(nested_value, dict):
+                    # If the nested value is itself a dictionary, recursively create a nested class
+                    nested_class = create_attr_class_from_dict(
+                        f"{child_class_name}_{nested_key.capitalize()}", nested_value
+                    )
+                    child_attributes[nested_key] = attr.ib(
+                        default=nested_class(**nested_value)
+                    )
+                else:
+                    child_attributes[nested_key] = attr.ib(default=nested_value)
+
+            # Make the child class
+            ChildClass = attr.make_class(
+                child_class_name, child_attributes, frozen=True
             )
-            attributes[key] = attr.ib(default=nested_class(**value))
+            # Append the child class to the list of child classes
+            child_classes.append(ChildClass)
         else:
             attributes[key] = attr.ib(default=value)
+
+    # Append the child classes to the attributes
+    for child_class in child_classes:
+        attributes[child_class.__name__] = attr.ib(default=child_class)
+
+    # Create the main class
     return attr.make_class(class_name, attributes, frozen=True)
+
+
+def create_attr_class_from_dict_infinity(class_name: str, data_dict: dict) -> any:
+    """Recursively create an attrs class from a dictionary."""
+    attributes = {}
+    nested_attributes = {}
+    nested_nested_attributes = {}
+    dict_nested_instances = {}
+    dict_nested_nested_instances = {}
+
+    logging.debug("Inside the function")
+    for key, value in data_dict.items():
+        logging.debug(f"key: {key}, value: {value}")
+        # if a nested dictionary is found, create a new class for it
+        if isinstance(value, dict):
+            logging.debug(" ")
+            logging.debug("Nested dict is found")
+            nested_data_dict = value
+            nested_class_name = str(key)
+
+            for nested_key, nested_value in nested_data_dict.items():
+                logging.debug(f"nested_key: {nested_key}, nested_value: {nested_value}")
+
+                # looping it through on itself
+                nested_nested_class_instance = create_attr_class_from_dict_infinity(
+                    nested_class_name, nested_data_dict
+                )
+                nested_attributes[nested_key] = attr.ib(
+                    default=nested_nested_class_instance
+                )
+                dict_nested_nested_instances[nested_class_name] = (
+                    nested_nested_class_instance
+                )
+
+            # (1) Create the nested class
+            NestedClass = attr.make_class(
+                nested_class_name, nested_attributes, frozen=True
+            )
+            # (2) Update the nested_data_dict to include the instantiated nested nested classes
+            for nested_key, nested_value in nested_data_dict.items():
+                if nested_key in dict_nested_nested_instances:
+                    nested_data_dict[nested_key] = dict_nested_nested_instances[
+                        nested_key
+                    ]
+
+            # (3) Instantiate the nested class
+            nested_instance = NestedClass(**nested_data_dict)
+            logging.debug(f"nested_instance: {nested_instance}")
+
+            ## Needed for adding to the main-class
+            dict_nested_instances[nested_class_name] = nested_instance
+            attributes[key] = attr.ib(default=nested_instance)
+
+        else:
+            attributes[key] = attr.ib(default=value)
+
+    # (1) create the class
+    DictParentClass = attr.make_class(class_name, attributes, frozen=True)
+
+    # (2) Update the data_dict to include the instantiated nested classes
+    for key, value in data_dict.items():
+        if key in dict_nested_instances:
+            data_dict[key] = dict_nested_instances[key]
+
+    # (3) Instantiate the class
+    dict_parent_instance = DictParentClass(**data_dict)
+
+    return dict_parent_instance
 
 
 def setup_config(
     path_config,
     path_processed_data_folder,
 ):
+    # Define paths
 
     # Load the yaml defined settings into dicts
     config_data = cases_yaml_reader.read_yaml_file(path_config, None)
@@ -611,42 +747,29 @@ def setup_config(
         / config_data["kite_name"]
         / f"config_kite_{config_data['kite_name']}.yaml"
     )
-    config_data_kite = cases_yaml_reader.read_yaml_file(path_kite_config, None)
-
-    # Log the updates for debugging
-    for key, value in config_data.items():
-        if key in config_data:
-            logging.debug(
-                f"Key {key} in config_data is being updated from {config_data[key]} to {value}"
-            )
-        else:
-            logging.debug(f"Key {key} is being added to config_data with value {value}")
-
-    # TODO: remove boilerplate, and do it like below here
-    # # Create subclasses first
-    # aero_config = AeroConfig.from_yaml(config_data)
-    # solver_config = SolverConfig.create(config_data)
-    # aero_structural_config = AeroStructuralConfig.create(config_data)
-    # tether_config = TetherConfig.create(config_data)
-    # kite_config = KiteConfig.create(config_data)
-
-    aero_config = ini_aero_config(AeroConfig, config_data)
-    solver_config = ini_solver_config(SolverConfig, config_data)
-    aero_structural_config = ini_aero_structural_config(
-        AeroStructuralConfig, config_data
-    )
-    tether_config = ini_tether_config(TetherConfig, config_data)
     path_kite_data = (
         Path(path_processed_data_folder)
         / str(config_data["kite_name"])
         / "processed_design_files"
     )
+    config_data_kite = cases_yaml_reader.read_yaml_file(path_kite_config, None)
     dict_kite_config = ini_kite_config(
         KiteConfig,
         config_data,
         config_data_kite,
         path_kite_data,
     )
+
+    ###############
+    #  OLD METHOD
+    ###############
+    aero_config = ini_aero_config(AeroConfig, config_data)
+    solver_config = ini_solver_config(SolverConfig, config_data)
+    aero_structural_config = ini_aero_structural_config(
+        AeroStructuralConfig, config_data
+    )
+    tether_config = ini_tether_config(TetherConfig, config_data)
+
     kite_config = instantiate_kite_config(
         KiteConfig,
         BridleConfig,
@@ -655,7 +778,7 @@ def setup_config(
         ConnectivityConfig,
         AirfoilGeometry,
         StiffnessConfig,
-        dict_kite_config,
+        dict_kite_config["kite"],
     )
 
     # Create Config
@@ -669,54 +792,91 @@ def setup_config(
         kite_config,
     )
 
-    # ## TODO: new method
-    # # Create attrs classes dynamically based on the dictionaries
-    # update confige to include all the child-classe
-    # config_data.update(aero_config)
-    # config_data.update(solver_config)
-    # config_data.update(aero_structural_config)
-    # config_data.update(tether_config)
-    # config_data["kite"] = dict_kite_config
+    ##############
+    # NEW METHOD
 
-    ##TODO:
     # (1) create a dict from the yaml files
     # (2) create extra dicts for some of the child classes
     # (3) create a big nested dict_config_data with all of these dicts
     # (4) dynamically create a frozen attrs nested config class from this big dictionary
 
-    # Still to do:
-    # (2) creating the dicts for all of the child classes
-    # (3) creating the big nested dict_config_data
-    # (4) checking if it can handle nests well, if not then update the function to handle nests
+    ##############
 
-    # making np.array for all lists in the dictionary
-    for key, value in config_data.items():
-        if isinstance(value, list):
-            config_data[key] = np.array(value)
+    # TODO: change yaml from AeroConfig to just aero
+    ## adding the dicts to the config_data without changing the yaml for now
+    config_data["aero"] = config_data["AeroConfig"]
+    config_data["solver"] = config_data["SolverConfig"]
+    config_data["aero_structural"] = config_data["AeroStructuralConfig"]
+    config_data["tether"] = config_data["TetherConfig"]
+    config_data["kite"] = dict_kite_config["kite"]
+    # print(f'config_data["TetherConfig"]: {config_data["TetherConfig"]}')
+    # print(f'dict_kite_config["kite"]: {dict_kite_config["kite"]}')
 
-    General_Config = create_attr_class_from_dict("General_Config", config_data)
-    # Kite_Config = create_attr_class_from_dict("Kite_Config", dict_kite_config)
+    print(config_data)
+    general_configg = create_attr_class_from_dict_infinity(
+        "general_configg", config_data
+    )
 
-    # # Initialize classes with the dictionaries
-    general_configg = General_Config(**config_data)
-    # kite_configg = Kite_Config(**dict_kite_config)
+    # Adding the kite
+    # config_data.update(dict_kite_config)
 
-    print("general_configg:", general_configg)
-    print(" ")
-    print("config", config)
-    print(" ")
-    print("----------------------------")
-    # print("kite_config", kite_config)
-    # print(" ")
-    # print("kite_configg:", kite_configg)
+    ## looping through config_data to find a list or array, and transform it to a np.array
+    def changing_dict_list_entries_to_arrays(dict_input: dict) -> dict:
+        """This function loops through a dictionary and changes all the lists to np.arrays
 
-    print("---------------------------------")
+        Args:
+            dict_input (dict): dictionary with lists as values
+
+        Returns:
+            dict: dictionary with np.arrays as values
+        """
+        for key, value in dict_input.items():
+            if isinstance(value, list) 
+                and not isinstance(value, str) 
+                and not isinstance(value, dict):
+                dict_input[key] = np.array([float(value_i) for value_i in value])
+            elif isinstance(value, dict):
+                nested_dict = value
+                dict_input[key] = changing_dict_list_entries_to_arrays(nested_dict)
+
+        return dict_input
+
+    config_data = changing_dict_list_entries_to_arrays(config_data)
+
+    ## finding level of depth
+    def max_nesting_level(data_dict):
+        max_level = 0
+
+        def _max_nesting_level(data_dict, current_level):
+            nonlocal max_level
+            if not isinstance(data_dict, dict):
+                return
+            max_level = max(max_level, current_level)
+            for value in data_dict.values():
+                _max_nesting_level(value, current_level + 1)
+
+        _max_nesting_level(data_dict, 0)
+        return max_level
+
+    print(f"Depth of dictionairy: {max_nesting_level(config_data)}")
+
+    # general_configg = create_attr_class_from_dict_infinity("general_configg", config_data)
+
+    # ##################
+    # # PRINTING DIFFERENCES
+    # ##################
+
     print("---------------------------------")
     print("Differences between General_Config and config:")
     print(set(attr.asdict(general_configg)) - set(attr.asdict(config)))
+    # print(set(config_data) - set(attr.asdict(config)))
     print(f" ")
     print(set(attr.asdict(config)) - set(attr.asdict(general_configg)))
+    # print(set(attr.asdict(config)) - set(config_data))
     print("---------------------------------")
-    print("---------------------------------")
+
+    # print(f"config.solver: {(config.solver)}")
+    # print(f"general_configg.SolverConfig: {(general_configg.solver)}")
+    # print(f'config.solver - general_configg.solver: {set(attr.asdict(  config.solver)) - set(attr.asdict(general_configg.SolverConfig))}')
 
     return config
