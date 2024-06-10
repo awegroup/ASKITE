@@ -4,24 +4,26 @@
 import time
 import numpy as np
 import pandas as pd
-from kitesim.aerodynamic import VSM, bridle_line_system_aero
+from kitesim.VortexStepMethod import VSM
+from kitesim.aerodynamic import bridle_line_system_aero
 from kitesim.coupling import coupling_struc2aero, coupling_aero2struc
 from kitesim.solver import solver_utils
-from kitesim.aerodynamic import tether_aero, VSM, bridle_line_system_aero
+from kitesim.aerodynamic import tether_aero, bridle_line_system_aero
+from kitesim.particleSystem.ParticleSystem import ParticleSystem
+from kitesim.VortexStepMethod import VSM
 
 
 def run_aerostructural_solver(sim_input):
+    """Runs the aero-structural solver for the given input parameters"""
 
     # Unpacking input_dict
     points = sim_input["points"]
     vel_app = sim_input["vel_app"]
-    psystem = sim_input["psystem"]
-    params = sim_input["params"]
     config = sim_input["config"]
-    input_VSM = sim_input["input_VSM"]
     input_bridle_aero = sim_input["input_bridle_aero"]
+    input_VSM = sim_input["input_VSM"]
+    input_PSM = sim_input["input_PSM"]
 
-    """Runs the aero-structural solver for the given input parameters"""
     # GENERAL INITIALIZATION
     ## case settings
     sim_name = config.sim_name
@@ -31,6 +33,15 @@ def run_aerostructural_solver(sim_input):
     is_print_intermediate_results = config.is_print_intermediate_results
     is_with_gravity = config.is_with_gravity
     is_with_velocity_initialization = config.is_with_velocity_initialization
+
+    ## instantiating the PSM
+    psystem = ParticleSystem(
+        input_PSM["connectivity_matrix"],
+        input_PSM["initial_conditions"],
+        input_PSM["params_dict"],
+    )
+    # TODO: would be cleaner if this was extracted from input_PSM or config
+    params = input_PSM["params_dict"]
 
     ## setting up the position-dataframe
     t_vector = np.linspace(
@@ -43,16 +54,16 @@ def run_aerostructural_solver(sim_input):
         x[f"z{i + 1}"] = np.zeros(len(t_vector))
 
     position = pd.DataFrame(index=t_vector, columns=x)
+    aero_structural_tol = params["aerostructural_tol"]
 
-    ## parameters
+    # INITIALISATION OF VARIABLES
+    ## parameters used in the loop
     start_time = time.time()
     is_convergence = False
     residual_f_list = []
     f_tether_drag = np.zeros(3)
     is_residual_below_tol = False
     damping_ratio = config.solver.damping_constant
-
-    # INITIALISATION OF VARIABLES
 
     ## actuation
     ### depower tape
@@ -104,7 +115,6 @@ def run_aerostructural_solver(sim_input):
         )
         vel_app = np.copy(config.vel_app_initial)
 
-    ## crosswind initialisation
     if is_with_vk_optimization:
         # tolerance for fx, if fx>tol*fz, then update vk_x
         tol_fx_ratio_to_fz = config.tol_fx_ratio_to_fz
@@ -403,9 +413,9 @@ def run_aerostructural_solver(sim_input):
 
         ### All the convergence checks, are be done in if-elif because only 1 should hold at once
         # if convergence (residual below set tolerance)
-        if np.linalg.norm(residual_f) <= params["aerostructural_tol"]:
+        if np.linalg.norm(residual_f) <= aero_structural_tol:
             is_residual_below_tol = True
-        if np.linalg.norm(residual_f) <= params["aerostructural_tol"] and i > 50:
+        if np.linalg.norm(residual_f) <= aero_structural_tol and i > 50:
             is_residual_below_tol = True
             is_convergence = True
 

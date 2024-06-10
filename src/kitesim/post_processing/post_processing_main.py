@@ -9,7 +9,7 @@ from kitesim.post_processing import printing
 from kitesim.post_processing import animation
 
 
-def create_results_folder(config, path_results_folder: str) -> str:
+def create_results_folder(sim_input, path_results_folder: str) -> str:
     """Create a folder to store the results of the simulation.
 
     Args:
@@ -19,6 +19,8 @@ def create_results_folder(config, path_results_folder: str) -> str:
     Returns:
         str: The path to the created results folder.
     """
+    config = sim_input["config"]
+
     path_results_folder_run = (
         Path(path_results_folder)
         / config.kite_name
