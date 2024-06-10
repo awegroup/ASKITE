@@ -831,9 +831,7 @@ def setup_config(
             dict: dictionary with np.arrays as values
         """
         for key, value in dict_input.items():
-            if isinstance(value, list) 
-                and not isinstance(value, str) 
-                and not isinstance(value, dict):
+            if isinstance(value, list):
                 dict_input[key] = np.array([float(value_i) for value_i in value])
             elif isinstance(value, dict):
                 nested_dict = value
@@ -860,7 +858,9 @@ def setup_config(
 
     print(f"Depth of dictionairy: {max_nesting_level(config_data)}")
 
-    # general_configg = create_attr_class_from_dict_infinity("general_configg", config_data)
+    general_configg = create_attr_class_from_dict_infinity(
+        "general_configg", config_data
+    )
 
     # ##################
     # # PRINTING DIFFERENCES

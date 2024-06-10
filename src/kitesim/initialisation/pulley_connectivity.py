@@ -121,6 +121,14 @@ def extract_pulley_connectivity(points, bridle_ci, bridle_cj, pulley_data):
     pulley_cj = np.concatenate((pulley_cj_key, pulley_cj_value))
 
     pulley_data["line_indices"] = np.ndarray.flatten(np.array(pulley_line_indices))
+
+    # transform pulley_line_pair indices from a dict to a nested list
+    # Why? Because attrs dataclasses can't handle numbers as attributes
+    # Does not seem used anywhere
+    pulley_line_pair_indices = [
+        [key, value] for key, value in pulley_line_pair_indices.items()
+    ]
+
     pulley_data["line_pair_indices"] = pulley_line_pair_indices
     pulley_data["ci"] = pulley_ci
     pulley_data["cj"] = pulley_cj
@@ -149,6 +157,10 @@ def extract_pulley_connectivity(points, bridle_ci, bridle_cj, pulley_data):
             [line_2_idx_p3, line_2_idx_p4, line_2_rest_length_p3p4]
         )
 
+    # transform other_line_pair from a dict to a nested list
+    # Why? Because attrs dataclasses can't handle numbers as attributes
+    # USED in input_particleSystem for rotational springs
+    additional_dict = [[key, value] for key, value in additional_dict.items()]
     pulley_data["other_line_pair"] = additional_dict
 
     return pulley_data

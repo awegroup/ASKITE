@@ -358,15 +358,15 @@ config_data_kite_3 = {
             "mass": 0.1,
             "number_of_pulleys_in_back_lines": np.array(2),
             "line_indices": [6, 4, 8, 5],
-            "line_pair_indices": {"6": 4, "8": 5},
+            # "line_pair_indices": {"6": 4, "8": 5},
             "ci": np.array([23, 27, 22, 22]),
             "cj": np.array([24, 28, 24, 28]),
-            "other_line_pair": {
-                "6": np.array([22.0, 24.0, 2.86387114]),
-                "4": np.array([23.0, 24.0, 2.34058161]),
-                "8": np.array([22.0, 28.0, 2.86387114]),
-                "5": np.array([27.0, 28.0, 2.34058161]),
-            },
+            # "other_line_pair": {
+            #     "6": np.array([22.0, 24.0, 2.86387114]),
+            #     "4": np.array([23.0, 24.0, 2.34058161]),
+            #     "8": np.array([22.0, 28.0, 2.86387114]),
+            #     "5": np.array([27.0, 28.0, 2.34058161]),
+            # },
         }
     }
 }
@@ -683,8 +683,6 @@ def create_attr_class_from_dict_NEW(class_name: str, nest0_data_dict: dict) -> a
 
     # Level 0
     for nest0_key, nest0_value in nest0_data_dict.items():
-        print("nest0_key: ", nest0_key, type(nest0_key))
-        nest0_key = str(nest0_key)
         if isinstance(nest0_value, dict):
             nest1_data_dict = nest0_value
 
@@ -922,7 +920,8 @@ def changing_dict_list_entries_to_arrays(dict_input: dict) -> dict:
 
 
 print(f"Depth of dictionairy: {max_nesting_level(config_data)}")
-# config_data = changing_dict_list_entries_to_arrays(config_data)
+config_data = config_data_kite_3
+config_data = changing_dict_list_entries_to_arrays(config_data)
 # random_name = create_attr_class_from_dict_infinity("random_name", config_data)
-random_name = create_attr_class_from_dict_NEW("random_name", config_data_kite_1)
+random_name = create_attr_class_from_dict_NEW("random_name", config_data)
 # print(random_name)

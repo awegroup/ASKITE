@@ -39,10 +39,16 @@ def define_params(config, wing_connectivity, connectivity_matrix):
     wing_rest_lengths = config.kite.wing_rest_lengths_initial
     rest_lengths = np.concatenate((wing_rest_lengths, bridle_rest_lengths))
 
-    other_line_pair_corrected_dict = {}
-
     n_wing_elements = len(wing_connectivity)
-    other_line_pair_dict = config.kite.pulley.other_line_pair
+
+    # Transform pulley.other_line_pair to a dict
+    # data_struc is [["3",value],["5", value], ...]
+    other_line_pair_dict = {}
+    for entry in config.kite.pulley.other_line_pair:
+        other_line_pair_dict[entry[0]] = entry[1]
+
+    # Correct the key
+    other_line_pair_corrected_dict = {}
     for key_i in other_line_pair_dict.keys():
         corrected_key = str(int(key_i) + n_wing_elements)
         other_line_pair_corrected_dict[corrected_key] = other_line_pair_dict[key_i]
