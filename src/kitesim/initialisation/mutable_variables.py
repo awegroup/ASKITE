@@ -1,3 +1,4 @@
+import numpy as np
 from kitesim.initialisation import (
     input_particleSystem,
     particles_with_rotational_resistance,

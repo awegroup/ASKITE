@@ -658,14 +658,7 @@ config_data_kite_4 = {
 }
 
 
-def update_dict_with_instantiated_classes(
-    data_dict: dict, dict_nested_instances: dict
-) -> dict:
-    """Update the data_dict to include the instantiated classes."""
-    for key, value in data_dict.items():
-        if key in dict_nested_instances:
-            data_dict[key] = dict_nested_instances[key]
-    return data_dict
+
 
 
 def create_attr_class_from_dict_NEW(class_name: str, nest0_data_dict: dict) -> any:
