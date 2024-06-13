@@ -167,7 +167,10 @@ def run_aerostructural_solver(sim_input):
     print(f" ")
     print(f"Running aero-structural simulation")
     print(f"----------------------------------- ")
+
+    ######################################################################
     # SIMULATION LOOP
+    ######################################################################
     ## propagating the simulation for each timestep and saving results
     for i, step in enumerate(t_vector):
         if is_with_vk_optimization:
@@ -501,6 +504,10 @@ def run_aerostructural_solver(sim_input):
 
         if is_convergence:
             break
+    ######################################################################
+    ## END OF SIMULATION FOR LOOP
+    ######################################################################
+
     print(
         f"delta_steering_tape_right = {(psystem.extract_rest_length[index_steering_tape_right]- initial_length_steering_tape_right)}"
     )
