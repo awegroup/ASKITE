@@ -11,6 +11,7 @@ def create_input_bridle_aero(config):
         The input bridle aero class.
     """
     input_bridle_aero_dict = {
+        "is_with_aero_bridle": config.is_with_aero_bridle,
         "vel_wind": config.vel_wind,
         "bridle_ci": config.kite.connectivity.bridle_ci,
         "bridle_cj": config.kite.connectivity.bridle_cj,

@@ -9,15 +9,16 @@ def calculate_fx(
     vel_kite_x,
     vel_app,
     points,
-    config,
+    connectivity,
+    input_tether_aero,
     input_VSM,
     input_bridle_aero,
 ):
-    vel_app[0] = config.vel_wind[0] - float(vel_kite_x)
+    vel_app[0] = input_bridle_aero.vel_wind[0] - float(vel_kite_x)
 
     # Struc --> aero
     points_left_to_right = coupling_struc2aero.order_struc_nodes_right_to_left(
-        points, config.kite.connectivity.plate_point_indices
+        points, connectivity.plate_point_indices
     )
     # Wing Aerodynamic
     (
@@ -34,16 +35,16 @@ def calculate_fx(
     # Aero --> struc
     force_aero_wing = coupling_aero2struc.aero2struc(
         points,
-        config.kite.connectivity.wing_ci,
-        config.kite.connectivity.wing_cj,
-        config.kite.connectivity.plate_point_indices,
+        connectivity.wing_ci,
+        connectivity.wing_cj,
+        connectivity.plate_point_indices,
         force_aero_wing_VSM,
         moment_aero_wing_VSM,
         ringvec,
         controlpoints,
     )  # Put in the new positions of the points
     # Bridle Aerodynamics
-    if config.is_with_aero_bridle:
+    if input_bridle_aero.is_with_aero_bridle:
         force_aero_bridle = (
             bridle_line_system_aero.calculate_force_aero_bridle_thedens2022(
                 points, vel_app, input_bridle_aero
@@ -57,10 +58,7 @@ def calculate_fx(
     force_aero_x = np.sum(force_aero[:, 0])
 
     drag_tether = tether_aero.calculate_tether_drag(
-        config.tether.diameter,
-        config.tether.length,
-        config.rho,
-        config.aero.cd_cylinder,
+        input_tether_aero,
         vel_app,
     )
     # print(f"force_aero_x: {force_aero_x:.1f}N and drag_tether: {drag_tether:.1f}N")
@@ -74,14 +72,14 @@ def optimalisation_of_vk_for_fx_0(
     vk_x_initial_guess,
     vel_app,
     points,
-    config,
+    n_segments,
+    connectivity,
     input_VSM,
     input_bridle_aero,
     tol_vk_optimization,
 ):
-    vel_wind = config.vel_wind
-    n_segments = config.kite.n_segments
-    plate_point_indices = config.kite.connectivity.plate_point_indices
+    vel_wind = input_bridle_aero.vel_wind
+    plate_point_indices = connectivity.plate_point_indices
 
     # TODO: remove hardcoding
     # initialising
@@ -125,7 +123,8 @@ def optimalisation_of_vk_for_fx_0(
             vel_kite_x,
             vel_app,
             points,
-            config,
+            connectivity,
+            input_tether_aero,
             input_VSM,
             input_bridle_aero,
         )
@@ -149,7 +148,14 @@ def optimalisation_of_vk_for_fx_0(
         constraints=[nonlinearConstraints],
         tol=tol_vk_optimization,
         # method="SLSQP",
-        args=(vel_app, points, config, input_VSM, input_bridle_aero),
+        args=(
+            vel_app,
+            points,
+            connectivity,
+            input_tether_aero,
+            input_VSM,
+            input_bridle_aero,
+        ),
         # options={'verbose': 1},
         bounds=boundData,
     )
