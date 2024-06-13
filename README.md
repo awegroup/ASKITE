@@ -105,6 +105,16 @@ should show a sort of important message
 ## Installation Instructions
 
 ### Developer
+Clone the repo
+```bash
+git clone https://github.com/jellepoland/kitesim
+```
+
+Go into the repo folder
+```bash
+cd kitesim
+```
+
 Create a new venv with the following command:
 ```bash
 python -m venv venv
