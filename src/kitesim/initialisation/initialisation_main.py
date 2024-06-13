@@ -95,6 +95,7 @@ def get_sim_input(
         "vel_app": np.array(config.vel_wind - config.vel_kite),
         "config": config,
         "input_bridle_aero": input_bridle_aero.create_input_bridle_aero(config),
+        "input_tether_aero": input_bridle_aero.create_input_bridle_aero(config),
         "input_VSM": input_vsm.create_input_VSM(config),
         "input_PSM": input_psm.create_input_PSM(config),
     }

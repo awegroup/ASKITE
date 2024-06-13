@@ -21,6 +21,7 @@ def run_aerostructural_solver(sim_input):
     vel_app = sim_input["vel_app"]
     config = sim_input["config"]
     input_bridle_aero = sim_input["input_bridle_aero"]
+    input_tether_aero = sim_input["input_tether_aero"]
     input_VSM = sim_input["input_VSM"]
     input_PSM = sim_input["input_PSM"]
 
@@ -63,7 +64,16 @@ def run_aerostructural_solver(sim_input):
     residual_f_list = []
     f_tether_drag = np.zeros(3)
     is_residual_below_tol = False
+
+    ##TODO: should this be done differently?
+    # Defining variables outside the loop, to speed up RUNTIME
     damping_ratio = config.solver.damping_constant
+    connectivity = config.kite.connectivity
+    n_segments = config.kite.n_segments
+    is_with_varying_va = config.is_with_varying_va
+    coupling_method = config.coupling_method
+    n_chordwise_aero_nodes = config.aero.n_chordwise_aero_nodes
+    aero_structural_max_iter = config.aero_structural.max_iter
 
     ## actuation
     ### depower tape
@@ -181,16 +191,14 @@ def run_aerostructural_solver(sim_input):
                 -vel_app[0],
                 vel_app,
                 points,
-                config,
+                connectivity,  #
+                input_tether_aero,  #
                 input_VSM,
                 input_bridle_aero,
             )
 
             f_tether_drag_x = tether_aero.calculate_tether_drag(
-                config.tether.diameter,
-                config.tether.length,
-                config.rho,
-                config.aero.cd_cylinder,
+                input_tether_aero,
                 vel_app,
             )
             f_tether_drag = np.array([f_tether_drag_x, 0, 0])
@@ -205,7 +213,8 @@ def run_aerostructural_solver(sim_input):
                     -vel_app[0],
                     vel_app,
                     points,
-                    config,
+                    n_segments,
+                    connectivity,
                     input_VSM,
                     input_bridle_aero,
                     tol_vk_optimization,
@@ -239,10 +248,11 @@ def run_aerostructural_solver(sim_input):
             # v_a_i = v_w - v_k_i | v_k_i = v_k * (r_0 + y_i) / r_k
             # The 1/4chord control point locations are used as y_i,
             # Obtained from the controlpoints dict, only defined after first iteration
-            if i > n_turn_initialisation_iterations and config.is_with_varying_va:
-                vel_kite = config.vel_wind - vel_app
+            if i > n_turn_initialisation_iterations and is_with_varying_va:
+                vel_kite = input_bridle_aero.vel_wind - vel_app
                 vel_app_distributed = [
-                    config.vel_wind - (vel_kite * (r_0 + cp["coordinates"][1]) / r_k)
+                    input_bridle_aero.vel_wind
+                    - (vel_kite * (r_0 + cp["coordinates"][1]) / r_k)
                     for cp in controlpoints
                 ]
 
@@ -268,21 +278,21 @@ def run_aerostructural_solver(sim_input):
             vel_app_distributed,
         )
         # Aero --> struc
-        if config.coupling_method == "NN":
+        if coupling_method == "NN":
             force_aero_wing = coupling_aero2struc.aero2struc_NN(
-                config.aero.n_chordwise_aero_nodes,
+                n_chordwise_aero_nodes,
                 wingpanels,
                 force_aero_wing_VSM,
                 points_wing_segment_corners_aero_orderded,
                 index_transformation_aero_to_struc_dict,
                 points,
             )
-        elif config.coupling_method == "MSc_Oriol":
+        elif coupling_method == "MSc_Oriol":
             force_aero_wing = coupling_aero2struc.aero2struc(
                 points,
-                config.kite.connectivity.wing_ci,
-                config.kite.connectivity.wing_cj,
-                config.kite.connectivity.plate_point_indices,
+                connectivity.wing_ci,
+                connectivity.wing_cj,
+                connectivity.plate_point_indices,
                 force_aero_wing_VSM,
                 moment_aero_wing_VSM,
                 ringvec,
@@ -292,7 +302,7 @@ def run_aerostructural_solver(sim_input):
             raise ValueError("Coupling method not recognized; wrong name or typo")
 
         # Bridle Aerodynamics
-        if config.is_with_aero_bridle:
+        if input_bridle_aero.is_with_aero_bridle:
             force_aero_bridle = (
                 bridle_line_system_aero.calculate_force_aero_bridle_thedens2022(
                     points, vel_app, input_bridle_aero
@@ -439,10 +449,10 @@ def run_aerostructural_solver(sim_input):
             print("Classic PS non-converging - residual no longer changes")
             break
         # if to many iterations are needed
-        elif i > config.aero_structural.max_iter:
+        elif i > aero_structural_max_iter:
             is_convergence = False
             print(
-                f"Classic PS non-converging - more than max ({config.aero_structural.max_iter}) iterations needed"
+                f"Classic PS non-converging - more than max ({aero_structural_max_iter}) iterations needed"
             )
             break
         # special case for running the simulation for only one timestep

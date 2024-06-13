@@ -1,4 +1,4 @@
-def calculate_tether_drag(tether_diameter, tether_length, rho, cd_cylinder, vel_app):
+def calculate_tether_drag(input_tether_aero, vel_app):
     ## TETHER DRAG (commented is pauls method, uncommented is the mentioned paper method)
     # unit_vector_bridle = np.array([0,0,1])
     # vel_bridle_abs = np.linalg.norm(vel_app)
@@ -25,13 +25,15 @@ def calculate_tether_drag(tether_diameter, tether_length, rho, cd_cylinder, vel_
     # print(f'Tether drag: {drag_tether}')
 
     # from this paper: https://www.researchgate.net/publication/329390819_A_reference_model_for_airborne_wind_energy_systems_for_optimization_and_control
-    drag_tether = (
-        (1 / 8)
-        * rho
-        * cd_cylinder
-        * tether_diameter
-        * tether_length
-        * (vel_app[0] ** 2)
-    )
-
+    if input_tether_aero.is_with_aero_tether:
+        drag_tether = (
+            (1 / 8)
+            * input_tether_aero.rho
+            * input_tether_aero.cd_cylinder
+            * input_tether_aero.tether_diameter
+            * input_tether_aero.tether_length
+            * (vel_app[0] ** 2)
+        )
+    else:
+        drag_tether = 0
     return drag_tether
