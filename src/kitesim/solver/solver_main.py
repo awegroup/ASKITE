@@ -4,22 +4,26 @@
 import time
 import numpy as np
 import pandas as pd
-from kitesim.aerodynamic import VSM, bridle_line_system_aero
+from kitesim.VortexStepMethod import VSM
+from kitesim.aerodynamic import bridle_line_system_aero
 from kitesim.coupling import coupling_struc2aero, coupling_aero2struc
 from kitesim.solver import solver_utils
-from kitesim.aerodynamic import tether_aero, VSM, bridle_line_system_aero
+from kitesim.aerodynamic import tether_aero, bridle_line_system_aero
+from kitesim.particleSystem.ParticleSystem import ParticleSystem
+from kitesim.VortexStepMethod import VSM
 
 
-def run_aerostructural_solver(
-    points,
-    vel_app,
-    psystem,
-    params,
-    config,
-    input_VSM,
-    input_bridle_aero,
-):
+def run_aerostructural_solver(sim_input):
     """Runs the aero-structural solver for the given input parameters"""
+
+    # Unpacking input_dict
+    points = sim_input["points"]
+    vel_app = sim_input["vel_app"]
+    config = sim_input["config"]
+    input_bridle_aero = sim_input["input_bridle_aero"]
+    input_VSM = sim_input["input_VSM"]
+    input_PSM = sim_input["input_PSM"]
+
     # GENERAL INITIALIZATION
     ## case settings
     sim_name = config.sim_name
@@ -29,6 +33,15 @@ def run_aerostructural_solver(
     is_print_intermediate_results = config.is_print_intermediate_results
     is_with_gravity = config.is_with_gravity
     is_with_velocity_initialization = config.is_with_velocity_initialization
+
+    ## instantiating the PSM
+    psystem = ParticleSystem(
+        input_PSM["connectivity_matrix"],
+        input_PSM["initial_conditions"],
+        input_PSM["params_dict"],
+    )
+    # TODO: would be cleaner if this was extracted from input_PSM or config
+    params = input_PSM["params_dict"]
 
     ## setting up the position-dataframe
     t_vector = np.linspace(
@@ -41,16 +54,16 @@ def run_aerostructural_solver(
         x[f"z{i + 1}"] = np.zeros(len(t_vector))
 
     position = pd.DataFrame(index=t_vector, columns=x)
+    aero_structural_tol = params["aerostructural_tol"]
 
-    ## parameters
+    # INITIALISATION OF VARIABLES
+    ## parameters used in the loop
     start_time = time.time()
     is_convergence = False
     residual_f_list = []
     f_tether_drag = np.zeros(3)
     is_residual_below_tol = False
     damping_ratio = config.solver.damping_constant
-
-    # INITIALISATION OF VARIABLES
 
     ## actuation
     ### depower tape
@@ -102,7 +115,6 @@ def run_aerostructural_solver(
         )
         vel_app = np.copy(config.vel_app_initial)
 
-    ## crosswind initialisation
     if is_with_vk_optimization:
         # tolerance for fx, if fx>tol*fz, then update vk_x
         tol_fx_ratio_to_fz = config.tol_fx_ratio_to_fz
@@ -155,7 +167,10 @@ def run_aerostructural_solver(
     print(f" ")
     print(f"Running aero-structural simulation")
     print(f"----------------------------------- ")
+
+    ######################################################################
     # SIMULATION LOOP
+    ######################################################################
     ## propagating the simulation for each timestep and saving results
     for i, step in enumerate(t_vector):
         if is_with_vk_optimization:
@@ -401,9 +416,9 @@ def run_aerostructural_solver(
 
         ### All the convergence checks, are be done in if-elif because only 1 should hold at once
         # if convergence (residual below set tolerance)
-        if np.linalg.norm(residual_f) <= params["aerostructural_tol"]:
+        if np.linalg.norm(residual_f) <= aero_structural_tol:
             is_residual_below_tol = True
-        if np.linalg.norm(residual_f) <= params["aerostructural_tol"] and i > 50:
+        if np.linalg.norm(residual_f) <= aero_structural_tol and i > 50:
             is_residual_below_tol = True
             is_convergence = True
 
@@ -489,6 +504,10 @@ def run_aerostructural_solver(
 
         if is_convergence:
             break
+    ######################################################################
+    ## END OF SIMULATION FOR LOOP
+    ######################################################################
+
     print(
         f"delta_steering_tape_right = {(psystem.extract_rest_length[index_steering_tape_right]- initial_length_steering_tape_right)}"
     )
@@ -513,202 +532,97 @@ def run_aerostructural_solver(
 
     # defining post_processing_output
     aero_structural_total_time = time.time() - start_time
-    num_of_iterations = i
     wing_rest_lengths = psystem.extract_rest_length[0:len_wing_rest_length]
     bridle_rest_lengths = psystem.extract_rest_length[len_wing_rest_length:]
-    print_data = [
-        is_convergence,
-        num_of_iterations,
-        aero_structural_total_time,
-        vel_app,
-        residual_f_including_fixed_nodes,
-        residual_f,
-        f_internal,
-        f_external,
-        [force_aero, force_aero_wing, force_aero_bridle],
-        f_tether_drag,
-        force_gravity,
-        wing_rest_lengths,
-        bridle_rest_lengths,
-    ]
-    plot_data = [
-        [wingpanels, controlpoints, rings, coord_L, F_rel],
-        wing_rest_lengths,
-        bridle_rest_lengths,
-    ]
-
-    # TODO: remove this; was an attempt to use df functionality more
     position_without_na = position.dropna(
         how="all",
         subset=position.columns[position.columns.str.contains("[xyz]\d+")],
         axis=0,
     )
     num_of_rows = position_without_na.shape[0]
-    animation_data = [
-        position_without_na,
-        num_of_rows,
-        wing_rest_lengths,
-        bridle_rest_lengths,
-    ]
-    # TODO: this should become a list of seperate variables, now you are saving duplicate data.
-    post_processing_data = {
-        "print_data": print_data,
-        "plot_data": plot_data,
-        "animation_data": animation_data,
+
+    sim_output = {
+        "points": points,
+        "position": position,
+        "aero_structural_total_time": aero_structural_total_time,
+        "num_of_iterations": i,
+        "is_convergence": is_convergence,
+        "wing_rest_lengths": wing_rest_lengths,
+        "bridle_rest_lengths": bridle_rest_lengths,
+        # print data
+        "is_convergence": is_convergence,
+        "num_of_iterations": i,
+        "vel_app": vel_app,
+        ## aero_structural_total_time
+        "residual_f_including_fixed_nodes": residual_f_including_fixed_nodes,
+        "residual_f": residual_f,
+        "f_internal": f_internal,
+        "f_external": f_external,
+        "force_aero": force_aero,
+        "force_aero_wing": force_aero_wing,
+        "force_aero_bridle": force_aero_bridle,
+        "f_tether_drag": f_tether_drag,
+        "force_gravity": force_gravity,
+        ## wing_rest_lengths
+        ## bridle_rest_lengths
+        # plot data
+        "wingpanels": wingpanels,
+        "controlpoints": controlpoints,
+        "rings": rings,
+        "coord_L": coord_L,
+        "F_rel": F_rel,
+        ## wing_rest_lengths
+        ## bridle_rest_lengths
+        # animation data
+        "position_without_na": position_without_na,
+        "num_of_rows": num_of_rows,
+        ## wing_rest_lengths
+        ## bridle_rest_lengths
     }
 
-    return points, position_without_na, post_processing_data
+    # aero_structural_total_time = time.time() - start_time
+    # num_of_iterations = i
+    # wing_rest_lengths = psystem.extract_rest_length[0:len_wing_rest_length]
+    # bridle_rest_lengths = psystem.extract_rest_length[len_wing_rest_length:]
+    # print_data = [
+    #     is_convergence,
+    #     num_of_iterations,
+    #     aero_structural_total_time,
+    #     vel_app,
+    #     residual_f_including_fixed_nodes,
+    #     residual_f,
+    #     f_internal,
+    #     f_external,
+    #     [force_aero, force_aero_wing, force_aero_bridle],
+    #     f_tether_drag,
+    #     force_gravity,
+    #     wing_rest_lengths,
+    #     bridle_rest_lengths,
+    # ]
+    # plot_data = [
+    #     [wingpanels, controlpoints, rings, coord_L, F_rel],
+    #     wing_rest_lengths,
+    #     bridle_rest_lengths,
+    # ]
 
+    # # TODO: remove this; was an attempt to use df functionality more
+    # position_without_na = position.dropna(
+    #     how="all",
+    #     subset=position.columns[position.columns.str.contains("[xyz]\d+")],
+    #     axis=0,
+    # )
+    # num_of_rows = position_without_na.shape[0]
+    # animation_data = [
+    #     position_without_na,
+    #     num_of_rows,
+    #     wing_rest_lengths,
+    #     bridle_rest_lengths,
+    # ]
+    # # TODO: this should become a list of seperate variables, now you are saving duplicate data.
+    # post_processing_data = {
+    #     "print_data": print_data,
+    #     "plot_data": plot_data,
+    #     "animation_data": animation_data,
+    # }
 
-# # %% Old solver (Non Alex framework)
-# def calculate_total_force(
-#     x,
-#     bridle_rest_lengths,
-#     wing_rest_lengths,
-#     force_aero,
-#     input_calculate_total_force,
-#     is_calculated_total_force_flattened=False,
-# ):
-#     """Defines the iter_differential equations for the coupled spring-mass system."""
-#     ## unpacking the input
-#     bridle_point_index = input_calculate_total_force.bridle_point_index
-#     acc_kite = input_calculate_total_force.acc_kite
-#     if input_calculate_total_force.is_with_gravity:
-#         grav_constant = np.array([0, 0, -input_calculate_total_force.grav_constant])
-#     else:
-#         grav_constant = np.array([0, 0, 0])
-#     mass_points = input_calculate_total_force.mass_points
-
-#     points_local = x.reshape(force_aero.shape)  # Renaming for consistency
-#     # points_local = structural_mesher.make_symmetrical(points_ini,points_local)
-
-#     ## Getting the force_aero ##TODO: making strong-coupled an option
-
-#     ## Getting the force_spring
-#     input_calculate_force_spring = (
-#         input_calculate_total_force.INPUT_calculate_force_spring
-#     )
-#     force_spring = structural_model.calculate_force_spring(
-#         points_local,
-#         bridle_rest_lengths,
-#         wing_rest_lengths,
-#         input_calculate_force_spring,
-#     )
-
-#     ### Filling the vector f = Function that fills equation representation of vector w = [vel1_x,points1_x,vel1_y,points1_y,...,veln_z,pointsn_z]
-#     force = np.zeros(
-#         force_spring.shape
-#     )  ##TODO: make this an array and fill appropriately?
-#     for i, (force_spring_i, force_aero_i, mass_i) in enumerate(
-#         zip(force_spring, force_aero, mass_points)
-#     ):
-#         # forces --> internal: spring-force | external: aero and inertial
-#         force[i][0] = (
-#             force_spring_i[0]
-#             + force_aero_i[0]
-#             + mass_i * (-acc_kite[0] + grav_constant[0])
-#         )  # F in x-direction
-#         force[i][1] = (
-#             force_spring_i[1]
-#             + force_aero_i[1]
-#             + mass_i * (-acc_kite[1] + grav_constant[1])
-#         )  # F in y-direction
-#         force[i][2] = (
-#             force_spring_i[2]
-#             + force_aero_i[2]
-#             + mass_i * (-acc_kite[2] + grav_constant[2])
-#         )  # F in z-direction
-
-#     ## Enforcing ball-joint constraint / (dirichlet) boundary-condition
-#     force[bridle_point_index] = np.zeros(3)
-
-#     if is_calculated_total_force_flattened:
-#         force = np.ndarray.tolist(np.ndarray.flatten(force))
-
-#     return force
-
-
-# def calculate_points_new(
-#     points, bridle_rest_lengths, wing_rest_lengths, force_aero, input_structural_solver
-# ):
-#     """calculates the new positions, given the old positions and the force_aero"""
-
-#     input_calculate_total_force = input_structural_solver.INPUT_calculate_total_force
-
-#     ## Solver ##TODO: figure out if solver indeed requires a list, ideally could work with np.array
-#     if input_structural_solver.method == "root":
-#         is_calculated_total_force_flattened = False
-#         result = scipy.optimize.root(
-#             calculate_total_force,
-#             np.ndarray.tolist(np.ndarray.flatten(points)),
-#             method="df-sane",  # SOLVER_CONFIG['INTEGRATION_METHOD'],
-#             # fatol=SOLVER_CONFIG['TOL_root'],
-#             # tol=SOLVER_CONFIG['TOL_root'],
-#             args=(
-#                 bridle_rest_lengths,
-#                 wing_rest_lengths,
-#                 force_aero,
-#                 input_calculate_total_force,
-#                 is_calculated_total_force_flattened,
-#             ),
-#             options={"maxfev": input_structural_solver.max_fev},
-#             #  'fatol:': SOLVER_CONFIG['TOL_root']}
-#         )
-#         solver_max_error = np.abs(result.fun).max()
-#         points_flat = result.x  # reading out solution
-#         points_new = np.array(points_flat.reshape(force_aero.shape))
-
-#     elif input_structural_solver.method == "newton":
-#         is_calculated_total_force_flattened = True
-#         result = scipy.optimize.newton(
-#             calculate_total_force,
-#             np.ndarray.tolist(np.ndarray.flatten(points)),
-#             # tol=SOLVER_CONFIG['TOL'],
-#             # rtol = SOLVER_CONFIG['RTOL_newton'],
-#             full_output=False,
-#             args=(
-#                 bridle_rest_lengths,
-#                 wing_rest_lengths,
-#                 force_aero,
-#                 input_calculate_total_force,
-#                 is_calculated_total_force_flattened,
-#             ),
-#             maxiter=input_structural_solver.newton_max_fev,
-#             disp=False,
-#         )
-
-#         points_new = np.array(result.reshape(force_aero.shape))
-#         solver_max_error = np.abs(
-#             calculate_total_force(
-#                 points_new,
-#                 bridle_rest_lengths,
-#                 wing_rest_lengths,
-#                 force_aero,
-#                 input_calculate_total_force,
-#             )
-#         ).max()
-
-#     # elif SOLVER_CONFIG['METHOD'] == 'odeint':
-#     #     is_calculated_total_force_flattened = True
-#     #     t_final = 1000.  # A large time interval to approximate steady state
-#     #     num_time_points = 1000  # Number of time points (optional)
-
-#     #     # Generate the time points (optional)
-#     #     t = np.linspace(0, t_final, num_time_points)
-#     #     y_solution = scipy.integrate.ode(calculate_total_force,
-#     #                                      t,
-#     #                                     np.ndarray.tolist(np.ndarray.flatten(points)),
-#     #                                     # args=(solver_arguments,force_aero,is_calculated_total_force_flattened),
-#     #                                     set_integrator='vode',
-#     #                                     options={'method': 'bdf'}
-#     #                                     )
-
-#     #     points_new = np.array(y_solution[-1].reshape(force_aero.shape))
-#     #
-
-#     else:
-#         raise Exception(
-#             "SOLVER_CONFIG['METHOD'] not recognized, should be: 'root' or 'newton' "
-#         )
-
-#     return points_new, solver_max_error
+    return sim_output

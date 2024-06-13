@@ -1,7 +1,8 @@
 import numpy as np
 import scipy.optimize
+from kitesim.VortexStepMethod import VSM
 from kitesim.coupling import coupling_aero2struc, coupling_struc2aero
-from kitesim.aerodynamic import VSM, bridle_line_system_aero, tether_aero
+from kitesim.aerodynamic import bridle_line_system_aero, tether_aero
 
 
 def calculate_fx(

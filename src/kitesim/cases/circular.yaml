@@ -1,12 +1,11 @@
-''' Circular case '''
+# Circular case
 is_with_vk_optimization: true
 is_circular_case: true
-is_run_only_1_time_step: false
 is_print_intermediate_results: false
 is_with_gravity: false
-is_with_velocity_initialization: false
 ### inflow conditions
 vel_wind: !!seq [0,0,4]
+# This is an initial guess for the kite velocity
 vel_kite: !!seq [-20, 0, 0]
 acc_kite: !!seq [0, 0, 0]
 ### crosswind
