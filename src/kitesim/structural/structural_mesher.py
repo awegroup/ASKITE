@@ -90,7 +90,16 @@ def update_for_billowing(points_ini, springL_wing, u_p):
 #     return np.array(symmetrical_points)
 
 
-def find_symmetrical_pairs(points, tolerance=1e-5):
+def find_symmetrical_pairs(points: np.ndarray, tolerance: float = 1e-5) -> np.ndarray:
+    """Find symmetrical values across axis [1] (which represents y-axis, or mid-span of the kite)
+   
+    Args:
+        points (np.ndarray): array of shape (n, 3)
+        tolerance (float): absolute tolerance for comparing values, default 1e-5
+    
+    Returns:
+        np.ndarray: array of indices of symmetrical pairs, shape (m, 2)
+    """
     left_points_indices = [i for i, point in enumerate(points) if point[1] > 0]
     right_points_indices = [i for i, point in enumerate(points) if point[1] < 0]
 
@@ -111,7 +120,7 @@ def find_symmetrical_pairs(points, tolerance=1e-5):
             [(left_index, right_index) for right_index in matched_indices]
         )
 
-    return symmetrical_pairs
+    return np.array(symmetrical_pairs)
 
 
 def make_symmetrical(points_ini, points, tolerance=1e-5):
