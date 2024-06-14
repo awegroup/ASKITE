@@ -123,4 +123,4 @@ def processing_output(path_results_folder_run: str) -> dict:
         print("--> Generating ANIMATION \{*_*}/")
         animation.make_animation(loaded_data, path_results_folder_run)
 
-    return
+    return loaded_data_input

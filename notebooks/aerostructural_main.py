@@ -69,7 +69,7 @@ def main():
     )
 
     # Create interpretable results
-    post_processing_main.processing_output(
+    loaded_data_input = post_processing_main.processing_output(
         path_results_folder_run,
     )
 

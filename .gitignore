@@ -179,9 +179,8 @@ processed_data/*
 
 results/*
 !results/V3_25/
-
 # also ignore animation files, they are too big
-results/V3_25/animation/
+results/V3_25/**/**/animation/
 
 # Specific to the V9_60C directory #TODO: this should be removed at some point
 src/initialisation/V9_60C
