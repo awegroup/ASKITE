@@ -27,6 +27,7 @@ is_with_compression_limit: !!bool true
 compression_limit: !!float .85
 # the factor by which stiffness is increased if over the limit
 limit_stiffness_factor: !!float 10.
+is_with_rotational_resistance: !!bool false
 
 #TODO: below should be removed at some point
 ## airfoil import settings
