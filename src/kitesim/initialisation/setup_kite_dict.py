@@ -102,10 +102,6 @@ def process_kite_yamls_into_dict(config_data, config_data_kite, path_kite_data):
         kcu_data["index"] = config_data_kite["kcu"]["index"]
         kcu_data["extra"] = {}
 
-        ## stiffness rotational ##TODO: can this be done cleaner?
-        stiffness_bend_strut = 0
-        stiffness_bend_leading_edge = 0
-
     elif kite_name == "V9_60C":
         # TODO: Should be generated/imported directly from the surfplan file instead
 
@@ -172,9 +168,14 @@ def process_kite_yamls_into_dict(config_data, config_data_kite, path_kite_data):
             ),
         }
 
-        ## rotational stiffness
+    #TODO: Things should be toggle ON/OFF in kite_config file
+    ## Rotational resistance
+    if config_data_kite["is_with_rotational_resistance"]:
         stiffness_bend_strut = config_data_kite["stiffness_bend_strut"]
         stiffness_bend_leading_edge = config_data_kite["stiffness_bend_leading_edge"]
+    else:
+        stiffness_bend_strut = 0
+        stiffness_bend_leading_edge = 0
 
     ## Extracting pulley connectivity
     pulley_data = pulley_connectivity.extract_pulley_connectivity(

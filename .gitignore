@@ -172,7 +172,7 @@ pyvenv.cfg
 # Ignoring all except V3_25
 data/*
 !data/V3_25/
-!data/V3_25/config.yaml
+!data/config.yaml
 
 processed_data/*
 !processed_data/V3_25/
