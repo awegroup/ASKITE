@@ -24,7 +24,7 @@ def run_aerostructural_solver(sim_input):
     input_VSM = sim_input["input_VSM"]
     input_PSM = sim_input["input_PSM"]
 
-    # GENERAL INITIALIZATION
+    # GENERAL INITIALIsATION
     ## case settings
     sim_name = config.sim_name
     is_with_vk_optimization = config.is_with_vk_optimization
@@ -32,7 +32,7 @@ def run_aerostructural_solver(sim_input):
     is_run_only_1_time_step = config.is_run_only_1_time_step
     is_print_intermediate_results = config.is_print_intermediate_results
     is_with_gravity = config.is_with_gravity
-    is_with_velocity_initialization = config.is_with_velocity_initialization
+    is_with_velocity_initialisation = config.is_with_velocity_initialisation
 
     ## instantiating the PSM
     psystem = ParticleSystem(
@@ -108,7 +108,7 @@ def run_aerostructural_solver(sim_input):
 
     ## velocity initialisation
     n_vel_initialisation_steps = config.n_vel_initialisation_steps
-    if is_with_velocity_initialization:
+    if is_with_velocity_initialisation:
         # set the velocity to a lower value, to initialize the simulation and get rid of velocity induces shock
         vel_app_linspace = np.linspace(
             config.vel_app_initial, np.copy(vel_app), n_vel_initialisation_steps
@@ -451,7 +451,7 @@ def run_aerostructural_solver(sim_input):
 
         ### Update order - velocity - depower tape - steering tape
         ## if vel not yet at real value, update vel
-        if is_with_velocity_initialization and i < n_vel_initialisation_steps:
+        if is_with_velocity_initialisation and i < n_vel_initialisation_steps:
             vel_app = vel_app_linspace[i]
             print(f"||--- update vel_app: {vel_app}")
 
