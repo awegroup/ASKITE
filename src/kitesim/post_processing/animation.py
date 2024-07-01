@@ -104,7 +104,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
 from kitesim.coupling import coupling_struc2aero
-from kitesim.VortexStepMethod import VSM
+from kitesim.VortexStepMethod import VSM_old
 from kitesim.post_processing import post_processing_utils
 from kitesim.post_processing import plotting
 
@@ -181,7 +181,9 @@ def make_animation(loaded_data: dict, path_run_results_folder: str):
             rings,
             coord_L,
             coord_refined,
-        ) = VSM.calculate_force_aero_wing_VSM(points_left_to_right, vel_app, input_VSM)
+        ) = VSM_old.calculate_force_aero_wing_VSM(
+            points_left_to_right, vel_app, input_VSM
+        )
 
         elongation_values = post_processing_utils.calculate_elongation(
             points,

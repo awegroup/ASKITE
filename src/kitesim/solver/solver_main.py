@@ -4,13 +4,13 @@
 import time
 import numpy as np
 import pandas as pd
-from kitesim.VortexStepMethod import VSM
+from kitesim.VortexStepMethod import VSM_old
 from kitesim.aerodynamic import bridle_line_system_aero
 from kitesim.coupling import coupling_struc2aero, coupling_aero2struc
 from kitesim.solver import solver_utils
 from kitesim.aerodynamic import tether_aero, bridle_line_system_aero
 from kitesim.particleSystem.ParticleSystem import ParticleSystem
-from kitesim.VortexStepMethod import VSM
+from kitesim.VortexStepMethod import VSM_old
 
 
 def run_aerostructural_solver(sim_input):
@@ -271,7 +271,7 @@ def run_aerostructural_solver(sim_input):
             rings,
             coord_L,
             coord_refined,
-        ) = VSM.calculate_force_aero_wing_VSM(
+        ) = VSM_old.calculate_force_aero_wing_VSM(
             points_wing_segment_corners_aero_orderded,
             vel_app,
             input_VSM,

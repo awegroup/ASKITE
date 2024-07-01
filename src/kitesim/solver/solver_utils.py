@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.optimize
-from kitesim.VortexStepMethod import VSM
+from kitesim.VortexStepMethod import VSM_old
 from kitesim.coupling import coupling_aero2struc, coupling_struc2aero
 from kitesim.aerodynamic import bridle_line_system_aero, tether_aero
 
@@ -31,7 +31,7 @@ def calculate_fx(
         rings,
         coord_L,
         coord_refined,
-    ) = VSM.calculate_force_aero_wing_VSM(points_left_to_right, vel_app, input_VSM)
+    ) = VSM_old.calculate_force_aero_wing_VSM(points_left_to_right, vel_app, input_VSM)
     # Aero --> struc
     force_aero_wing = coupling_aero2struc.aero2struc(
         points,

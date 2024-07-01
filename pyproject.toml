@@ -21,8 +21,8 @@ dependencies = [
     "plotly",
     "pillow",
     "ipywidgets",
-    "pydantic"
-]
+    "pydantic",
+    "LightSailSim @ git+https://github.com/awegroup/Particle_System_Simulator.git@develop"]
 requires-python = ">=3.8"
 authors = [
   {name = "Jelle Poland"},
@@ -51,3 +51,6 @@ dev = [
 
 [project.urls]
 Repository = "https://github.com/jellepoland/kitesim.git"
+[tool.pip]
+allow-external = [
+    "LightSailSim @ git+https://github.com/awegroup/Particle_System_Simulator.git@develop"]
