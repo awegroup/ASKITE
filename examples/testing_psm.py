@@ -18,8 +18,9 @@ import os
 from pathlib import Path
 
 from kitesim.initialisation import initialisation_main
-from kitesim.solver import solver_main
+from kitesim.solver import solver_main_external_psm
 from kitesim.post_processing import post_processing_main
+from kitesim.logging_config import *
 
 
 # Import modules
@@ -59,19 +60,19 @@ def main():
     )
 
     # AeroStructural Simulation
-    sim_output = solver_main.run_aerostructural_solver(
+    sim_output = solver_main_external_psm.run_aerostructural_solver(
         sim_input,
     )
 
-    # Save outputs
-    post_processing_main.saving_all_dict_entries(
-        sim_output, "output", path_results_folder_run
-    )
+    # # Save outputs
+    # post_processing_main.saving_all_dict_entries(
+    #     sim_output, "output", path_results_folder_run
+    # )
 
-    # Create interpretable results
-    loaded_data_input = post_processing_main.processing_output(
-        path_results_folder_run,
-    )
+    # # Create interpretable results
+    # loaded_data_input = post_processing_main.processing_output(
+    #     path_results_folder_run,
+    # )
 
 
 if __name__ == "__main__":

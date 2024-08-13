@@ -55,7 +55,11 @@ class ParticleSystem:
         self.__is_tension = np.copy(sim_param["is_tension"])
 
         # special for pulleys
-        self.__is_pulley = np.copy(sim_param["is_pulley"])
+        if "is_pulley" in sim_param:
+            self.__is_pulley = np.copy(sim_param["is_pulley"])
+        # if this entry is not provided, create an empty array where each index is set to False
+        else:
+            self.__is_pulley = np.zeros((len(self.__connectivity_matrix),), dtype=bool)
         if "pulley_other_line_pair" in sim_param:
             # copy.deepcopy is used, because np.copy only works for np.arrays -this must remain an dict
             self.__pulley_other_line_pair = copy.deepcopy(
@@ -211,7 +215,7 @@ class ParticleSystem:
 
         # BiCGSTAB from scipy library
         dv, _ = bicgstab(
-            A, b, tol=self.__rtol, atol=self.__atol, maxiter=self.__maxiter
+            A, b, rtol=self.__rtol, atol=self.__atol, maxiter=self.__maxiter
         )
 
         v_next = v_current + dv
@@ -470,6 +474,10 @@ class ParticleSystem:
     @property
     def x_current_2D(self):
         return np.array([particle.x for particle in self.__particles])
+
+    @property
+    def particles(self):
+        return self.__particles
 
     ##TODO: these are commented out for now, as they are not used.
     # @property
