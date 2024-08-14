@@ -10,7 +10,6 @@ dependencies = [
     "matplotlib",
     "scipy",
     "pandas",
-    "matplotlib",
     "scikit-learn",
     "attrs",
     "pytest",
@@ -21,8 +20,9 @@ dependencies = [
     "plotly",
     "pillow",
     "ipywidgets",
-    "pydantic"
-]
+    "pydantic",
+    "PSS @ git+https://github.com/awegroup/Particle_System_Simulator.git@package_data",
+    "VSM @ git+https://github.com/ocayon/Vortex-Step-Method.git@develop"]
 requires-python = ">=3.8"
 authors = [
   {name = "Jelle Poland"},
@@ -38,6 +38,9 @@ classifiers = [
     "Programming Language :: Python",
     "Intended Audience :: Kite Designers, Developers",
 ]
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [tool.pytest.ini_options]
 addopts = "--cov=kitesim"
 

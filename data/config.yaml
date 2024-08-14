@@ -39,9 +39,9 @@ solver:
   newton_rtol: !!float 10.0
   newton_max_iter: !!int 2000
   newton_disp: !!bool false
-  damping_constant: !!float 0.9
+  damping_constant: !!float 1.0
   is_with_visc_damping: !!bool true
-  dt: !!float 0.01
+  dt: !!float 0.1
   n_time_steps: !!int 10000
   abs_tol: !!float 1.0e-50
   rel_tol: !!float 1.0e-5
@@ -51,7 +51,7 @@ solver:
 aero_structural:
   max_iter: !!int 2500
   it_check: !!int 5
-  tol: !!float 25.0
+  tol: !!float 10
   crosswind_max_iter: !!int 50
   crosswind_tol: !!float 0.01
   crosswind_relax_factor: !!float 0.5
