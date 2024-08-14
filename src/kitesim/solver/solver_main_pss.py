@@ -16,6 +16,118 @@ from PSS.particleSystem.SpringDamper import SpringDamperType
 import PSS.particleSystem as PSS
 
 
+## converting the string spring types to the enum
+def string_to_springdampertype(link_type: str) -> SpringDamperType:
+    """
+    Convert a string representation of a link type to a SpringDamperType enum value.
+
+    Args:
+        link_type (str): String representation of the link type.
+
+    Returns:
+        SpringDamperType: Corresponding enum value.
+
+    Raises:
+        ValueError: If the input string doesn't match any SpringDamperType.
+    """
+    try:
+        return SpringDamperType(link_type.lower())
+    except ValueError:
+        raise ValueError(f"Invalid link type: {link_type}")
+
+
+def prepare_pss_input(input_PSM, grav_constant):
+    logging.debug(
+        f" type of connectivity_matrix: {type(input_PSM['connectivity_matrix'])}, shape: {np.shape(input_PSM['connectivity_matrix'])}"
+    )
+    logging.debug(
+        f" type of initial_conditions: {type(input_PSM['initial_conditions'])}, len: {len(input_PSM['initial_conditions'])}"
+    )
+    logging.debug(
+        f" type of params_dict: {type(input_PSM['params_dict'])}, len: {len(input_PSM['params_dict'])}"
+    )
+    logging.debug(f"params: {input_PSM['params_dict']}")
+    logging.debug(f"initial_conditions: {input_PSM['initial_conditions']}")
+    logging.debug(f"connectivity_matrix: {input_PSM['connectivity_matrix']}")
+
+    # defining the new PSS inputs
+    pss_initial_conditions = input_PSM["initial_conditions"]
+    logging.debug(f"pss_initial_conditions: {pss_initial_conditions}")
+
+    # refining the params_dict
+    pss_param_dict = input_PSM["params_dict"]
+    pss_param_dict.update({"g": -grav_constant[2]})
+    logging.debug(f"pss_param_dict: {pss_param_dict.keys()}")
+
+    # restructuring connectivity matrix
+    connectivity_matrix = input_PSM["connectivity_matrix"]
+
+    pss_connectivity_matrix = []
+    for idx, _ in enumerate(connectivity_matrix):
+        if pss_param_dict["is_compression"][idx] and pss_param_dict["is_tension"][idx]:
+            linktype = "default"
+        elif (
+            pss_param_dict["is_compression"][idx]
+            and not pss_param_dict["is_tension"][idx]
+        ):
+            linktype = "nontensile"
+        elif pss_param_dict["is_pulley"][idx]:
+            linktype = "pulley"
+        elif (
+            pss_param_dict["is_tension"][idx]
+            and not pss_param_dict["is_compression"][idx]
+        ):
+            linktype = "noncompressive"
+
+        logging.debug(f"idx: {idx}")
+        logging.debug(f"connectivity_matrix[idx]: {connectivity_matrix[idx]}")
+        logging.debug(f"pss_param_dict['k'][idx]: {pss_param_dict['k'][idx]}")
+        logging.debug(f"pss_param_dict['c']: {pss_param_dict['c']}")
+        logging.debug(f"linktype: {linktype}")
+
+        pss_connectivity_matrix.append(
+            [
+                int(connectivity_matrix[idx][0]),
+                int(connectivity_matrix[idx][1]),
+                float(pss_param_dict["k"][idx]),
+                float(pss_param_dict["c"]),
+                string_to_springdampertype(linktype),
+            ]
+        )
+
+    logging.debug(f"pss_connectivity_matrix: {pss_connectivity_matrix}")
+
+    return pss_connectivity_matrix, pss_initial_conditions, pss_param_dict
+
+
+def run_pss(psystem, params, f_external):
+    f_ext = f_external
+    t_vector_internal = np.linspace(
+        params["dt"], params["t_steps"] * params["dt"], params["t_steps"]
+    )
+    E_kin = []
+    f_int = []
+    E_kin_tol = 1e-3  # 1e-29
+
+    logging.debug(f"Running PS simulation, f_int: {psystem.f_int}")
+
+    # And run the simulation
+    for step_internal in t_vector_internal:
+        psystem.kin_damp_sim(f_ext)
+
+        E_kin.append(np.linalg.norm(psystem.x_v_current[1] ** 2))
+        f_int.append(np.linalg.norm(psystem.f_int))
+
+        converged = False
+        if step_internal > 10:
+            if np.max(E_kin[-10:-1]) <= E_kin_tol:
+                converged = True
+        if converged and step_internal > 1:
+            print("Kinetic damping PS converged", step_internal)
+            break
+    return psystem
+
+
 def run_aerostructural_solver(sim_input):
     """Runs the aero-structural solver for the given input parameters"""
 
@@ -38,6 +150,7 @@ def run_aerostructural_solver(sim_input):
     is_with_gravity = config.is_with_gravity
     is_with_velocity_initialisation = config.is_with_velocity_initialisation
 
+    # logging
     logging.debug(
         f"Running aero-structural simulation for {sim_name}, shape: {np.shape(sim_name)}"
     )
@@ -59,93 +172,15 @@ def run_aerostructural_solver(sim_input):
     logging.debug(
         f" type of sim_input: {type(sim_input)}, shape: {np.shape(sim_input)}"
     )
-    logging.debug(
-        f" type of connectivity_matrix: {type(input_PSM['connectivity_matrix'])}, shape: {np.shape(input_PSM['connectivity_matrix'])}"
+
+    ## Instating the PSS
+    connectivity_matrx, initial_conditions, params = prepare_pss_input(
+        input_PSM, config.grav_constant
     )
-    logging.debug(
-        f" type of initial_conditions: {type(input_PSM['initial_conditions'])}, len: {len(input_PSM['initial_conditions'])}"
-    )
-    logging.debug(
-        f" type of params_dict: {type(input_PSM['params_dict'])}, len: {len(input_PSM['params_dict'])}"
-    )
-    logging.debug(f"params: {input_PSM['params_dict']}")
-    logging.debug(f"initial_conditions: {input_PSM['initial_conditions']}")
-    logging.debug(f"connectivity_matrix: {input_PSM['connectivity_matrix']}")
-
-    # defining the new PSS inputs
-    PSS_initial_conditions = input_PSM["initial_conditions"]
-    logging.debug(f"PSS_initial_conditions: {PSS_initial_conditions}")
-
-    # refining the params_dict
-    PSS_params_dict = input_PSM["params_dict"]
-    PSS_params_dict.update({"g": -config.grav_constant[2]})
-    logging.debug(f"PSS_params_dict: {PSS_params_dict.keys()}")
-
-    # restructuring connectivity matrix
-    connectivity_matrix = input_PSM["connectivity_matrix"]
-
-    ## converting the string spring types to the enum
-    def string_to_springdampertype(link_type: str) -> SpringDamperType:
-        """
-        Convert a string representation of a link type to a SpringDamperType enum value.
-
-        Args:
-            link_type (str): String representation of the link type.
-
-        Returns:
-            SpringDamperType: Corresponding enum value.
-
-        Raises:
-            ValueError: If the input string doesn't match any SpringDamperType.
-        """
-        try:
-            return SpringDamperType(link_type.lower())
-        except ValueError:
-            raise ValueError(f"Invalid link type: {link_type}")
-
-    PSS_connectivity_matrix = []
-    for idx, _ in enumerate(connectivity_matrix):
-        if (
-            PSS_params_dict["is_compression"][idx]
-            and PSS_params_dict["is_tension"][idx]
-        ):
-            linktype = "default"
-        elif (
-            PSS_params_dict["is_compression"][idx]
-            and not PSS_params_dict["is_tension"][idx]
-        ):
-            linktype = "nontensile"
-        elif PSS_params_dict["is_pulley"][idx]:
-            linktype = "pulley"
-        elif (
-            PSS_params_dict["is_tension"][idx]
-            and not PSS_params_dict["is_compression"][idx]
-        ):
-            linktype = "noncompressive"
-
-        logging.debug(f"idx: {idx}")
-        logging.debug(f"connectivity_matrix[idx]: {connectivity_matrix[idx]}")
-        logging.debug(f"PSS_params_dict['k'][idx]: {PSS_params_dict['k'][idx]}")
-        logging.debug(f"PSS_params_dict['c']: {PSS_params_dict['c']}")
-        logging.debug(f"linktype: {linktype}")
-
-        PSS_connectivity_matrix.append(
-            [
-                int(connectivity_matrix[idx][0]),
-                int(connectivity_matrix[idx][1]),
-                float(PSS_params_dict["k"][idx]),
-                float(PSS_params_dict["c"]),
-                string_to_springdampertype(linktype),
-            ]
-        )
-
-    logging.debug(f"PSS_connectivity_matrix: {PSS_connectivity_matrix}")
-
-    ## Instating the PSM from LightSailSim, PSS
     psystem = PSS.ParticleSystem(
-        PSS_connectivity_matrix,
-        PSS_initial_conditions,
-        PSS_params_dict,
+        connectivity_matrx,
+        initial_conditions,
+        params,
     )
 
     # TODO: would be cleaner if this was extracted from input_PSM or config
@@ -426,48 +461,10 @@ def run_aerostructural_solver(sim_input):
         f_external = force_external.flatten()
         end_time_f_ext = time.time()
 
+        ## PSS
         begin_time_f_int = time.time()
-
-        logging.debug(
-            f"f_external[2]: {f_external[2]} shape of f_external: {np.shape(np.array(f_external))}, len: {len(f_external)}"
-        )
-        ######### running PS simulation
-
-        f_ext = f_external
-        t_vector_internal = np.linspace(
-            params["dt"], params["t_steps"] * params["dt"], params["t_steps"]
-        )
-        final_step = 0
-        E_kin = []
-        f_int = []
-        E_kin_tol = 1e-3  # 1e-29
-
-        logging.debug(f"Running PS simulation, f_int: {psystem.f_int}")
-
-        # And run the simulation
-        for step_internal in t_vector_internal:
-            psystem.kin_damp_sim(f_ext)
-
-            final_step = step_internal
-            (
-                x,
-                v,
-            ) = psystem.x_v_current
-            E_kin.append(np.linalg.norm(v * v))
-            f_int.append(np.linalg.norm(psystem.f_int))
-
-            converged = False
-            if step_internal > 10:
-                if np.max(E_kin[-10:-1]) <= E_kin_tol:
-                    converged = True
-            if converged and step_internal > 1:
-                print("Kinetic damping PS converged", step_internal)
-                break
-        #####################
-
-        position.loc[step] = x
-        # position.loc[step], _ = psystem.kin_damp_sim(f_external)
-
+        psystem = run_pss(psystem, params, f_external)
+        position.loc[step], _ = psystem.x_v_current
         # # TODO: remove
         # # an attempt at relaxation
         # if i > 0:
