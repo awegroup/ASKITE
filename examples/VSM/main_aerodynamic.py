@@ -32,16 +32,16 @@ sys.path.append(project_root)  # Needed for running in terminal
 os.chdir(project_root)  # Needed for running in interactive python environment
 
 # Import modules
-from src.initialisation.input_classes import input_VSM, input_bridle_aero
-from src.initialisation.yaml_loader import config
-from src.coupling import coupling_aero2struc, coupling_struc2aero
-from src.post_processing import (
+from kitesim.initialisation.input_classes import input_VSM, input_bridle_aero
+from kitesim.initialisation.yaml_loader import config
+from kitesim.coupling import coupling_aero2struc, coupling_struc2aero
+from kitesim.post_processing import (
     functions_print,
     functions_plot,
     post_processing_utils,
     post_processing_main,
 )
-from src.aerodynamic import (
+from kitesim.aerodynamic import (
     VSM,
     breukels_2D,
     plate_aero,
