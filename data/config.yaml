@@ -83,7 +83,7 @@ animation_elev: !!float 9.14
 animation_azim: !!float 230.0
 
 ## simulation_settings
-is_run_only_1_time_step: !!bool false
+is_run_only_1_time_step: !!bool true
 is_with_velocity_initialisation: !!bool false
 n_vel_initialisation_steps: !!int 10
 coupling_method: !!str "NN"

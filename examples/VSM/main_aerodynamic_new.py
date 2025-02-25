@@ -16,8 +16,8 @@ while not os.path.isfile(os.path.join(root_dir, ".gitignore")):
 save_results_folder = Path(root_dir) / "examples" / "VSM" / "results"
 
 # Defining settings
-n_panels = 45
-spanwise_panel_distribution = "unchanged"
+n_panels = 18
+spanwise_panel_distribution = "split_provided"
 
 ### rib_list_from_CAD_LE_TE_and_surfplan_d_tube_camber_10ribs
 csv_file_path = (
@@ -40,6 +40,7 @@ rib_list_from_CAD_LE_TE_and_surfplan_d_tube_camber_10ribs = []
 for i in range(len(LE_x_array)):
     LE = np.array([LE_x_array[i], LE_y_array[i], LE_z_array[i]])
     TE = np.array([TE_x_array[i], TE_y_array[i], TE_z_array[i]])
+    print(f"i, {i}, LE: {LE}, TE: {TE}")
     rib_list_from_CAD_LE_TE_and_surfplan_d_tube_camber_10ribs.append(
         [LE, TE, ["lei_airfoil_breukels", [d_tube_array[i], camber_array[i]]]]
     )
@@ -55,7 +56,7 @@ wing_aero_CAD_10ribs = WingAerodynamics([CAD_wing])
 aoa_rad = np.deg2rad(10)
 side_slip = 0
 yaw_rate = 0
-Umag = 15
+Umag = 12
 va = (
     np.array(
         [
@@ -66,8 +67,14 @@ va = (
     )
     * Umag
 )
+va = np.array([12, 0, 2])
 wing_aero_CAD_10ribs.va = va, yaw_rate
 
+
+# printing the wing geometry
+for panel in wing_aero_CAD_10ribs.panels:
+    print(f"panel ac: {panel.aerodynamic_center}")
+    print(f"panel cp: {panel.control_point}")
 
 ### plotting shapes
 plot_geometry(
@@ -80,3 +87,15 @@ plot_geometry(
     view_elevation=15,
     view_azimuth=-120,
 )
+
+
+## Running the solver
+solver = Solver(aerodynamic_model_type="VSM", is_with_artificial_damping=True)
+results = solver.solve(wing_aero_CAD_10ribs)
+
+
+def is_symmetric_1d(array, tol=1e-8):
+    return np.allclose(array, array[::-1], atol=tol)
+
+
+print(f"\n VSM is symmetric: {is_symmetric_1d(results['gamma_distribution'])}")

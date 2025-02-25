@@ -1,6 +1,7 @@
 # %%
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
+import logging
 
 
 def force2nodes(F, Fpoint, nodes, tangential):
@@ -321,6 +322,74 @@ def aero2struc_NN(
     ## Step 1: Define a chordwise distribution
     # 1.1) Calculate midpoints of the wingpanels
     midpoints = calculate_midpoints(wingpanels)
+    logging.info(f"midpoints-old {midpoints[0]} \n")
+    # 1.2) Interpolate chordwise points, creating a chordwise aero-mesh component
+    chordwise_points = interpolate_chordwise_points(midpoints, n_chordwise_aero_nodes)
+    # 1.3) Generate a distribution
+    chordwise_distribution, percentage_distribution = generate_distribution(
+        n_chordwise_aero_nodes
+    )
+
+    ## Step 2: Distribute the aerodynamic forces chordwise
+    force_aero_wing_VSM_distributed_chordwise = np.zeros(
+        (len(force_aero_wing_VSM), n_chordwise_aero_nodes, 3)
+    )
+    for i, points in enumerate(chordwise_points):
+        for j, point in enumerate(points):
+            force_aero_wing_VSM_distributed_chordwise[i, j] = (
+                force_aero_wing_VSM[i] * percentage_distribution[j]
+            )
+
+    ## Step 3: Map the aerodynamic mesh to the to the wing segment corners aerodynamic orderded
+    force_aero_wing_segment_cornes_aero_mesh = map_aerodynamic_to_structural(
+        chordwise_points.reshape(-1, 3),
+        points_wing_segment_corners_aero_orderded,
+        force_aero_wing_VSM_distributed_chordwise.reshape(-1, 3),
+    )
+
+    ## Step 4: Change the segment corners from aero-orderded too struc-orderded
+    force_aero_wing_segment_corners_struc_mesh = np.zeros_like(points_structural_nodes)
+    for key, value in index_transformation_aero_to_struc_dict.items():
+        force_aero_wing_segment_corners_struc_mesh[key] = (
+            force_aero_wing_segment_cornes_aero_mesh[value]
+        )
+
+    return force_aero_wing_segment_corners_struc_mesh
+
+
+def aero2struc_NN_vsm(
+    n_chordwise_aero_nodes,
+    wing_aero,
+    force_aero_wing_VSM,
+    points_wing_segment_corners_aero_orderded,
+    index_transformation_aero_to_struc_dict,
+    points_structural_nodes,
+):
+
+    ## Step 1: Define a chordwise distribution
+    # 1.1) Calculate midpoints of the wingpanels
+    # midpoints = calculate_midpoints(wingpanels)
+    # THIS SHOULD NOT BE MIDPOINTS, BUT SHOULD BE THE POINTS ON THE AC TO CP LINE
+    # (AS THIS LINE IS NOT NECESSARILY IN THE MIDDLE OF THE PANEL)
+    midpoints = []
+    for panel in wing_aero.panels:
+        # define a vector from the aerodynamic center to the control point
+        vec_from_ac_to_cp_half_chord_length = (
+            panel.aerodynamic_center - panel.control_point
+        )
+
+        # define a leading-edge and trailing-edge point
+        point_mid_le = (
+            panel.aerodynamic_center + 0.5 * vec_from_ac_to_cp_half_chord_length
+        )
+        point_mid_te = panel.control_point - 0.5 * vec_from_ac_to_cp_half_chord_length
+        midpoints.append({"point_mid_te": point_mid_te, "point_mid_le": point_mid_le})
+
+    # flipping the points to the right-order
+    logging.info(f"midpoints-before-flip {midpoints[0]} \n")
+    midpoints = midpoints[::-1]
+    logging.info(f"midpoints-new {midpoints[0]} \n")
+
     # 1.2) Interpolate chordwise points, creating a chordwise aero-mesh component
     chordwise_points = interpolate_chordwise_points(midpoints, n_chordwise_aero_nodes)
     # 1.3) Generate a distribution
