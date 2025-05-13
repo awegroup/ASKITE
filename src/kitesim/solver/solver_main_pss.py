@@ -402,6 +402,7 @@ def run_aerostructural_solver(sim_input):
         points_wing_segment_corners_aero_orderded = points[
             index_transformation_struc_to_aero
         ]
+
         # Wing Aerodynamic
         (
             force_aero_wing_VSM,

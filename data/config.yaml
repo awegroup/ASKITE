@@ -10,12 +10,12 @@ sim_name: !!str "straight"
 u_p: !!float 1.0
 depower_tape_extension_percentage: !!float 8.0
 # steering
-delta_ls_ini: !!float 0.01
+delta_ls_ini: !!float 0.00
 ## NEW - in meters
 depower_tape_extension_step: !!float 0.01
-depower_tape_final_extension: !!float 0.01
-steering_tape_extension_step: !!float 0.05
-steering_tape_final_extension: !!float -0.2
+depower_tape_final_extension: !!float 0.2
+steering_tape_extension_step: !!float 0
+steering_tape_final_extension: !!float 0
 
 # Aerodynamic -ChildClass: aero
 aero:
@@ -66,7 +66,7 @@ is_print_mid_results: !!bool true
 is_with_initial_plot: !!bool false
 is_with_plotly_plot: !!bool false
 is_with_aero_geometry: !!bool true
-is_with_printing: !!bool false
+is_with_printing: !!bool true
 
 ## plotting
 is_with_plotting: !!bool true
@@ -90,7 +90,7 @@ coupling_method: !!str "NN"
 is_from_filename: !!bool false
 is_with_initial_point_velocity: !!bool false
 is_billowing_on: !!bool true
-is_with_gravity: !!bool false
+is_with_gravity: !!bool true
 is_with_aero_bridle: !!bool true
 is_with_aero_tether: !!bool true
 bridle_initial_compression_factor: !!float 1.0

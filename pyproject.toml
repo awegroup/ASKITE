@@ -1,3 +1,4 @@
+
 [build-system]
 requires = ["setuptools >= 61.0"]
 build-backend = "setuptools.build_meta"
@@ -21,11 +22,11 @@ dependencies = [
     "pillow",
     "ipywidgets",
     "pydantic",
-    "PSS @ git+https://github.com/awegroup/Particle_System_Simulator.git@package_data",
+    "PSS @ git+https://github.com/awegroup/Particle_System_Simulator.git@main",
     "VSM @ git+https://github.com/ocayon/Vortex-Step-Method.git@develop"]
 requires-python = ">=3.8"
 authors = [
-  {name = "Jelle Poland"},
+  {name = "Jelle Poland"}
 ]
 maintainers = [
   {name = "Jelle Poland"}
@@ -49,7 +50,7 @@ dev = [
     "pytest",
     "black",
     "flake8",
-    "pytest-cov",
+    "pytest-cov"
     ]
 
 [project.urls]
