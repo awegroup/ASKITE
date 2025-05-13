@@ -8,19 +8,16 @@ import logging
 import os
 import sys
 from pathlib import Path
-from kitesim.VortexStepMethod import VSM_old
-from kitesim.aerodynamic import bridle_line_system_aero
 from kitesim.coupling import coupling_struc2aero, coupling_aero2struc
 from kitesim.solver import solver_utils
-from kitesim.aerodynamic import tether_aero, bridle_line_system_aero
-from kitesim.particleSystem.ParticleSystem import ParticleSystem
 from kitesim.VortexStepMethod import VSM_old
 from PSS.particleSystem.SpringDamper import SpringDamperType
 import PSS.particleSystem as PSS
 import VSM.WingGeometry as VSM_WingGeometry
-import VSM.WingAerodynamics as VSM_WingAerodynamics
+import VSM.BodyAerodynamics as VSM_BodyAerodynamics
 import VSM.Solver as VSM_Solver
 import VSM.plotting as VSM_plotting
+from kitesim.solver.vsm_functions import initialize_vsm, run_vsm_package
 
 
 ## converting the string spring types to the enum
@@ -174,7 +171,7 @@ def grab_V3_25_csv_wing_data():
     )
 
 
-def run_aerostructural_solver(sim_input):
+def run_aerostructural_solver(sim_input, PROJECT_DIR):
     """Runs the aero-structural solver for the given input parameters"""
 
     # Unpacking input_dict
@@ -219,12 +216,10 @@ def run_aerostructural_solver(sim_input):
     logging.info(f" points: {points}")
 
     ## Instantiating the VSM
-    n_panels = 18
+    n_panels = 40
     spanwise_panel_distribution = "unchanged"
     wing = VSM_WingGeometry.Wing(n_panels, spanwise_panel_distribution)
-    vsm_solver = VSM_Solver.Solver(
-        aerodynamic_model_type="VSM", is_with_artificial_damping=True
-    )
+    vsm_solver = VSM_Solver.Solver()
     (
         LE_x_array,
         LE_y_array,
@@ -235,6 +230,18 @@ def run_aerostructural_solver(sim_input):
         d_tube_array,
         camber_array,
     ) = grab_V3_25_csv_wing_data()
+
+    body_aero, vsm_solver = initialize_vsm(
+        geometry_csv_path=Path(PROJECT_DIR)
+        / "data"
+        / "V3_25"
+        / "wing_geometry_from_CAD.csv",
+        polar_data_dir=Path(PROJECT_DIR) / "data" / "V3_25" / "2D_polars_from_CFD",
+        n_panels=40,
+        spanwise_panel_distribution="uniform",
+        is_half_wing=True,
+        is_with_corrected_polar=True,
+    )
 
     ## Instating the PSS
     connectivity_matrx, initial_conditions, params = prepare_pss_input(
@@ -473,6 +480,7 @@ def run_aerostructural_solver(sim_input):
         points_wing_segment_corners_aero_orderded = points[
             index_transformation_struc_to_aero
         ]
+
         # Wing Aerodynamic
         (
             force_aero_wing_VSM_old,
@@ -507,16 +515,16 @@ def run_aerostructural_solver(sim_input):
                 )
                 wing.add_section(LE, TE, ["lei_airfoil_breukels", [d_tube, camber]])
 
-            # instantiate the wing_aero object
-            wing_aero = VSM_WingAerodynamics.WingAerodynamics([wing])
+            # instantiate the body_aero object
+            body_aero = VSM_BodyAerodynamics.BodyAerodynamics([wing])
             # set va
-            wing_aero.va = vel_app
-            logging.info(f"wing_aero.va: {wing_aero.va}")
+            body_aero.va = vel_app
+            logging.info(f"body_aero.va: {body_aero.va}")
 
             # plotting the geometry
             VSM_plotting.plot_geometry(
-                wing_aero,
-                title="wing_aero_CAD_10ribs",
+                body_aero,
+                title="body_aero_CAD_10ribs",
                 data_type=".pdf",
                 save_path="",
                 is_save=False,
@@ -525,14 +533,14 @@ def run_aerostructural_solver(sim_input):
                 view_azimuth=-120,
             )
             # Solve the wing aerodynamics
-            results_aero = vsm_solver.solve(wing_aero)
+            results_aero = vsm_solver.solve(body_aero)
             force_aero_wing_VSM_flipped = results_aero["F_distribution"]
 
             # flip it back
             force_aero_wing_VSM = force_aero_wing_VSM_flipped[::-1]
-            return force_aero_wing_VSM, wing_aero
+            return force_aero_wing_VSM, body_aero
 
-        force_aero_wing_VSM, wing_aero = run_vsm(
+        force_aero_wing_VSM, body_aero = run_vsm(
             points_wing_segment_corners_aero_orderded, wing, vel_app, vsm_solver
         )
         logging.info(
@@ -541,6 +549,19 @@ def run_aerostructural_solver(sim_input):
         logging.info(
             f"force_aero_wing_VSM_old: {np.shape(force_aero_wing_VSM_old)} \n {force_aero_wing_VSM_old}"
         )
+        print(f"\nOLD force_aero_wing_VSM: {force_aero_wing_VSM}")
+
+        force_aero_wing_VSM, body_aero = run_vsm_package(
+            body_aero=body_aero,
+            solver=vsm_solver,
+            le_arr=points_wing_segment_corners_aero_orderded[0::2, :],
+            te_arr=points_wing_segment_corners_aero_orderded[1::2, :],
+            va_vector=vel_app,
+        )
+        print(f"\nNEW force_aero_wing_VSM: {force_aero_wing_VSM}")
+
+        print(f" you have reached your desired break point")
+        breakpoint()
 
         # logging.info(
         #     f"force_delta: {np.sum(force_aero_wing_VSM-force_aero_wing_VSM_old)}"
@@ -559,7 +580,7 @@ def run_aerostructural_solver(sim_input):
             # )
             force_aero_wing = coupling_aero2struc.aero2struc_NN_vsm(
                 n_chordwise_aero_nodes,
-                wing_aero,
+                body_aero,
                 force_aero_wing_VSM,
                 points_wing_segment_corners_aero_orderded,
                 index_transformation_aero_to_struc_dict,
