@@ -178,7 +178,6 @@ processed_data/*
 !processed_data/V3_25/
 
 results/*
-!results/V3_25/
 # also ignore animation files, they are too big
 results/V3_25/**/**/animation/
 

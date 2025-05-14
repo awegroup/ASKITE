@@ -65,11 +65,11 @@ tether: # set to zero, if you don't want tether force
 is_print_mid_results: !!bool true
 is_with_initial_plot: !!bool false
 is_with_plotly_plot: !!bool false
-is_with_aero_geometry: !!bool true
-is_with_printing: !!bool true
+is_with_aero_geometry: !!bool false
+is_with_printing: !!bool false
 
 ## plotting
-is_with_plotting: !!bool true
+is_with_plotting: !!bool false
 plot_format: !!str "png"
 plot_elev: !!seq [9.14, 9.14]
 plot_azim: !!seq [90, 230]
@@ -83,7 +83,7 @@ animation_elev: !!float 9.14
 animation_azim: !!float 230.0
 
 ## simulation_settings
-is_run_only_1_time_step: !!bool false
+is_run_only_1_time_step: !!bool true
 is_with_velocity_initialisation: !!bool false
 n_vel_initialisation_steps: !!int 10
 coupling_method: !!str "NN"

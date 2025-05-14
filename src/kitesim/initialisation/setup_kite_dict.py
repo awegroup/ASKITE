@@ -168,7 +168,7 @@ def process_kite_yamls_into_dict(config_data, config_data_kite, path_kite_data):
             ),
         }
 
-    #TODO: Things should be toggle ON/OFF in kite_config file
+    # TODO: Things should be toggle ON/OFF in kite_config file
     ## Rotational resistance
     if config_data_kite["is_with_rotational_resistance"]:
         stiffness_bend_strut = config_data_kite["stiffness_bend_strut"]

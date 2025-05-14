@@ -1,0 +1,149 @@
+# Surfplan file name
+surfplan_filename: !!str "V3_25"
+
+# Kite geometry
+# # TODO: this should be an output of the struc2aero
+# area_projected: !!float 19.753
+# # # TODO: Should be generated/imported from the surfplan file instead
+# ref_chord: !!float 2.2
+# # TODO: Should be generated/imported from the surfplan file instead
+wing_mass: !!float 11.0 #kg
+area_surface: !!float 25 #m2
+
+# stiffnesses
+# va ~10 1e4 #2024/03/24
+# va ~20 5e4 #2024/02/24
+# va ~30 6e5
+# va ~40 6.5e5
+stiffness_bridle: !!float 5e4
+stiffness_tube: !!float 5e4
+stiffness_trailing_edge: !!float 5e4
+stiffness_canopy: !!float 1e3
+
+# structural settings
+is_with_elongation_limit: !!bool true
+elongation_limit: !!float 1.15
+is_with_compression_limit: !!bool true
+compression_limit: !!float .85
+# the factor by which stiffness is increased if over the limit
+limit_stiffness_factor: !!float 10.
+is_with_rotational_resistance: !!bool false
+
+#TODO: below should be removed at some point
+## airfoil import settings
+is_tube_diameter_dimensionless: !!bool false
+is_canopy_max_height_dimensionless: !!bool true
+
+#TODO: below shouldn't all be hardcoded
+## bridles
+bridle:
+  diameter: !!float 0.01
+  density: !!float 230
+  bridle_point_index: !!int 0
+  #TODO: should delete these
+  cd: !!float 1.1
+  #TODO: check this value
+  cd_shear: !!float 0.02
+  depower_tape_index: !!int 1
+  left_steering_tape_index: !!int 2
+  right_steering_tape_index: !!int 3
+
+## pulleys
+pulley:
+  point_indices: !!seq [24, 28] #TODO: this should be extracted from the CAD file
+  mass: !!float 0.1
+  number_of_pulleys_in_back_lines: !!int 2 #is info to read out the CAD
+
+## KCU
+# N.Gechiere     --> CD: 0.47, Diameter: 0.38
+# M.Schelbergen  --> CD: 1.0, Area: 0.25 (would be diam: .565m)
+kcu:
+  drag_coefficient: !!float 0.47
+  diameter: !!float 0.38
+  index: !!int 21
+  mass: !!float 8.4
+
+#TODO: should read from Surfplan instead of hardcoded
+# some airfoil parameters
+billowing_angles: !!seq [1, 10, 15, 18, 20, 18, 15, 10, 1]
+tube_diameters:
+  !!seq [
+    0.1,
+    0.151561,
+    0.178254,
+    0.19406,
+    0.202418,
+    0.202418,
+    0.19406,
+    0.178254,
+    0.151561,
+    0.1,
+  ]
+canopy_max_heights:
+  !!seq [0.02, 0.03, 0.04, 0.05, 0.06, 0.06, 0.05, 0.04, 0.03, 0.02]
+
+wing_connectivity:
+  ci: [19, 2, 18, 1, 19, 2, 2, 3, 17, 18,
+       2, 3, 3, 4, 16, 17, 3, 4, 4, 5,
+       15, 16, 4, 5, 5, 6, 14, 15, 5, 6,
+       6, 7, 13, 14, 6, 7, 7, 8, 12, 13,
+       7, 8, 8, 9, 11, 12, 8, 9, 9, 20,
+       10, 11, 9, 20]
+
+  cj: [2, 18, 1, 19, 18, 1, 3, 17, 18, 2,
+       17, 18, 4, 16, 17, 3, 16, 17, 5, 15,
+       16, 4, 15, 16, 6, 14, 15, 5, 14, 15,
+       7, 13, 14, 6, 13, 14, 8, 12, 13, 7,
+       12, 13, 9, 11, 12, 8, 11, 12, 20, 10,
+       11, 9, 10, 11]
+
+
+bridle_connectivity:
+  ci: [ 0, 21, 21, 21, 22, 22, 23, 23, 27, 27,
+        24, 24, 28, 28, 25, 25, 29, 29, 26, 26,
+        30, 30,  0,  0, 31, 31, 34, 34, 32, 32,
+        35, 35, 33, 33, 36, 36, 24, 28, 31, 34]
+
+  cj: [21, 22, 23, 27, 24, 28, 24,  1, 28, 10,
+        25, 26, 29, 30, 18, 17, 11, 12, 16, 15,
+        13, 14, 31, 34, 32, 33, 35, 36,  2,  3,
+         9,  8,  4,  5,  7,  6, 19, 20, 19, 20]
+
+points:
+  [0, 0.0, 0.0, 0.0, '<enter-type>']
+  [1, 1.5450326776836745, 4.130039796867375, 7.261364950271782, '<enter-type>']
+  [2, -0.01769468978128639, 3.9841196033007544, 8.497033387639695, '<enter-type>']
+  [3, -0.23864988658488862, 3.147085371141592, 9.816746227504566, '<enter-type>']
+  [4, -0.3852940131556698, 1.9677011127725468, 10.6073565473802, '<enter-type>']
+  [5, -0.4584192791195412, 0.6669541551721638, 10.948973784300064, '<enter-type>']
+  [6, -0.4584192791195412, -0.6669541551721638, 10.948973784300064, '<enter-type>']
+  [7, -0.3852940131556698, -1.9677011127725468, 10.6073565473802, '<enter-type>']
+  [8, -0.23864988658488862, -3.147085371141592, 9.816746227504566, '<enter-type>']
+  [9, -0.01769468978128639, -3.9841196033007544, 8.497033387639695, '<enter-type>']
+  [10, 1.5450326776836745, -4.130039796867375, 7.261364950271782, '<enter-type>']
+  [11, 1.7103966474299823, -3.9715968676171474, 8.492040169869373, '<enter-type>']
+  [12, 2.0106621688737727, -3.12943184814695, 9.787197879905024, '<enter-type>']
+  [13, 2.118729000086964, -1.9545056515510937, 10.55854695742184, '<enter-type>']
+  [14, 2.16733994663813, -0.6634087911809183, 10.889841638961673, '<enter-type>']
+  [15, 2.16733994663813, 0.6634087911809183, 10.889841638961673, '<enter-type>']
+  [16, 2.118729000086964, 1.9545056515510937, 10.55854695742184, '<enter-type>']
+  [17, 2.0106621688737727, 3.12943184814695, 9.787197879905024, '<enter-type>']
+  [18, 1.7103966474299823, 3.9715968676171474, 8.492040169869373, '<enter-type>']
+  [19, 0.8630767430175426, 4.1565, 7.423819809051551, '<enter-type>']
+  [20, 0.8630767430175426, -4.1565, 7.423819809051551, '<enter-type>']
+  [21, 0.17884119251811076, 0.0, 0.9330143770911036, '<enter-type>']
+  [22, 0.4176659156066993, 0.0, 2.0047264427326446, '<enter-type>']
+  [23, 0.4765199236180079, 0.515701635045511, 2.4187272340933115, '<enter-type>']
+  [24, 1.0118690598081908, 0.85948465466864, 4.671178520435504, '<enter-type>']
+  [25, 1.447067774285811, 2.71993276851239, 7.354965134765166, '<enter-type>']
+  [26, 1.5342469795828642, 1.3437933594787979, 7.833401527870664, '<enter-type>']
+  [27, 0.4765199236180079, -0.515701635045511, 2.4187272340933115, '<enter-type>']
+  [28, 1.0118690598081908, -0.85948465466864, 4.671178520435504, '<enter-type>']
+  [29, 1.447067774285811, -2.71993276851239, 7.354965134765166, '<enter-type>']
+  [30, 1.5342469795828642, -1.3437933594787979, 7.833401527870664, '<enter-type>']
+  [31, -0.06579255760134889, 1.3268467003328777, 5.531595097127407, '<enter-type>']
+  [32, -0.042661843847079224, 2.0553030306836795, 7.2551007793587665, '<enter-type>']
+  [33, -0.09211118715063556, 1.267408888894257, 7.827716375899725, '<enter-type>']
+  [34, -0.06579255760134889, -1.3268467003328777, 5.531595097127407, '<enter-type>']
+  [35, -0.042661843847079224, -2.0553030306836795, 7.2551007793587665, '<enter-type>']
+  [36, -0.09211118715063556, -1.267408888894257, 7.827716375899725, '<enter-type>']

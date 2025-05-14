@@ -25,7 +25,6 @@ def setup_config(
     Args:
         path_config (str): The path to the configuration file.
         path_processed_data_folder (str): The path to the processed data folder.
-
     Returns:
         The configuration class.
     """

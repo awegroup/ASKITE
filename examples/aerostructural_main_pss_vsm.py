@@ -21,6 +21,7 @@ from kitesim.initialisation import initialisation_main
 from kitesim.solver import solver_main_pss_vsm
 from kitesim.post_processing import post_processing_main
 from kitesim.logging_config import *
+from kitesim.utils import load_and_save_config_files
 
 # TODO: could add a function somewhere that always finds the right root dir
 # # Find the root directory of the repository
@@ -40,34 +41,13 @@ def main():
     print(f"PROJECT_DIR: {PROJECT_DIR}")
     print(f" :)")
 
-    # defining paths
-    # path_config = "../data/config.yaml"
-    path_config = Path(PROJECT_DIR) / "data" / "config.yaml"
-    # underlying mechanism assumes specific folder structure inside processed_data
-    ## kite config files in folder: processed_data/kite_name
-    ## kite data files in folder: processed_data/kite_name/processed_design_files
-    path_processed_data_folder = Path(PROJECT_DIR) / "processed_data"
-    path_results_folder = Path(PROJECT_DIR) / "results"
+    # load and save config files
+    config, config_kite = load_and_save_config_files(PROJECT_DIR)
 
-    # Loading the input
-    sim_input = initialisation_main.get_sim_input(
-        path_config,
-        path_processed_data_folder,
+    # run AeroStructural simulation
+    sim_output = solver_main_pss_vsm.run_aerostructural_solver(
+        config, config_kite, PROJECT_DIR
     )
-    print(f"sim_input: {sim_input}")
-
-    # Create results folder
-    path_results_folder_run = post_processing_main.create_results_folder(
-        sim_input, path_results_folder
-    )
-
-    # Save inputs
-    post_processing_main.saving_all_dict_entries(
-        sim_input, "input", path_results_folder_run
-    )
-
-    # AeroStructural Simulation
-    sim_output = solver_main_pss_vsm.run_aerostructural_solver(sim_input, PROJECT_DIR)
 
     # Save outputs
     post_processing_main.saving_all_dict_entries(

@@ -36,10 +36,8 @@ def run_vsm_package(
     le_arr,
     te_arr,
     va_vector,
-    d_tube_arr=None,
-    y_camber_arr=None,
+    aero_input_type="reuse_initial_polar_data",
     yaw_rate=0.0,
-    aero_input_type="polar_data",
 ):
     """
     Run the VSM simulation with updated geometry and velocity.
@@ -47,9 +45,14 @@ def run_vsm_package(
     Returns:
         force_distribution: Nx3 array of aerodynamic force vectors.
     """
+    # redefine the points
     body_aero.update_from_points(
-        le_arr, te_arr, d_tube_arr, y_camber_arr, aero_input_type=aero_input_type
+        le_arr,
+        te_arr,
+        aero_input_type=aero_input_type,
     )
+    # set again where velocity vector is coming from
     body_aero.va = (va_vector, yaw_rate)
+    # solve the problem
     results = solver.solve(body_aero)
     return results["F_distribution"], body_aero
