@@ -104,7 +104,8 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
 from kitesim.coupling import coupling_struc2aero
-from kitesim.VortexStepMethod import VSM_old
+
+# from kitesim.VortexStepMethod import VSM_old
 from kitesim.post_processing import post_processing_utils
 from kitesim.post_processing import plotting
 

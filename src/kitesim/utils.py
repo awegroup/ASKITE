@@ -1,7 +1,7 @@
 import yaml
 from pathlib import Path
 import numpy as np
-import os
+import pandas as pd
 from datetime import datetime
 from scipy.spatial import ConvexHull
 
@@ -33,19 +33,45 @@ def load_and_save_config_files(PROJECT_DIR):
     )
 
     # create a results folder on this date and time and save the config files
-    path_results_folder = (
+    results_dir = (
         Path(PROJECT_DIR)
         / "results"
         / f'{config["kite_name"]}'
         / f'{datetime.now().strftime("%Y_%m_%d_%H")}h'
     )
-    path_results_folder.mkdir(parents=True, exist_ok=True)
-    with open(path_results_folder / "config.yaml", "w") as f:
+    results_dir.mkdir(parents=True, exist_ok=True)
+    with open(results_dir / "config.yaml", "w") as f:
         yaml.dump(config, f, sort_keys=False)
-    with open(path_results_folder / "config_kite.yaml", "w") as f:
+    with open(results_dir / "config_kite.yaml", "w") as f:
         yaml.dump(config_kite, f, sort_keys=False)
 
-    return config, config_kite
+    return config, config_kite, results_dir
+
+
+def load_sim_output(h5_path):
+    """
+    Load simulation results and metadata from an HDF5 file written with pd.HDFStore.
+
+    Args:
+        h5_path (str or Path): Path to the .h5 file (e.g. "sim_output.h5").
+
+    Returns:
+        dict: {
+            "metadata": dict of run‐level metadata,
+            "tracking_without_na": pandas.DataFrame
+        }
+    """
+    h5_path = Path(h5_path)
+    if not h5_path.exists():
+        raise FileNotFoundError(f"No such file: {h5_path}")
+
+    with pd.HDFStore(h5_path, mode="r") as store:
+        # Replace "tracking_no_na" if you used a different key
+        df = store["tracking_no_na"]
+        storer = store.get_storer("tracking_no_na")
+        meta = getattr(storer.attrs, "metadata", {})
+
+    return meta, df
 
 
 ##TODO: at this point unused
