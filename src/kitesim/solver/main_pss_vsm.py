@@ -9,55 +9,24 @@ import os
 import sys
 from pathlib import Path
 from kitesim.coupling import coupling_struc2aero, coupling_aero2struc
-from kitesim.solver import solver_utils
 from kitesim.solver.vsm_functions import initialize_vsm, run_vsm_package
 from kitesim.solver.pss_functions import instantiate_psystem, run_pss
+from kitesim.solver.initialisation import initialising_solver
 
 
-def run_aerostructural_solver(config, config_kite, PROJECT_DIR):
+def run_aerostructural_solver(config_dict, config_kite_dict, PROJECT_DIR):
     """Runs the aero-structural solver for the given input parameters"""
 
-    # # Unpacking input_dict
-    # points = sim_input["points"]
-
-    # vel_app = sim_input["vel_app"]
-    # config = sim_input["config"]
-    # input_bridle_aero = sim_input["input_bridle_aero"]
-    # input_tether_aero = sim_input["input_tether_aero"]
-    # input_VSM = sim_input["input_VSM"]
-    # input_PSM = sim_input["input_PSM"]
-
-    # # GENERAL INITIALIsATION
-    # ## case settings
-    # sim_name = config.sim_name
-    # is_with_vk_optimization = config.is_with_vk_optimization
-    # is_circular_case = config.is_circular_case
-    # is_run_only_1_time_step = config.is_run_only_1_time_step
-    # is_print_intermediate_results = config.is_print_intermediate_results
-    # is_with_gravity = config.is_with_gravity
-    # is_with_velocity_initialisation = config.is_with_velocity_initialisation
-
-    # # logging
-    # logging.info(
-    #     f"Running aero-structural simulation for {sim_name}, shape: {np.shape(sim_name)}"
-    # )
-    # logging.debug(
-    #     f" type of input_PSM: {type(input_PSM)}, shape: {np.shape(input_PSM)}"
-    # )
-    # logging.debug(
-    #     f" type of input_VSM: {type(input_VSM)}, shape: {np.shape(input_VSM)}"
-    # )
-    # logging.info(
-    #     f" type of input_bridle_aero: {type(input_bridle_aero)}, shape: {np.shape(input_bridle_aero)}"
-    # )
-    # logging.info(
-    #     f" type of input_tether_aero: {type(input_tether_aero)}, shape: {np.shape(input_tether_aero)}"
-    # )
-    # logging.info(f" type of points: {type(points)}, shape: {np.shape(points)}")
-    # logging.info(f" type of vel_app: {type(vel_app)}, shape: {np.shape(vel_app)}")
-    # logging.info(f" type of config: {type(config)}, shape: {np.shape(config)}")
-    # logging.info(f" type of sim_input: {type(sim_input)}, shape: {np.shape(sim_input)}")
-    # logging.info(f" points: {points}")
+    ### SOLVER INITIALISATION
+    (
+        points,
+        wing_connectivity,
+        bridle_connectivity,
+        kite_connectivity,
+        wing_rest_lengths_initial,
+        rest_lengths,
+        m_array,
+    ) = initialising_solver(config_kite_dict)
 
     ### AERO initialisation -- VSM
     body_aero, vsm_solver = initialize_vsm(
@@ -73,9 +42,19 @@ def run_aerostructural_solver(config, config_kite, PROJECT_DIR):
     )
 
     ## STRUC initialisation -- PSS
-    psystem, params, config = instantiate_psystem(
-        PROJECT_DIR, config["kite_name"], config["grav_constant"], config, config_kite
+    psystem, params = instantiate_psystem(
+        config_dict,
+        config_kite_dict,
+        points,
+        wing_connectivity,
+        kite_connectivity,
+        rest_lengths,
+        m_array,
     )
+
+    ##TODO: add a function to set the initial position of the kite
+    # if config_dict["is_with_initial_plot"]:
+    #     plot the geometry
 
     ## setting up the position-dataframe
     t_vector = np.linspace(
@@ -92,44 +71,34 @@ def run_aerostructural_solver(config, config_kite, PROJECT_DIR):
 
     # INITIALISATION OF VARIABLES
     ## parameters used in the loop
-    points = config.kite.points_ini
-    vel_app = np.array(config.vel_wind - config.vel_kite)
+    vel_app = np.array(config_dict["vel_wind"]) - np.array(config_dict["vel_kite"])
     start_time = time.time()
     is_convergence = False
     residual_f_list = []
     f_tether_drag = np.zeros(3)
     is_residual_below_tol = False
     is_run_only_1_time_step = True
-
-    ##TODO: should this be done differently?
-    # Defining variables outside the loop, to speed up RUNTIME
-    damping_ratio = config.solver.damping_constant
-    connectivity = config.kite.connectivity
-    n_segments = config.kite.n_segments
-    is_with_varying_va = config.is_with_varying_va
-
-    coupling_method = config.coupling_method
-    n_chordwise_aero_nodes = config.aero.n_chordwise_aero_nodes
-    aero_structural_max_iter = config.aero_structural.max_iter
+    coupling_method = config_dict["coupling_method"]
+    n_chordwise_aero_nodes = config_dict["aero"]["n_chordwise_aero_nodes"]
+    aero_structural_max_iter = config_dict["aero_structural"]["max_iter"]
 
     ## actuation
-    ### depower tape
-    index_fixed_node = config.kite.bridle.bridle_point_index
-    len_wing_rest_length = len(config.kite.wing_rest_lengths_initial)
-    index_depower_tape = len_wing_rest_length + config.kite.bridle.depower_tape_index
+    len_wing_rest_length = len(wing_rest_lengths_initial)
+    index_depower_tape = (
+        len_wing_rest_length + config_kite_dict["bridle"]["depower_tape_index"]
+    )
     initial_length_depower_tape = params["l0"][index_depower_tape]
-    depower_tape_extension_step = config.depower_tape_extension_step
-    depower_tape_final_extension = config.depower_tape_final_extension
-    ### steering tape
+    depower_tape_extension_step = config_dict["depower_tape_extension_step"]
+    depower_tape_final_extension = config_dict["depower_tape_final_extension"]
     index_steering_tape_left = (
-        len_wing_rest_length + config.kite.bridle.left_steering_tape_index
+        len_wing_rest_length + config_kite_dict["bridle"]["left_steering_tape_index"]
     )
     index_steering_tape_right = (
-        len_wing_rest_length + config.kite.bridle.right_steering_tape_index
+        len_wing_rest_length + config_kite_dict["bridle"]["right_steering_tape_index"]
     )
     initial_length_steering_tape_right = params["l0"][index_steering_tape_right]
-    steering_tape_extension_step = config.steering_tape_extension_step
-    steering_tape_final_extension = config.steering_tape_final_extension
+    steering_tape_extension_step = config_dict["steering_tape_extension_step"]
+    steering_tape_final_extension = config_dict["steering_tape_final_extension"]
     ### printing initial lengths
     print(
         f"Initial depower tape length: {psystem.extract_rest_length[index_depower_tape]:.3f}m"
@@ -144,11 +113,9 @@ def run_aerostructural_solver(config, config_kite, PROJECT_DIR):
         f"Desired steering tape length right: {initial_length_steering_tape_right + steering_tape_final_extension:.3f}m"
     )
 
-    ## gravity
-    mass_points = config.kite.mass_points
-    if config.is_with_gravity:
+    if config_dict["is_with_gravity"]:
         force_gravity = np.array(
-            [np.array(config.grav_constant) * m_pt for m_pt in mass_points]
+            [np.array(config_dict["grav_constant"]) * m_pt for m_pt in m_array]
         )
     else:
         force_gravity = np.zeros(points.shape)
@@ -158,7 +125,7 @@ def run_aerostructural_solver(config, config_kite, PROJECT_DIR):
         points_wing_segment_corners_aero_orderded,
         index_transformation_struc_to_aero,
     ) = coupling_struc2aero.extract_wingpanel_corners_aero_orderded(
-        points, config.kite.connectivity.plate_point_indices
+        points, np.array(config_kite_dict["plate_point_indices"])
     )
     logging.info(
         f"points_wing_segment_corners_aero_orderded: {points_wing_segment_corners_aero_orderded}"
@@ -359,29 +326,29 @@ def run_aerostructural_solver(config, config_kite, PROJECT_DIR):
         ## bridle_rest_lengths
     }
 
-    from VSM.interactive import interactive_plot
+    # from VSM.interactive import interactive_plot
 
-    points_wing_segment_corners_aero_orderded = points[
-        index_transformation_struc_to_aero
-    ]
-    force_aero_wing_VSM, body_aero = run_vsm_package(
-        body_aero=body_aero,
-        solver=vsm_solver,
-        le_arr=points_wing_segment_corners_aero_orderded[0::2, :],
-        te_arr=points_wing_segment_corners_aero_orderded[1::2, :],
-        va_vector=vel_app,
-        aero_input_type="reuse_initial_polar_data",
-    )
+    # points_wing_segment_corners_aero_orderded = points[
+    #     index_transformation_struc_to_aero
+    # ]
+    # force_aero_wing_VSM, body_aero = run_vsm_package(
+    #     body_aero=body_aero,
+    #     solver=vsm_solver,
+    #     le_arr=points_wing_segment_corners_aero_orderded[0::2, :],
+    #     te_arr=points_wing_segment_corners_aero_orderded[1::2, :],
+    #     va_vector=vel_app,
+    #     aero_input_type="reuse_initial_polar_data",
+    # )
 
-    interactive_plot(
-        body_aero,
-        vel=np.linalg.norm(vel_app),
-        angle_of_attack=10,
-        side_slip=0,
-        yaw_rate=0,
-        is_with_aerodynamic_details=True,
-        title="TUDELFT_V3_KITE",
-    )
+    # interactive_plot(
+    #     body_aero,
+    #     vel=np.linalg.norm(vel_app),
+    #     angle_of_attack=10,
+    #     side_slip=0,
+    #     yaw_rate=0,
+    #     is_with_aerodynamic_details=True,
+    #     title="TUDELFT_V3_KITE",
+    # )
     return sim_output
 
 

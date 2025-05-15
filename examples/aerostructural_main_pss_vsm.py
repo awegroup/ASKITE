@@ -17,8 +17,7 @@ Github: ...
 import os
 from pathlib import Path
 
-from kitesim.initialisation import initialisation_main
-from kitesim.solver import solver_main_pss_vsm
+from kitesim.solver import main_pss_vsm
 from kitesim.post_processing import post_processing_main
 from kitesim.logging_config import *
 from kitesim.utils import load_and_save_config_files
@@ -45,7 +44,7 @@ def main():
     config, config_kite = load_and_save_config_files(PROJECT_DIR)
 
     # run AeroStructural simulation
-    sim_output = solver_main_pss_vsm.run_aerostructural_solver(
+    sim_output = main_pss_vsm.run_aerostructural_solver(
         config, config_kite, PROJECT_DIR
     )
 

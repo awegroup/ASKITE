@@ -1,7 +1,9 @@
 import yaml
 from pathlib import Path
+import numpy as np
 import os
 from datetime import datetime
+from scipy.spatial import ConvexHull
 
 
 def load_yaml(path: Path) -> dict:
@@ -44,3 +46,19 @@ def load_and_save_config_files(PROJECT_DIR):
         yaml.dump(config_kite, f, sort_keys=False)
 
     return config, config_kite
+
+
+##TODO: at this point unused
+def calculate_projected_area(points):
+    # Project points onto the x,y plane
+    xy_points = points[:, :2]
+
+    # Find the convex hull
+    hull = ConvexHull(xy_points)
+    hull_points = xy_points[hull.vertices]
+
+    # Using the shoelace formula
+    x = hull_points[:, 0]
+    y = hull_points[:, 1]
+
+    return 0.5 * np.abs(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1)))
