@@ -328,15 +328,16 @@ def run_aerostructural_solver(config_dict, config_kite_dict, PROJECT_DIR, result
                 index_transformation_struc_to_aero
             ]
             ### AERO
-            f_aero_wing_VSM, body_aero = run_vsm_package(
-                body_aero=body_aero,
-                solver=vsm_solver,
-                le_arr=points_wing_segment_corners_aero_orderded[0::2, :],
-                te_arr=points_wing_segment_corners_aero_orderded[1::2, :],
-                va_vector=vel_app,
-                aero_input_type="reuse_initial_polar_data",
-                initial_polar_data=initial_polar_data,
-            )
+            if i == 0:
+                f_aero_wing_VSM, body_aero = run_vsm_package(
+                    body_aero=body_aero,
+                    solver=vsm_solver,
+                    le_arr=points_wing_segment_corners_aero_orderded[0::2, :],
+                    te_arr=points_wing_segment_corners_aero_orderded[1::2, :],
+                    va_vector=vel_app,
+                    aero_input_type="reuse_initial_polar_data",
+                    initial_polar_data=initial_polar_data,
+                )
             ### AERO --> STRUC
             if coupling_method == "NN":
                 f_aero_wing = coupling_aero2struc.aero2struc_NN_vsm(
