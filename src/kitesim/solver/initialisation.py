@@ -1,23 +1,50 @@
 import numpy as np
 
 
+# TODO: further extend this to also extract pulley_indices and so on.
 def convert_points(points):
     """
-    Convert a list of [idx, x, y, z, type] entries into an (N,3) NumPy array of [x, y, z].
+    Convert a list of [idx, x, y, z, type, subtype] entries into:
+      - coords:   (N,3) float array of [x,y,z]
+      - ids:      (N,)   int array of the original point indices
+      - le_idx:   (n_LE,) int array of point-indices whose subtype == "le"
+      - te_idx:   (n_TE,) int array of point-indices whose subtype == "te"
 
     Parameters
     ----------
     points : list of lists
-        Each element is [index, x, y, z, some_type].
+        Each element is [index, x, y, z, type, subtype].
 
     Returns
     -------
-    numpy.ndarray
-        An array of shape (len(points), 3) with just the x, y, z values.
+    coords : np.ndarray, shape (N,3)
+    ids    : np.ndarray, shape (N,)
+    le_idx : np.ndarray, shape (<=N,)
+    te_idx : np.ndarray, shape (<=N,)
     """
-    # Using tuple unpacking to skip first and last items
-    xyz = [[x, y, z] for _, x, y, z, _ in points]
-    return np.array(xyz, dtype=float)
+    coords = []
+    ids = []
+    le_idx = []
+    te_idx = []
+
+    for idx, x, y, z, major, subtype in points:
+        idx = int(idx)
+        ids.append(idx)
+        coords.append([x, y, z])
+
+        # collect wing LE/TE indices
+        if major.lower() == "wing":
+            if subtype.lower() == "le":
+                le_idx.append(idx)
+            elif subtype.lower() == "te":
+                te_idx.append(idx)
+
+    return (
+        np.array(coords, dtype=float),
+        np.array(ids, dtype=int),
+        np.array(le_idx, dtype=int),
+        np.array(te_idx, dtype=int),
+    )
 
 
 def calculate_edge_lengths(ci, cj, pos):
@@ -88,7 +115,7 @@ def new_calculate_mass_distribution(
 
 def initialising_solver(config_kite_dict):
 
-    points = convert_points(config_kite_dict["points"])
+    points, ids, le_idx, te_idx = convert_points(config_kite_dict["points"])
 
     ## extracting the connectivity from config_kite
     wing_connectivity = np.column_stack(
@@ -142,6 +169,8 @@ def initialising_solver(config_kite_dict):
 
     return (
         points,
+        le_idx,
+        te_idx,
         wing_connectivity,
         bridle_connectivity,
         kite_connectivity,

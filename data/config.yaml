@@ -12,7 +12,7 @@ depower_tape_extension_percentage: !!float 8.0
 # steering
 delta_ls_ini: !!float 0.00
 ## NEW - in meters
-depower_tape_extension_step: !!float 0.01
+depower_tape_extension_step: !!float 0.1
 depower_tape_final_extension: !!float 0.2
 steering_tape_extension_step: !!float 0
 steering_tape_final_extension: !!float 0
@@ -41,8 +41,8 @@ solver:
   newton_disp: !!bool false
   damping_constant: !!float 1.0
   is_with_visc_damping: !!bool true
-  dt: !!float 0.1
-  n_time_steps: !!int 10000
+  dt: !!float 1.0
+  n_time_steps: !!int 50
   abs_tol: !!float 1.0e-50
   rel_tol: !!float 1.0e-5
   max_iter: !!int 50000
@@ -65,6 +65,7 @@ tether: # set to zero, if you don't want tether force
 is_print_mid_results: !!bool true
 ##TODO: currently not working
 is_with_initial_plot: !!bool false
+is_with_final_plot: !!bool true
 is_with_plotly_plot: !!bool false
 is_with_aero_geometry: !!bool false
 is_with_printing: !!bool false
@@ -84,7 +85,7 @@ animation_elev: !!float 9.14
 animation_azim: !!float 230.0
 
 ## simulation_settings
-is_run_only_1_time_step: !!bool true
+is_run_only_1_time_step: !!bool false
 is_with_velocity_initialisation: !!bool false
 n_vel_initialisation_steps: !!int 10
 coupling_method: !!str "NN"

@@ -2,148 +2,185 @@
 # defining function for the spring-damper system
 
 import time
+from tqdm import tqdm
 import numpy as np
 import pandas as pd
 import logging
+import matplotlib.pyplot as plt
 import os
 import sys
 from pathlib import Path
+import copy
+import h5py
 from kitesim.coupling import coupling_struc2aero, coupling_aero2struc
 from kitesim.solver.vsm_functions import initialize_vsm, run_vsm_package
 from kitesim.solver.pss_functions import instantiate_psystem, run_pss
 from kitesim.solver.initialisation import initialising_solver
 
 
-# Set up unified tracking dataframe including position, forces, and residuals
-def setup_tracking_dataframe(params, t_vector):
-    """
-    Initialize unified dataframe to track position, forces, and residuals across iterations.
-
-    Args:
-        params: Dictionary with simulation parameters
-        t_vector: Time vector for simulation steps
-
-    Returns:
-        Unified tracking dataframe
-    """
-    n_points = params["n"]
-    columns = {}
-
-    # Position columns (per node)
-    for i in range(n_points):
-        columns[f"x{i+1}"] = np.zeros(len(t_vector))
-        columns[f"y{i+1}"] = np.zeros(len(t_vector))
-        columns[f"z{i+1}"] = np.zeros(len(t_vector))
-
-    # Force columns (per node)
-    for i in range(n_points):
-        # Aerodynamic forces
-        columns[f"aero_x{i+1}"] = np.zeros(len(t_vector))
-        columns[f"aero_y{i+1}"] = np.zeros(len(t_vector))
-        columns[f"aero_z{i+1}"] = np.zeros(len(t_vector))
-
-        # Internal forces
-        columns[f"int_x{i+1}"] = np.zeros(len(t_vector))
-        columns[f"int_y{i+1}"] = np.zeros(len(t_vector))
-        columns[f"int_z{i+1}"] = np.zeros(len(t_vector))
-
-        # External forces (sum of all external forces)
-        columns[f"ext_x{i+1}"] = np.zeros(len(t_vector))
-        columns[f"ext_y{i+1}"] = np.zeros(len(t_vector))
-        columns[f"ext_z{i+1}"] = np.zeros(len(t_vector))
-
-    # Residual and convergence columns
-    columns["residual_norm"] = np.zeros(len(t_vector))  # Overall residual norm
-    columns["max_residual"] = np.zeros(len(t_vector))  # Maximum residual component
-    columns["pos_change_norm"] = np.zeros(
-        len(t_vector)
-    )  # Position change between iterations
-    columns["vel_change_norm"] = np.zeros(
-        len(t_vector)
-    )  # Velocity change between iterations
-
-    # Create unified dataframe
-    tracking_df = pd.DataFrame(index=t_vector, columns=columns)
-
-    return tracking_df
+def setup_tracking_arrays(n_pts, t_vector):
+    nt = len(t_vector)
+    return {
+        "positions": np.zeros((nt, n_pts, 3)),
+        "f_external": np.zeros((nt, n_pts, 3)),
+        "f_residual": np.zeros((nt, n_pts, 3)),
+        "residual_norm": np.zeros(nt),
+        "max_residual": np.zeros(nt),
+        "pos_change": np.zeros(nt),
+        "vel_change": np.zeros(nt),
+    }
 
 
-# Update the unified tracking dataframe during simulation
-def update_tracking(
-    tracking_df,
-    step,
-    psystem,
-    points,
-    points_prev,
-    force_aero,
-    force_external,
-    residual_f,
+def update_tracking_arrays(
+    tracking, step, psystem, points, points_prev, f_external_flat, f_residual_flat
 ):
+    # Unpack 3D storage
+    pos3d = tracking["positions"]
+    ext3d = tracking["f_external"]
+    res3d = tracking["f_residual"]
+
+    n_pts = pos3d.shape[1]
+
+    # 1) Positions
+    pos_flat, _ = psystem.x_v_current  # shape (n_pts*3,)
+    pos3d[step] = pos_flat.reshape(n_pts, 3)
+
+    # 2) External & residual forces: reshape before storing
+    ext3d[step] = f_external_flat.reshape(n_pts, 3)
+    res3d[step] = f_residual_flat.reshape(n_pts, 3)
+
+    # 3) Norms
+    tracking["residual_norm"][step] = np.linalg.norm(f_residual_flat)
+    tracking["max_residual"][step] = np.max(np.abs(f_residual_flat))
+
+    # 4) Deltas
+    if points_prev is not None:
+        dp = points - points_prev
+        tracking["pos_change"][step] = np.linalg.norm(dp)
+
+        if hasattr(psystem, "v_current_2D") and hasattr(psystem, "v_prev_2D"):
+            dv = psystem.v_current_2D - psystem.v_prev_2D
+            tracking["vel_change"][step] = np.linalg.norm(dv)
+
+
+def save_results(tracking, meta, filename):
+    with h5py.File(filename, "w") as f:
+        grp = f.create_group("tracking")
+        for name, arr in tracking.items():
+            grp.create_dataset(name, data=arr[: meta["n_iter"]], compression="gzip")
+        for k, v in meta.items():
+            grp.attrs[k] = v
+
+
+def plot_psm(particles, pss_kite_connectivity, f_ext=None, title="PSM State"):
     """
-    Update tracking dataframe with current iteration data
+    Plot a ParticleSystem snapshot in 3D.
 
     Args:
-        tracking_df: Unified tracking dataframe
-        step: Current time step
-        psystem: Particle system object
-        points: Current position of points
-        points_prev: Position of points from previous iteration
-        force_aero: Aerodynamic forces
-        force_external: Total external forces
-        residual_f: Residual forces
+        particles: list of particle objects with attributes
+                   .x (np.array shape (3,)), .fixed (bool)
+        connectivity_matrix: list of [i, j, ...] giving springs
+        f_ext: optional external forces, either:
+               – flat array shape (n_pts*3,)
+               – array shape (n_pts,3)
+        title: figure title
     """
-    n_points = len(points)
+    connectivity_matrix = pss_kite_connectivity
+    # unpack positions & fixed mask
+    xs = np.array([p.x for p in particles])
+    fixed = np.array([p.fixed for p in particles])
 
-    # Reshape forces to match points shape if needed
-    f_int_2d = psystem.f_int.reshape(-1, 3)
+    fig = plt.figure()
+    ax = fig.add_subplot(projection="3d")
+    # scatter free vs fixed
+    ax.scatter(*(xs[~fixed].T), color="blue", label="Free nodes", s=20)
+    ax.scatter(*(xs[fixed].T), color="red", label="Fixed nodes", s=20)
 
-    # Update position data (replace existing implementation)
-    pos_data, _ = psystem.x_v_current
-    for i in range(n_points):
-        tracking_df.loc[step, f"x{i+1}"] = pos_data[i * 3]
-        tracking_df.loc[step, f"y{i+1}"] = pos_data[i * 3 + 1]
-        tracking_df.loc[step, f"z{i+1}"] = pos_data[i * 3 + 2]
+    # draw springs
+    for i, j, *rest in connectivity_matrix:
+        p1, p2 = xs[i], xs[j]
+        ax.plot(
+            [p1[0], p2[0]], [p1[1], p2[1]], [p1[2], p2[2]], color="gray", linewidth=1
+        )
 
-    # Update force data
-    for i in range(n_points):
-        # Aerodynamic forces
-        tracking_df.loc[step, f"aero_x{i+1}"] = force_aero[i, 0]
-        tracking_df.loc[step, f"aero_y{i+1}"] = force_aero[i, 1]
-        tracking_df.loc[step, f"aero_z{i+1}"] = force_aero[i, 2]
+    # optionally draw external forces
+    if f_ext is not None:
+        arr = np.array(f_ext)
+        if arr.ndim == 1:
+            arr = arr.reshape(-1, 3)
+        for pos, frc in zip(xs, arr):
+            ax.quiver(*pos, *frc, length=0.01, normalize=True)
 
-        # Internal forces
-        tracking_df.loc[step, f"int_x{i+1}"] = f_int_2d[i, 0]
-        tracking_df.loc[step, f"int_y{i+1}"] = f_int_2d[i, 1]
-        tracking_df.loc[step, f"int_z{i+1}"] = f_int_2d[i, 2]
+    # set aspect ratio to equal
+    bb = xs.max(axis=0) - xs.min(axis=0)
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Z")
+    ax.set_box_aspect(bb)
+    ax.set_title(title)
+    ax.legend()
+    plt.show()
 
-        # External forces
-        tracking_df.loc[step, f"ext_x{i+1}"] = force_external[i, 0]
-        tracking_df.loc[step, f"ext_y{i+1}"] = force_external[i, 1]
-        tracking_df.loc[step, f"ext_z{i+1}"] = force_external[i, 2]
 
-    # Update residual data
-    residual_norm = np.linalg.norm(residual_f)
-    max_residual = np.max(np.abs(residual_f))
+def plot_psm_final_vs_initial(initial_positions, final_positions, connectivity_matrix):
+    """
+    Compare initial vs final PSM states in one 3D plot.
 
-    # Calculate position and velocity changes if previous points are available
-    if points_prev is not None:
-        pos_change = points - points_prev
-        pos_change_norm = np.linalg.norm(pos_change)
+    Args:
+        initial_positions: list of [x, v, m, fixed] or objects with .x/.fixed
+        final_positions:   same format as initial_positions
+        connectivity_matrix: list of [i, j, ...] giving springs
+    """
 
-        # Velocity change (if velocity is tracked)
-        if hasattr(psystem, "v_current_2D") and hasattr(psystem, "v_prev_2D"):
-            vel_change = psystem.v_current_2D - psystem.v_prev_2D
-            vel_change_norm = np.linalg.norm(vel_change)
-        else:
-            vel_change_norm = 0.0
-    else:
-        pos_change_norm = 0.0
-        vel_change_norm = 0.0
+    # unpack coords
+    def unpack(pos_list):
+        out = []
+        for item in pos_list:
+            if hasattr(item, "x"):
+                out.append(item.x)
+            else:
+                out.append(item[0])
+        return np.array(out)
 
-    tracking_df.loc[step, "residual_norm"] = residual_norm
-    tracking_df.loc[step, "max_residual"] = max_residual
-    tracking_df.loc[step, "pos_change_norm"] = pos_change_norm
-    tracking_df.loc[step, "vel_change_norm"] = vel_change_norm
+    xi = unpack(initial_positions)
+    xf = unpack(final_positions)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(projection="3d")
+
+    ax.scatter(*(xi.T), color="black", marker="o", s=10, label="Initial")
+    ax.scatter(*(xf.T), color="red", marker="o", s=10, label="Final")
+
+    # draw lines
+    for i, j, *rest in connectivity_matrix:
+        p1i, p2i = xi[i], xi[j]
+        p1f, p2f = xf[i], xf[j]
+        ax.plot(
+            [p1i[0], p2i[0]],
+            [p1i[1], p2i[1]],
+            [p1i[2], p2i[2]],
+            color="black",
+            linewidth=1,
+        )
+        ax.plot(
+            [p1f[0], p2f[0]],
+            [p1f[1], p2f[1]],
+            [p1f[2], p2f[2]],
+            color="red",
+            linewidth=1,
+        )
+
+    # equal aspect
+    all_pts = np.vstack((xi, xf))
+    bb = all_pts.max(axis=0) - all_pts.min(axis=0)
+    ax.set_box_aspect(bb)
+
+    ax.set_title("PSM: Initial (black) vs Final (red)")
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Z")
+    ax.legend()
+    plt.show()
 
 
 def run_aerostructural_solver(config_dict, config_kite_dict, PROJECT_DIR, results_dir):
@@ -152,6 +189,8 @@ def run_aerostructural_solver(config_dict, config_kite_dict, PROJECT_DIR, result
     ### SOLVER INITIALISATION
     (
         points,
+        le_idx,
+        te_idx,
         wing_connectivity,
         bridle_connectivity,
         kite_connectivity,
@@ -172,9 +211,17 @@ def run_aerostructural_solver(config_dict, config_kite_dict, PROJECT_DIR, result
         is_half_wing=True,
         is_with_corrected_polar=True,
     )
+    wing = body_aero.wings[0]
+    new_sections = wing.refine_aerodynamic_mesh()
+    initial_polar_data = []
+    for new_section in new_sections:
+        initial_polar_data.append(new_section.aero_input)
+    # print(f"new_sections: {new_sections}")
+    # print(f"aero_input_arr: {len(aero_input_arr)}")
+    # breakpoint()
 
     ## STRUC initialisation -- PSS
-    psystem, params = instantiate_psystem(
+    psystem, params, pss_kite_connectivity = instantiate_psystem(
         config_dict,
         config_kite_dict,
         points,
@@ -183,33 +230,19 @@ def run_aerostructural_solver(config_dict, config_kite_dict, PROJECT_DIR, result
         rest_lengths,
         m_array,
     )
-
-    ##TODO: add a function to set the initial position of the kite
-    # if config_dict["is_with_initial_plot"]:
-    #     plot the geometry
-
-    ## setting up the position-dataframe
-    t_vector = np.linspace(
-        params["dt"], params["t_steps"] * params["dt"], params["t_steps"]
-    )
-    tracking_df = setup_tracking_dataframe(params, t_vector)
+    initial_particles = copy.deepcopy(psystem.particles)
+    if config_dict["is_with_initial_plot"]:
+        plot_psm(
+            initial_particles, pss_kite_connectivity, f_ext=None, title="PSM State"
+        )
 
     # INITIALISATION OF VARIABLES
-    ## parameters used in the loop
-    points_prev = None  # Initialize previous points for tracking
     aero_structural_tol = params["aerostructural_tol"]
-    vel_app = np.array(config_dict["vel_wind"]) - np.array(config_dict["vel_kite"])
-    start_time = time.time()
-    is_convergence = False
-    residual_f_list = []
-    f_tether_drag = np.zeros(3)
-    is_residual_below_tol = False
-    is_run_only_1_time_step = True
+    is_run_only_1_time_step = config_dict["is_run_only_1_time_step"]
     coupling_method = config_dict["coupling_method"]
     n_chordwise_aero_nodes = config_dict["aero"]["n_chordwise_aero_nodes"]
     aero_structural_max_iter = config_dict["aero_structural"]["max_iter"]
-
-    ## actuation
+    # actuation
     len_wing_rest_length = len(wing_rest_lengths_initial)
     index_depower_tape = (
         len_wing_rest_length + config_kite_dict["bridle"]["depower_tape_index"]
@@ -217,27 +250,14 @@ def run_aerostructural_solver(config_dict, config_kite_dict, PROJECT_DIR, result
     initial_length_depower_tape = params["l0"][index_depower_tape]
     depower_tape_extension_step = config_dict["depower_tape_extension_step"]
     depower_tape_final_extension = config_dict["depower_tape_final_extension"]
-    index_steering_tape_left = (
-        len_wing_rest_length + config_kite_dict["bridle"]["left_steering_tape_index"]
+    n_depower_tape_steps = int(
+        depower_tape_final_extension / depower_tape_extension_step
     )
-    index_steering_tape_right = (
-        len_wing_rest_length + config_kite_dict["bridle"]["right_steering_tape_index"]
-    )
-    initial_length_steering_tape_right = params["l0"][index_steering_tape_right]
-    steering_tape_extension_step = config_dict["steering_tape_extension_step"]
-    steering_tape_final_extension = config_dict["steering_tape_final_extension"]
-    ### printing initial lengths
-    print(
+    logging.info(
         f"Initial depower tape length: {psystem.extract_rest_length[index_depower_tape]:.3f}m"
     )
-    print(
+    logging.info(
         f"Desired depower tape length: {initial_length_depower_tape + depower_tape_final_extension:.3f}m"
-    )
-    print(
-        f"Initial steering tape length right: {psystem.extract_rest_length[index_steering_tape_right]:.3f}m"
-    )
-    print(
-        f"Desired steering tape length right: {initial_length_steering_tape_right + steering_tape_final_extension:.3f}m"
     )
 
     if config_dict["is_with_gravity"]:
@@ -251,739 +271,222 @@ def run_aerostructural_solver(config_dict, config_kite_dict, PROJECT_DIR, result
     (
         points_wing_segment_corners_aero_orderded,
         index_transformation_struc_to_aero,
-    ) = coupling_struc2aero.extract_wingpanel_corners_aero_orderded(
-        points, np.array(config_kite_dict["plate_point_indices"])
+    ) = coupling_struc2aero.extract_wingpanel_corners_L_to_R(
+        points, np.array(config_kite_dict["plate_point_indices"], dtype=int)
     )
     logging.info(
         f"points_wing_segment_corners_aero_orderded: {points_wing_segment_corners_aero_orderded}"
     )
-    n_ribs = int(len(points_wing_segment_corners_aero_orderded) / 2)
-    n_panels = int(n_ribs - 1)
-    logging.info(f"n_ribs: {n_ribs}, n_panels: {n_panels}")
-
     ### creating a dict with key value pairs, to transform from aero to struc
     index_transformation_aero_to_struc_dict = {}
     for i, value in enumerate(index_transformation_struc_to_aero):
         index_transformation_aero_to_struc_dict[value] = i
 
-    print(f" ")
-    print(f"Running aero-structural simulation")
-    print(f"----------------------------------- ")
-
-    ######################################################################
-    # SIMULATION LOOP
-    ######################################################################
-    ## propagating the simulation for each timestep and saving results
-    for i, step in enumerate(t_vector):
-        if i > 0:
-            points_prev = points.copy()
-
-        ## external force
-        begin_time_f_ext = time.time()
-        ### STRUC --> AERO
-        # Ordering the points from left to right (-y to +y), the desired aero-ordering
-        points_wing_segment_corners_aero_orderded = points[
-            index_transformation_struc_to_aero
-        ]
-        ### AERO
-        force_aero_wing_VSM, body_aero = run_vsm_package(
-            body_aero=body_aero,
-            solver=vsm_solver,
-            le_arr=points_wing_segment_corners_aero_orderded[0::2, :],
-            te_arr=points_wing_segment_corners_aero_orderded[1::2, :],
-            va_vector=vel_app,
-            aero_input_type="reuse_initial_polar_data",
-        )
-        # reshuffle forces, instead of left-to-right, we make them right-to-left
-        force_aero_wing_VSM = force_aero_wing_VSM[::-1]
-        ### AERO --> STRUC
-        if coupling_method == "NN":
-            force_aero_wing = coupling_aero2struc.aero2struc_NN_vsm(
-                n_chordwise_aero_nodes,
-                body_aero,
-                force_aero_wing_VSM,
-                points_wing_segment_corners_aero_orderded,
-                index_transformation_aero_to_struc_dict,
-                points,
-            )
-        else:
-            raise ValueError("Coupling method not recognized; wrong name or typo")
-
-        # TODO: get bridle line forces back in to play
-        force_aero_bridle = np.zeros(points.shape)
-        force_aero = force_aero_wing + force_aero_bridle
-
-        ## summing up
-        force_external = force_aero + force_gravity
-
-        ### STRUC
-        ### f_external is flat, and force_external is 2D, ##TODO: could add this to the name?
-        f_external = force_external.flatten()
-        end_time_f_ext = time.time()
-        begin_time_f_int = time.time()
-        psystem = run_pss(psystem, params, f_external)
-        # position.loc[step], _ = psystem.x_v_current
-        end_time_f_int = time.time()
-
-        # logging.debug(f"position.loc[step].shape: {position.loc[step].shape}")
-        logging.debug(f"internal force: {psystem.f_int}")
-        logging.debug(f"external force: {f_external}")
-
-        # # TODO: ideally you don't need this here and have aero-also work with the flat format, as this should be faster
-        # # saving points in different format
-        # points = psystem.x_current_2D
-        ## TODO: replacing this function inside the src code to inhere
-        # Updating the points
-        points = np.array([particle.x for particle in psystem.particles])
-        residual_f = psystem.f_int + f_external
-        residual_f_list.append(np.linalg.norm(np.abs(residual_f)))
-        print(
-            f"i:{i}, t-step:{step:.2f}, residual_f: {np.linalg.norm(residual_f):.3f}N (aero: {end_time_f_ext-begin_time_f_ext:.3f}s, struc: {end_time_f_int-begin_time_f_int:.3f}s)"
-        )
-
-        # Update unified tracking dataframe (replaces position update)
-        update_tracking(
-            tracking_df,
-            step,
-            psystem,
-            points,
-            points_prev,
-            force_aero,
-            force_external,
-            residual_f,
-        )
-
-        ## calculating delta tape lengths
-        delta_depower_tape = (
-            psystem.extract_rest_length[index_depower_tape]
-            - initial_length_depower_tape
-        )
-
-        ### All the convergence checks, are be done in if-elif because only 1 should hold at once
-        # if convergence (residual below set tolerance)
-        if np.linalg.norm(residual_f) <= aero_structural_tol:
-            is_residual_below_tol = True
-        if np.linalg.norm(residual_f) <= aero_structural_tol and i > 50:
-            is_residual_below_tol = True
-            is_convergence = True
-
-        # if residual forces are NaN
-        elif np.isnan(np.linalg.norm(residual_f)):
-            is_convergence = False
-            print("Classic PS diverged - residual force is NaN")
-            break
-        # if residual forces are not changing anymore
-        elif (
-            i > 200
-            and np.abs(np.mean(residual_f_list[i - 25]) - residual_f_list[i]) < 1
-            and np.abs(np.mean(residual_f_list[i - 10]) - residual_f_list[i]) < 1
-            and np.abs(np.mean(residual_f_list[i - 5]) - residual_f_list[i]) < 1
-            and np.abs(np.mean(residual_f_list[i - 2]) - residual_f_list[i]) < 1
-        ):
-            is_convergence = False
-            print("Classic PS non-converging - residual no longer changes")
-            break
-        # if to many iterations are needed
-        elif i > aero_structural_max_iter:
-            is_convergence = False
-            print(
-                f"Classic PS non-converging - more than max ({aero_structural_max_iter}) iterations needed"
-            )
-            break
-        # special case for running the simulation for only one timestep
-        elif is_run_only_1_time_step:
-            break
-
-        ## if convergenced and not yet at desired depower-tape length
-        elif (
-            is_residual_below_tol and delta_depower_tape <= depower_tape_final_extension
-        ):
-            psystem.update_rest_length(index_depower_tape, depower_tape_extension_step)
-            delta_depower_tape = (
-                psystem.extract_rest_length[index_depower_tape]
-                - initial_length_depower_tape
-            )
-            print(
-                f"||--- delta l_d: {delta_depower_tape:.3f}m | new l_d: {psystem.extract_rest_length[index_depower_tape]:.3f}m"
-            )
-            is_residual_below_tol = False
-
-        ## if convergenced and all changes are made
-        elif is_residual_below_tol:
-            is_convergence = True
-
-        if is_convergence:
-            break
-    ######################################################################
-    ## END OF SIMULATION FOR LOOP
-    ######################################################################
-
-    # 1. Filter out rows with NaNs in all [xyz] columns
-    tracking_without_na = tracking_df.dropna(
-        how="all",
-        subset=tracking_df.columns[tracking_df.columns.str.contains("[xyz]")],
-        axis=0,
+    # PreLoop Initialisation
+    t_vector = np.linspace(
+        params["dt"], params["t_steps"] * params["dt"], params["t_steps"]
     )
+    tracking = setup_tracking_arrays(len(points), t_vector)
+    vel_app = np.array(config_dict["vel_wind"]) - np.array(config_dict["vel_kite"])
+    is_convergence = False
+    f_residual_list = []
+    f_tether_drag = np.zeros(3)
+    is_residual_below_tol = False
+    points_prev = None  # Initialize previous points for tracking
+    start_time = time.time()
 
-    # 2. Gather scalar metadata
-    aero_structural_total_time = time.time() - start_time
-    num_of_rows = tracking_without_na.shape[0]
-    wing_rest_lengths = psystem.extract_rest_length[:len_wing_rest_length]
-    bridle_rest_lengths = psystem.extract_rest_length[len_wing_rest_length:]
-
-    # 3. Write to HDF5 (one file holds table + metadata)
-    h5_path = results_dir / "sim_output.h5"
-    with pd.HDFStore(h5_path, mode="w") as store:
-        # store the filtered tracking table
-        store["tracking_no_na"] = tracking_without_na
-
-        # attach metadata as attributes on that node
-        meta = {
-            "total_time_s": aero_structural_total_time,
-            "num_iterations": i,
-            "converged": is_convergence,
-            "n_data_points": num_of_rows,
-            "wing_rest_lengths": wing_rest_lengths.tolist(),
-            "bridle_rest_lengths": bridle_rest_lengths.tolist(),
-        }
-        store.get_storer("tracking_no_na").attrs.metadata = meta
-
-    print(f"\nWrote {num_of_rows} valid snapshots and metadata to {h5_path}")
-
-    # 4. Return path (or load back if you need Python objects)
-    return {"hdf5_path": str(h5_path)}
-
-    # from VSM.interactive import interactive_plot
-
-    # points_wing_segment_corners_aero_orderded = points[
-    #     index_transformation_struc_to_aero
-    # ]
-    # force_aero_wing_VSM, body_aero = run_vsm_package(
+    # le_arr = points_wing_segment_corners_aero_orderded[0::2, :]
+    # te_arr = points_wing_segment_corners_aero_orderded[1::2, :]
+    # print(f"le_arr: len(le_arr): {len(le_arr)}")
+    # print(f"te_arr: len(te_arr): {len(te_arr)}")
+    # f_aero_wing_VSM, body_aero = run_vsm_package(
     #     body_aero=body_aero,
     #     solver=vsm_solver,
     #     le_arr=points_wing_segment_corners_aero_orderded[0::2, :],
     #     te_arr=points_wing_segment_corners_aero_orderded[1::2, :],
     #     va_vector=vel_app,
     #     aero_input_type="reuse_initial_polar_data",
+    #     initial_polar_data=initial_polar_data,
     # )
+    # print(f"f_aero_wing_VSM: {f_aero_wing_VSM}")
+    # breakpoint()
 
-    # interactive_plot(
-    #     body_aero,
-    #     vel=np.linalg.norm(vel_app),
-    #     angle_of_attack=10,
-    #     side_slip=0,
-    #     yaw_rate=0,
-    #     is_with_aerodynamic_details=True,
-    #     title="TUDELFT_V3_KITE",
-    # )
+    ######################################################################
+    # SIMULATION LOOP
+    ######################################################################
+    ## propagating the simulation for each timestep and saving results
+    with tqdm(total=len(t_vector), desc="Simulating", leave=True) as pbar:
+        for i, step in enumerate(t_vector):
+            if i > 0:
+                points_prev = points.copy()
 
+            ## external force
+            begin_time_f_ext = time.time()
+            ### STRUC --> AERO
+            # Ordering the points from left to right (-y to +y), the desired aero-ordering
+            points_wing_segment_corners_aero_orderded = points[
+                index_transformation_struc_to_aero
+            ]
+            ### AERO
+            f_aero_wing_VSM, body_aero = run_vsm_package(
+                body_aero=body_aero,
+                solver=vsm_solver,
+                le_arr=points_wing_segment_corners_aero_orderded[0::2, :],
+                te_arr=points_wing_segment_corners_aero_orderded[1::2, :],
+                va_vector=vel_app,
+                aero_input_type="reuse_initial_polar_data",
+                initial_polar_data=initial_polar_data,
+            )
+            ### AERO --> STRUC
+            if coupling_method == "NN":
+                f_aero_wing = coupling_aero2struc.aero2struc_NN_vsm(
+                    n_chordwise_aero_nodes,
+                    body_aero,
+                    f_aero_wing_VSM,
+                    points_wing_segment_corners_aero_orderded,
+                    index_transformation_aero_to_struc_dict,
+                    points,
+                )
+            else:
+                raise ValueError("Coupling method not recognized; wrong name or typo")
 
-# Example of post-processing function to analyze convergence
-def analyze_convergence(tracking_df):
-    """
-    Analyze the convergence behavior of the simulation
+            # TODO: get bridle line forces back in to play
+            f_aero_bridle = np.zeros(points.shape)
+            f_aero = f_aero_wing + f_aero_bridle
 
-    Args:
-        tracking_df: Unified tracking dataframe with residual data
+            ## summing up
+            f_external = f_aero + force_gravity
 
-    Returns:
-        Dictionary with convergence metrics
-    """
-    # Calculate convergence rate in the last iterations
-    final_iterations = min(20, len(tracking_df))
-    if final_iterations > 5:
-        residual_values = tracking_df["residual_norm"].iloc[-final_iterations:].values
-        iterations = np.arange(final_iterations)
+            ### STRUC
+            ### f_external is flat, and f_external is 2D, ##TODO: could add this to the name?
+            f_external = f_external.flatten()
+            end_time_f_ext = time.time()
+            begin_time_f_int = time.time()
+            psystem = run_pss(psystem, params, f_external)
+            # position.loc[step], _ = psystem.x_v_current
+            end_time_f_int = time.time()
 
-        # Fit exponential decay to estimate convergence rate
-        # log(residual) = log(initial) - rate * iteration
-        if np.all(residual_values > 0):
-            log_residuals = np.log(residual_values)
+            # logging.debug(f"position.loc[step].shape: {position.loc[step].shape}")
+            logging.debug(f"internal force: {psystem.f_int}")
+            logging.debug(f"external force: {f_external}")
 
-            # Simple linear regression
-            A = np.vstack([iterations, np.ones(len(iterations))]).T
-            rate, log_initial = np.linalg.lstsq(A, log_residuals, rcond=None)[0]
+            # # TODO: ideally you don't need this here and have aero-also work with the flat format, as this should be faster
+            # # saving points in different format
+            # points = psystem.x_current_2D
+            ## TODO: replacing this function inside the src code to inhere
+            # Updating the points
+            points = np.array([particle.x for particle in psystem.particles])
+            f_residual = psystem.f_int + f_external
+            f_residual_list.append(np.linalg.norm(np.abs(f_residual)))
 
-            convergence_rate = -rate  # Negative because we expect decreasing residuals
-        else:
-            convergence_rate = np.nan
-    else:
-        convergence_rate = np.nan
+            # Update unified tracking dataframe (replaces position update)
+            update_tracking_arrays(
+                tracking,
+                i,
+                psystem,
+                points,
+                points_prev,
+                f_external,
+                f_residual,
+            )
+            ## calculating delta tape lengths
+            delta_depower_tape = (
+                psystem.extract_rest_length[index_depower_tape]
+                - initial_length_depower_tape
+            )
 
-    # Calculate oscillation metrics (standard deviation of residual changes)
-    if len(tracking_df) > 5:
-        residual_changes = np.diff(tracking_df["residual_norm"].values)
-        oscillation_metric = (
-            np.std(residual_changes) / np.mean(np.abs(residual_changes))
-            if np.mean(np.abs(residual_changes)) > 0
-            else 0
-        )
-    else:
-        oscillation_metric = np.nan
+            pbar.set_postfix(
+                {
+                    "res": f"{np.linalg.norm(f_residual):.3f}N",
+                    # "aero": f"{end_time_f_ext-begin_time_f_ext:.2f}s",
+                    # "struc": f"{end_time_f_int-begin_time_f_int:.2f}s",
+                }
+            )
+            pbar.update(1)
 
-    # Calculate force balance metrics
-    # Average ratio of internal to external forces in final state
-    last_idx = tracking_df.index[-1]
-    force_columns = tracking_df.filter(regex="^(int|ext)_[xyz]").columns
-    int_cols = [col for col in force_columns if col.startswith("int_")]
-    ext_cols = [col for col in force_columns if col.startswith("ext_")]
+            ### All the convergence checks, are be done in if-elif because only 1 should hold at once
+            # if convergence (residual below set tolerance)
+            if (
+                i > n_depower_tape_steps
+                and np.linalg.norm(f_residual) <= aero_structural_tol
+            ):
+                is_residual_below_tol = True
+                is_convergence = True
+            # if np.linalg.norm(f_residual) <= aero_structural_tol and i > 50:
+            #     is_residual_below_tol = True
+            #     is_convergence = True
 
-    # Sum of force magnitudes in final state
-    int_force_sum = np.sqrt(
-        np.sum([tracking_df.loc[last_idx, col] ** 2 for col in int_cols])
-    )
-    ext_force_sum = np.sqrt(
-        np.sum([tracking_df.loc[last_idx, col] ** 2 for col in ext_cols])
-    )
-    force_balance_ratio = int_force_sum / ext_force_sum if ext_force_sum > 0 else np.nan
+            # if residual forces are NaN
+            elif np.isnan(np.linalg.norm(f_residual)):
+                is_convergence = False
+                logging.info("Classic PS diverged - residual force is NaN")
+                break
+            # if residual forces are not changing anymore
+            elif (
+                i > 200
+                and np.abs(np.mean(f_residual_list[i - 25]) - f_residual_list[i]) < 1
+                and np.abs(np.mean(f_residual_list[i - 10]) - f_residual_list[i]) < 1
+                and np.abs(np.mean(f_residual_list[i - 5]) - f_residual_list[i]) < 1
+                and np.abs(np.mean(f_residual_list[i - 2]) - f_residual_list[i]) < 1
+            ):
+                is_convergence = False
+                logging.info("Classic PS non-converging - residual no longer changes")
+                break
+            # if to many iterations are needed
+            elif i > aero_structural_max_iter:
+                is_convergence = False
+                logging.info(
+                    f"Classic PS non-converging - more than max ({aero_structural_max_iter}) iterations needed"
+                )
+                break
+            # special case for running the simulation for only one timestep
+            elif is_run_only_1_time_step:
+                break
 
-    return {
-        "convergence_rate": convergence_rate,
-        "oscillation_metric": oscillation_metric,
-        "min_residual": tracking_df["residual_norm"].min(),
-        "max_residual": tracking_df["residual_norm"].max(),
-        "final_residual": tracking_df["residual_norm"].iloc[-1],
-        "iterations_to_converge": len(tracking_df),
-        "force_balance_ratio": force_balance_ratio,
+            ## if convergenced and not yet at desired depower-tape length
+            elif (
+                is_residual_below_tol
+                and delta_depower_tape <= depower_tape_final_extension
+            ):
+                psystem.update_rest_length(
+                    index_depower_tape, depower_tape_extension_step
+                )
+                delta_depower_tape = (
+                    psystem.extract_rest_length[index_depower_tape]
+                    - initial_length_depower_tape
+                )
+                logging.info(
+                    f"||--- delta l_d: {delta_depower_tape:.3f}m | new l_d: {psystem.extract_rest_length[index_depower_tape]:.3f}m | Steps required: {n_depower_tape_steps}"
+                )
+                is_residual_below_tol = False
+
+            ## if convergenced and all changes are made
+            elif is_residual_below_tol:
+                is_convergence = True
+
+            if is_convergence:
+                n_iter = i + 1
+                break
+    ######################################################################
+    ## END OF SIMULATION FOR LOOP
+    ######################################################################
+    meta = {
+        "total_time_s": time.time() - start_time,
+        "n_iter": i,
+        "converged": is_convergence,
+        "wing_rest_lengths": psystem.extract_rest_length[
+            :len_wing_rest_length
+        ].tolist(),
+        "bridle_rest_lengths": psystem.extract_rest_length[
+            len_wing_rest_length:
+        ].tolist(),
     }
+    h5_path = Path(results_dir) / "sim_output.h5"
+    save_results(tracking, meta, h5_path)
 
-
-# Example of using the tracking data for visualization
-def plot_simulation_data(tracking_df, node_indices=None, save_path=None):
-    """
-    Create plots to visualize the simulation results
-
-    Args:
-        tracking_df: Unified tracking dataframe
-        node_indices: List of node indices to plot (if None, plots summary data)
-        save_path: Path to save figures (if None, displays figures)
-    """
-    import matplotlib.pyplot as plt
-
-    # If no specific nodes are requested, use a default selection or summary
-    if node_indices is None:
-        node_indices = [1]  # Default to first node
-
-    # Create figure for residuals
-    plt.figure(figsize=(10, 6))
-    plt.semilogy(
-        tracking_df.index, tracking_df["residual_norm"], "b-", label="Residual Norm"
-    )
-    plt.semilogy(
-        tracking_df.index, tracking_df["max_residual"], "r--", label="Max Residual"
-    )
-    plt.semilogy(
-        tracking_df.index,
-        tracking_df["pos_change_norm"],
-        "g-.",
-        label="Position Change",
-    )
-    plt.grid(True, which="both", ls="--")
-    plt.xlabel("Time Step")
-    plt.ylabel("Residual (log scale)")
-    plt.title("Convergence History")
-    plt.legend()
-    if save_path:
-        plt.savefig(f"{save_path}/residuals.png", dpi=300, bbox_inches="tight")
-
-    # Create figure for position trajectory of selected nodes
-    plt.figure(figsize=(10, 8))
-    for node_idx in node_indices:
-        x = tracking_df[f"x{node_idx}"]
-        y = tracking_df[f"y{node_idx}"]
-        z = tracking_df[f"z{node_idx}"]
-
-        ax = plt.axes(projection="3d")
-        ax.plot3D(x, y, z, label=f"Node {node_idx}")
-        ax.set_xlabel("X Position")
-        ax.set_ylabel("Y Position")
-        ax.set_zlabel("Z Position")
-        ax.set_title(f"Position Trajectory for Selected Nodes")
-        ax.legend()
-
-    if save_path:
-        plt.savefig(
-            f"{save_path}/position_trajectory.png", dpi=300, bbox_inches="tight"
+    if config_dict["is_with_final_plot"]:
+        plot_psm_final_vs_initial(
+            initial_particles, psystem.particles, pss_kite_connectivity
         )
 
-    # Create figure for force components for selected nodes
-    for node_idx in node_indices:
-        plt.figure(figsize=(12, 8))
-
-        # Create 3 subplots for x, y, z components
-        for i, component in enumerate(["x", "y", "z"]):
-            plt.subplot(3, 1, i + 1)
-            plt.plot(
-                tracking_df.index,
-                tracking_df[f"aero_{component}{node_idx}"],
-                "b-",
-                label="Aero Force",
-            )
-            plt.plot(
-                tracking_df.index,
-                tracking_df[f"int_{component}{node_idx}"],
-                "r--",
-                label="Internal Force",
-            )
-            plt.plot(
-                tracking_df.index,
-                tracking_df[f"ext_{component}{node_idx}"],
-                "g-.",
-                label="External Force",
-            )
-            plt.grid(True)
-            plt.xlabel("Time Step")
-            plt.ylabel(f"{component.upper()} Force Component")
-            if i == 0:
-                plt.title(f"Force Components for Node {node_idx}")
-            plt.legend()
-
-        plt.tight_layout()
-        if save_path:
-            plt.savefig(
-                f"{save_path}/forces_node{node_idx}.png", dpi=300, bbox_inches="tight"
-            )
-
-    if not save_path:
-        plt.show()
-
-
-# %%
-
-
-# def run_aerostructural_solver(config_dict, config_kite_dict, PROJECT_DIR):
-#     """Runs the aero-structural solver for the given input parameters"""
-
-#     ### SOLVER INITIALISATION
-#     (
-#         points,
-#         wing_connectivity,
-#         bridle_connectivity,
-#         kite_connectivity,
-#         wing_rest_lengths_initial,
-#         rest_lengths,
-#         m_array,
-#     ) = initialising_solver(config_kite_dict)
-
-#     ### AERO initialisation -- VSM
-#     body_aero, vsm_solver = initialize_vsm(
-#         geometry_csv_path=Path(PROJECT_DIR)
-#         / "data"
-#         / "V3_25"
-#         / "wing_geometry_from_CAD.csv",
-#         polar_data_dir=Path(PROJECT_DIR) / "data" / "V3_25" / "2D_polars_from_CFD",
-#         n_panels=9,
-#         spanwise_panel_distribution="uniform",
-#         is_half_wing=True,
-#         is_with_corrected_polar=True,
-#     )
-
-#     ## STRUC initialisation -- PSS
-#     psystem, params = instantiate_psystem(
-#         config_dict,
-#         config_kite_dict,
-#         points,
-#         wing_connectivity,
-#         kite_connectivity,
-#         rest_lengths,
-#         m_array,
-#     )
-
-#     ##TODO: add a function to set the initial position of the kite
-#     # if config_dict["is_with_initial_plot"]:
-#     #     plot the geometry
-
-#     ## setting up the position-dataframe
-#     t_vector = np.linspace(
-#         params["dt"], params["t_steps"] * params["dt"], params["t_steps"]
-#     )
-#     x = {}
-#     for i in range(params["n"]):
-#         x[f"x{i + 1}"] = np.zeros(len(t_vector))
-#         x[f"y{i + 1}"] = np.zeros(len(t_vector))
-#         x[f"z{i + 1}"] = np.zeros(len(t_vector))
-
-#     position = pd.DataFrame(index=t_vector, columns=x)
-#     aero_structural_tol = params["aerostructural_tol"]
-
-#     # INITIALISATION OF VARIABLES
-#     ## parameters used in the loop
-#     vel_app = np.array(config_dict["vel_wind"]) - np.array(config_dict["vel_kite"])
-#     start_time = time.time()
-#     is_convergence = False
-#     residual_f_list = []
-#     f_tether_drag = np.zeros(3)
-#     is_residual_below_tol = False
-#     is_run_only_1_time_step = True
-#     coupling_method = config_dict["coupling_method"]
-#     n_chordwise_aero_nodes = config_dict["aero"]["n_chordwise_aero_nodes"]
-#     aero_structural_max_iter = config_dict["aero_structural"]["max_iter"]
-
-#     ## actuation
-#     len_wing_rest_length = len(wing_rest_lengths_initial)
-#     index_depower_tape = (
-#         len_wing_rest_length + config_kite_dict["bridle"]["depower_tape_index"]
-#     )
-#     initial_length_depower_tape = params["l0"][index_depower_tape]
-#     depower_tape_extension_step = config_dict["depower_tape_extension_step"]
-#     depower_tape_final_extension = config_dict["depower_tape_final_extension"]
-#     index_steering_tape_left = (
-#         len_wing_rest_length + config_kite_dict["bridle"]["left_steering_tape_index"]
-#     )
-#     index_steering_tape_right = (
-#         len_wing_rest_length + config_kite_dict["bridle"]["right_steering_tape_index"]
-#     )
-#     initial_length_steering_tape_right = params["l0"][index_steering_tape_right]
-#     steering_tape_extension_step = config_dict["steering_tape_extension_step"]
-#     steering_tape_final_extension = config_dict["steering_tape_final_extension"]
-#     ### printing initial lengths
-#     print(
-#         f"Initial depower tape length: {psystem.extract_rest_length[index_depower_tape]:.3f}m"
-#     )
-#     print(
-#         f"Desired depower tape length: {initial_length_depower_tape + depower_tape_final_extension:.3f}m"
-#     )
-#     print(
-#         f"Initial steering tape length right: {psystem.extract_rest_length[index_steering_tape_right]:.3f}m"
-#     )
-#     print(
-#         f"Desired steering tape length right: {initial_length_steering_tape_right + steering_tape_final_extension:.3f}m"
-#     )
-
-#     if config_dict["is_with_gravity"]:
-#         force_gravity = np.array(
-#             [np.array(config_dict["grav_constant"]) * m_pt for m_pt in m_array]
-#         )
-#     else:
-#         force_gravity = np.zeros(points.shape)
-
-#     ## coupling initialisation
-#     (
-#         points_wing_segment_corners_aero_orderded,
-#         index_transformation_struc_to_aero,
-#     ) = coupling_struc2aero.extract_wingpanel_corners_aero_orderded(
-#         points, np.array(config_kite_dict["plate_point_indices"])
-#     )
-#     logging.info(
-#         f"points_wing_segment_corners_aero_orderded: {points_wing_segment_corners_aero_orderded}"
-#     )
-#     n_ribs = int(len(points_wing_segment_corners_aero_orderded) / 2)
-#     n_panels = int(n_ribs - 1)
-#     logging.info(f"n_ribs: {n_ribs}, n_panels: {n_panels}")
-
-#     ### creating a dict with key value pairs, to transform from aero to struc
-#     index_transformation_aero_to_struc_dict = {}
-#     for i, value in enumerate(index_transformation_struc_to_aero):
-#         index_transformation_aero_to_struc_dict[value] = i
-
-#     print(f" ")
-#     print(f"Running aero-structural simulation")
-#     print(f"----------------------------------- ")
-
-#     ######################################################################
-#     # SIMULATION LOOP
-#     ######################################################################
-#     ## propagating the simulation for each timestep and saving results
-#     for i, step in enumerate(t_vector):
-
-#         ## external force
-#         begin_time_f_ext = time.time()
-#         ### STRUC --> AERO
-#         # Ordering the points from left to right (-y to +y), the desired aero-ordering
-#         points_wing_segment_corners_aero_orderded = points[
-#             index_transformation_struc_to_aero
-#         ]
-#         ### AERO
-#         force_aero_wing_VSM, body_aero = run_vsm_package(
-#             body_aero=body_aero,
-#             solver=vsm_solver,
-#             le_arr=points_wing_segment_corners_aero_orderded[0::2, :],
-#             te_arr=points_wing_segment_corners_aero_orderded[1::2, :],
-#             va_vector=vel_app,
-#             aero_input_type="reuse_initial_polar_data",
-#         )
-#         # reshuffle forces, instead of left-to-right, we make them right-to-left
-#         force_aero_wing_VSM = force_aero_wing_VSM[::-1]
-#         ### AERO --> STRUC
-#         if coupling_method == "NN":
-#             force_aero_wing = coupling_aero2struc.aero2struc_NN_vsm(
-#                 n_chordwise_aero_nodes,
-#                 body_aero,
-#                 force_aero_wing_VSM,
-#                 points_wing_segment_corners_aero_orderded,
-#                 index_transformation_aero_to_struc_dict,
-#                 points,
-#             )
-#         else:
-#             raise ValueError("Coupling method not recognized; wrong name or typo")
-
-#         # TODO: get bridle line forces back in to play
-#         force_aero_bridle = np.zeros(points.shape)
-#         force_aero = force_aero_wing + force_aero_bridle
-
-#         ## summing up
-#         force_external = force_aero + force_gravity
-
-#         ### STRUC
-#         ### f_external is flat, and force_external is 2D, ##TODO: could add this to the name?
-#         f_external = force_external.flatten()
-#         end_time_f_ext = time.time()
-#         begin_time_f_int = time.time()
-#         psystem = run_pss(psystem, params, f_external)
-#         position.loc[step], _ = psystem.x_v_current
-#         end_time_f_int = time.time()
-
-#         logging.debug(f"position.loc[step].shape: {position.loc[step].shape}")
-#         logging.debug(f"internal force: {psystem.f_int}")
-#         logging.debug(f"external force: {f_external}")
-
-#         # # TODO: ideally you don't need this here and have aero-also work with the flat format, as this should be faster
-#         # # saving points in different format
-#         # points = psystem.x_current_2D
-#         ## TODO: replacing this function inside the src code to inhere
-#         points = np.array([particle.x for particle in psystem.particles])
-#         residual_f = psystem.f_int + f_external
-#         residual_f_list.append(np.linalg.norm(np.abs(residual_f)))
-#         print(
-#             f"i:{i}, t-step:{step:.2f}, residual_f: {np.linalg.norm(residual_f):.3f}N (aero: {end_time_f_ext-begin_time_f_ext:.3f}s, struc: {end_time_f_int-begin_time_f_int:.3f}s)"
-#         )
-
-#         ## calculating delta tape lengths
-#         delta_depower_tape = (
-#             psystem.extract_rest_length[index_depower_tape]
-#             - initial_length_depower_tape
-#         )
-
-#         ### All the convergence checks, are be done in if-elif because only 1 should hold at once
-#         # if convergence (residual below set tolerance)
-#         if np.linalg.norm(residual_f) <= aero_structural_tol:
-#             is_residual_below_tol = True
-#         if np.linalg.norm(residual_f) <= aero_structural_tol and i > 50:
-#             is_residual_below_tol = True
-#             is_convergence = True
-
-#         # if residual forces are NaN
-#         elif np.isnan(np.linalg.norm(residual_f)):
-#             is_convergence = False
-#             print("Classic PS diverged - residual force is NaN")
-#             break
-#         # if residual forces are not changing anymore
-#         elif (
-#             i > 200
-#             and np.abs(np.mean(residual_f_list[i - 25]) - residual_f_list[i]) < 1
-#             and np.abs(np.mean(residual_f_list[i - 10]) - residual_f_list[i]) < 1
-#             and np.abs(np.mean(residual_f_list[i - 5]) - residual_f_list[i]) < 1
-#             and np.abs(np.mean(residual_f_list[i - 2]) - residual_f_list[i]) < 1
-#         ):
-#             is_convergence = False
-#             print("Classic PS non-converging - residual no longer changes")
-#             break
-#         # if to many iterations are needed
-#         elif i > aero_structural_max_iter:
-#             is_convergence = False
-#             print(
-#                 f"Classic PS non-converging - more than max ({aero_structural_max_iter}) iterations needed"
-#             )
-#             break
-#         # special case for running the simulation for only one timestep
-#         elif is_run_only_1_time_step:
-#             break
-
-#         ## if convergenced and not yet at desired depower-tape length
-#         elif (
-#             is_residual_below_tol and delta_depower_tape <= depower_tape_final_extension
-#         ):
-#             psystem.update_rest_length(index_depower_tape, depower_tape_extension_step)
-#             delta_depower_tape = (
-#                 psystem.extract_rest_length[index_depower_tape]
-#                 - initial_length_depower_tape
-#             )
-#             print(
-#                 f"||--- delta l_d: {delta_depower_tape:.3f}m | new l_d: {psystem.extract_rest_length[index_depower_tape]:.3f}m"
-#             )
-#             is_residual_below_tol = False
-
-#         ## if convergenced and all changes are made
-#         elif is_residual_below_tol:
-#             is_convergence = True
-
-#         if is_convergence:
-#             break
-#     ######################################################################
-#     ## END OF SIMULATION FOR LOOP
-#     ######################################################################
-
-#     # defining post_processing_output
-#     aero_structural_total_time = time.time() - start_time
-#     wing_rest_lengths = psystem.extract_rest_length[0:len_wing_rest_length]
-#     bridle_rest_lengths = psystem.extract_rest_length[len_wing_rest_length:]
-#     position_without_na = position.dropna(
-#         how="all",
-#         subset=position.columns[position.columns.str.contains("[xyz]")],
-#         axis=0,
-#     )
-#     num_of_rows = position_without_na.shape[0]
-
-#     sim_output = {
-#         "points": points,
-#         "position": position,
-#         "aero_structural_total_time": aero_structural_total_time,
-#         "num_of_iterations": i,
-#         "is_convergence": is_convergence,
-#         "wing_rest_lengths": wing_rest_lengths,
-#         "bridle_rest_lengths": bridle_rest_lengths,
-#         # print data
-#         "is_convergence": is_convergence,
-#         "num_of_iterations": i,
-#         "vel_app": vel_app,
-#         ## aero_structural_total_time
-#         "residual_f_including_fixed_nodes": psystem.f,
-#         "residual_f": residual_f,
-#         "f_internal": psystem.f_int,
-#         "f_external": f_external,
-#         "force_aero": force_aero,
-#         "force_aero_wing": force_aero_wing,
-#         "force_aero_bridle": force_aero_bridle,
-#         "f_tether_drag": f_tether_drag,
-#         "force_gravity": force_gravity,
-#         ## wing_rest_lengths
-#         ## bridle_rest_lengths
-#         # plot data
-#         "wingpanels": np.zeros(points.shape),  # wingpanels,
-#         "controlpoints": np.zeros(points.shape),  # controlpoints,
-#         "rings": np.zeros(points.shape),  # rings,
-#         "coord_L": np.zeros(points.shape),  # coord_L,
-#         "F_rel": np.zeros(points.shape),  # F_rel,
-#         ## wing_rest_lengths
-#         ## bridle_rest_lengths
-#         # animation data
-#         "position_without_na": position_without_na,
-#         "num_of_rows": num_of_rows,
-#         ## wing_rest_lengths
-#         ## bridle_rest_lengths
-#     }
-
-#     # from VSM.interactive import interactive_plot
-
-#     # points_wing_segment_corners_aero_orderded = points[
-#     #     index_transformation_struc_to_aero
-#     # ]
-#     # force_aero_wing_VSM, body_aero = run_vsm_package(
-#     #     body_aero=body_aero,
-#     #     solver=vsm_solver,
-#     #     le_arr=points_wing_segment_corners_aero_orderded[0::2, :],
-#     #     te_arr=points_wing_segment_corners_aero_orderded[1::2, :],
-#     #     va_vector=vel_app,
-#     #     aero_input_type="reuse_initial_polar_data",
-#     # )
-
-#     # interactive_plot(
-#     #     body_aero,
-#     #     vel=np.linalg.norm(vel_app),
-#     #     angle_of_attack=10,
-#     #     side_slip=0,
-#     #     yaw_rate=0,
-#     #     is_with_aerodynamic_details=True,
-#     #     title="TUDELFT_V3_KITE",
-#     # )
-#     return sim_output
+    return {"hdf5_path": str(h5_path)}

@@ -365,7 +365,7 @@ def instantiate_psystem(
         pss_initial_conditions,
         pss_param_dict,
     )
-    return psystem, pss_param_dict
+    return psystem, pss_param_dict, pss_kite_connectivity
 
 
 def run_pss(psystem, params, f_external):
@@ -391,6 +391,6 @@ def run_pss(psystem, params, f_external):
             if np.max(E_kin[-10:-1]) <= E_kin_tol:
                 converged = True
         if converged and step_internal > 1:
-            print("Kinetic damping PS converged", step_internal)
+            # print("Kinetic damping PS converged", step_internal)
             break
     return psystem

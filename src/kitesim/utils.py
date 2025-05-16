@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 from scipy.spatial import ConvexHull
+import h5py
 
 
 def load_yaml(path: Path) -> dict:
@@ -50,28 +51,35 @@ def load_and_save_config_files(PROJECT_DIR):
 
 def load_sim_output(h5_path):
     """
-    Load simulation results and metadata from an HDF5 file written with pd.HDFStore.
+    Load simulation results and metadata from an HDF5 file written with h5py.
 
     Args:
         h5_path (str or Path): Path to the .h5 file (e.g. "sim_output.h5").
 
     Returns:
-        dict: {
-            "metadata": dict of run‐level metadata,
-            "tracking_without_na": pandas.DataFrame
-        }
+        tuple:
+            metadata: dict of run‐level metadata,
+            track:    dict of numpy arrays for each dataset under "tracking"
     """
     h5_path = Path(h5_path)
     if not h5_path.exists():
         raise FileNotFoundError(f"No such file: {h5_path}")
 
-    with pd.HDFStore(h5_path, mode="r") as store:
-        # Replace "tracking_no_na" if you used a different key
-        df = store["tracking_no_na"]
-        storer = store.get_storer("tracking_no_na")
-        meta = getattr(storer.attrs, "metadata", {})
+    with h5py.File(h5_path, "r") as f:
+        if "tracking" not in f:
+            raise KeyError(f"No 'tracking' group in {h5_path}")
+        grp = f["tracking"]
 
-    return meta, df
+        # load metadata
+        metadata = {key: grp.attrs[key] for key in grp.attrs}
+
+        # load all datasets under /tracking into numpy arrays
+        track = {}
+        for name, item in grp.items():
+            if isinstance(item, h5py.Dataset):
+                track[name] = item[()]  # read the full array into memory
+
+    return metadata, track
 
 
 ##TODO: at this point unused

@@ -596,3 +596,35 @@ def extract_wingpanel_corners_aero_orderded(points_ini, plate_point_indices):
     index_transformation.extend([plate_point_indices[0][0], plate_point_indices[0][3]])
 
     return coordinates_plates_LE_to_TE_R_to_L, np.array(index_transformation)
+
+
+def extract_wingpanel_corners_L_to_R(
+    points_ini: np.ndarray, plate_point_indices: np.ndarray
+):
+    """
+    Left-to-right, LE→TE ordering of wing panels.
+
+    Args:
+        points_ini:           array (n_pts, 3) of [x, y, z]
+        plate_point_indices:  array (n_seg, 4) of [left_LE, right_LE, right_TE, left_TE]
+
+    Returns:
+        coords:   array (2*n_seg + 2, 3) of [x,y,z] in LE→TE, left→right order
+        idx_map:  array (2*n_seg + 2,) of original point-indices
+    """
+    coords = []
+    idx_map = []
+
+    # 1) For each plate, in its given order, append left_LE (col 0), left_TE (col 3)
+    for left_LE, right_LE, right_TE, left_TE in plate_point_indices:
+        coords.append(points_ini[left_LE])
+        coords.append(points_ini[left_TE])
+        idx_map.extend([left_LE, left_TE])
+
+    # 2) Finally append right_LE (col 1) and right_TE (col 2) of the last plate
+    last = plate_point_indices[-1]
+    coords.append(points_ini[last[1]])
+    coords.append(points_ini[last[2]])
+    idx_map.extend([last[1], last[2]])
+
+    return np.vstack(coords), np.array(idx_map, dtype=int)

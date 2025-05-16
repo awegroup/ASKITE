@@ -37,6 +37,7 @@ def run_vsm_package(
     te_arr,
     va_vector,
     aero_input_type="reuse_initial_polar_data",
+    initial_polar_data=None,
     yaw_rate=0.0,
 ):
     """
@@ -50,6 +51,7 @@ def run_vsm_package(
         le_arr,
         te_arr,
         aero_input_type=aero_input_type,
+        initial_polar_data=initial_polar_data,
     )
     # set again where velocity vector is coming from
     body_aero.va = (va_vector, yaw_rate)

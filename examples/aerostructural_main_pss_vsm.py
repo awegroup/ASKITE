@@ -37,11 +37,10 @@ from kitesim.utils import load_and_save_config_files, load_sim_output
 def main():
     """Main function"""
     PROJECT_DIR = Path(__file__).resolve().parents[1]
-    print(f"PROJECT_DIR: {PROJECT_DIR}")
-    print(f" :)")
 
     # load and save config files
     config, config_kite, results_dir = load_and_save_config_files(PROJECT_DIR)
+    print(f"config files saved in {results_dir}\n")
 
     # run AeroStructural simulation
     sim_output = main_pss_vsm.run_aerostructural_solver(
@@ -49,9 +48,11 @@ def main():
     )
 
     # Load results
-    meta_data_dict, tracking_df = load_sim_output(Path(results_dir) / "sim_output.h5")
+    meta_data_dict, track = load_sim_output(Path(results_dir) / "sim_output.h5")
 
-    print(f"meta_data_dict: {meta_data_dict}")
+    print(f"n_iter: {meta_data_dict['n_iter']}")
+    # print(f"track: {track}")
+    f_internal = track["f_residual"] - track["f_external"]
 
     # # Save outputs
     # post_processing_main.saving_all_dict_entries(

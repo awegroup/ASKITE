@@ -386,9 +386,9 @@ def aero2struc_NN_vsm(
         midpoints.append({"point_mid_te": point_mid_te, "point_mid_le": point_mid_le})
 
     # flipping the points to the right-order
-    logging.info(f"midpoints-before-flip {midpoints[0]} \n")
+    logging.debug(f"midpoints-before-flip {midpoints[0]} \n")
     midpoints = midpoints[::-1]
-    logging.info(f"midpoints-new {midpoints[0]} \n")
+    logging.debug(f"midpoints-new {midpoints[0]} \n")
 
     # 1.2) Interpolate chordwise points, creating a chordwise aero-mesh component
     chordwise_points = interpolate_chordwise_points(midpoints, n_chordwise_aero_nodes)
