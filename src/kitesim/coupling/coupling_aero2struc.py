@@ -165,78 +165,7 @@ def aero2struc(pos, ci, cj, plates, F, M, ringvec, controlpoints):
     return lift_force
 
 
-# %% V9_60 trials?
-
-
-def aero2struc_V9_60(lift_force, plate_point_indices):
-    """
-    Takes lift-force, applied only at the plate corner points,
-    and distributes it to the structural wing nodes
-    """
-    ##  print(lift_force.shape)
-    ##  print(points_CAD_discretized.shape)
-    ##  print(plate_point_indices.shape)
-
-    ## 1) Instead of taking the points_wing from ci_wing,cj_wing -which is not ordered
-    #     we can take the points_wing from rib_db_whole_model_struts, which is ordered
-
-    ## 2) Lift is applied at each plate_point_indices index, and we know its order
-    #     thus, we can take the struts front and rear force and distribute it
-    #     by taking the average of the two strut forces
-
-    wing_node_indices_list = []
-
-    for i, strut in enumerate(rib_db_whole_model_struts):
-        wing_node_indices = strut[5][7:]
-        wing_node_indices_list.append(wing_node_indices)
-        ##  print("i",i, "| wing_node_indices",wing_node_indices)
-
-        ## build in a check, to make sure we are only taking the bridle-attachment nodes
-        for j in wing_node_indices:  # loop through each index
-            # print('j',j)
-            if j not in np.hstack(
-                (ci_wing, cj_wing)
-            ):  # verify that it is in the ci_wing or cj_wing
-                print("error")  # if not print an error
-
-        ## if it is not the last strut, take the left-points of the plate
-        if i < len(rib_db_whole_model_struts) - 1:
-            ## left points of the plate
-            idx_plate = i
-            idx_plate_front = 0
-            idx_plate_rear = 3
-
-        ## if it is the last strut, take the right_points of the plate
-        if i == len(rib_db_whole_model_struts):
-            ## right points of the plate
-            idx_plate = i - 1
-            idx_plate_front = 1
-            idx_plate_rear = 2
-
-        ## get the lift at the strut
-        lift_at_strut_i_front = lift_force[
-            plate_point_indices[idx_plate][idx_plate_front]
-        ]  # get the lift at the strut
-        lift_at_strut_i_rear = lift_force[
-            plate_point_indices[idx_plate][idx_plate_rear]
-        ]  # get the lift at the strut
-        lift_at_strut_i = (
-            lift_at_strut_i_front + lift_at_strut_i_rear
-        ) / 2  # get the average lift at the strut
-
-        ## distribute the lift EQUALLY over the present wing node ##TODO: equally is not physically correct
-        lift_per_wing_node_i = lift_at_strut_i / len(
-            wing_node_indices
-        )  # get the lift per wing node
-        for idx in wing_node_indices:  # loop through each index
-            lift_force[idx] = (
-                lift_per_wing_node_i  # distribute the lift over the wing node
-            )
-
-    return lift_force, wing_node_indices_list
-
-
-### NEW METHOD post 2024/02
+# %% Above is URIs old method, that also considers the momentum balance.
 
 
 # Distributing VSM-loads chordwise
@@ -279,82 +208,85 @@ def generate_distribution(n_chordwise_aero_nodes):
     return x, y / np.sum(y)
 
 
-def map_aerodynamic_to_structural(
-    aero_nodes,
-    struct_nodes,
-    aero_forces,
-):
-
-    # Step 1: Find nearest structural node for each aerodynamic node
-
-    # Fit nearest neighbor model
-    nn_model = NearestNeighbors(n_neighbors=1, algorithm="auto").fit(struct_nodes)
-
-    # Find nearest structural node for each aerodynamic node
-    distances, corresponding_nodes_indices = nn_model.kneighbors(aero_nodes)
-
-    # flatten indices
-    corresponding_nodes_indices = corresponding_nodes_indices.flatten()
-
-    # Step 2: transfer aerodynamic forces to structural nodes
-
-    # Initialize array to hold transferred forces
-    transferred_forces = np.zeros_like(struct_nodes)
-
-    # Assign aerodynamic forces to corresponding structural nodes
-    for i, aero_force in enumerate(aero_forces):
-        struct_node_index = corresponding_nodes_indices[i]
-        transferred_forces[struct_node_index] += aero_force
-
-    # Return indices of nearest structural nodes
-    return transferred_forces
-
-
-def aero2struc_NN(
-    n_chordwise_aero_nodes,
-    wingpanels,
-    force_aero_wing_VSM,
+# TODO: this should be placed in a more general plotting place/module
+def plot_aerodynamic_forces_chordwise_distributed(
+    flat_chordwise_points,
+    flat_force_aero_wing_VSM_distributed_chordwise,
     points_wing_segment_corners_aero_orderded,
-    index_transformation_aero_to_struc_dict,
-    points_structural_nodes,
 ):
+    import matplotlib.pyplot as plt
 
-    ## Step 1: Define a chordwise distribution
-    # 1.1) Calculate midpoints of the wingpanels
-    midpoints = calculate_midpoints(wingpanels)
-    logging.info(f"midpoints-old {midpoints[0]} \n")
-    # 1.2) Interpolate chordwise points, creating a chordwise aero-mesh component
-    chordwise_points = interpolate_chordwise_points(midpoints, n_chordwise_aero_nodes)
-    # 1.3) Generate a distribution
-    chordwise_distribution, percentage_distribution = generate_distribution(
-        n_chordwise_aero_nodes
+    # Create a new figure and set up 3D axes
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection="3d")
+
+    # Scatter plot of chordwise points (blue)
+    ax.scatter(
+        flat_chordwise_points[:, 0],
+        flat_chordwise_points[:, 1],
+        flat_chordwise_points[:, 2],
+        color="blue",
+        label="Chordwise Points",
     )
 
-    ## Step 2: Distribute the aerodynamic forces chordwise
-    force_aero_wing_VSM_distributed_chordwise = np.zeros(
-        (len(force_aero_wing_VSM), n_chordwise_aero_nodes, 3)
-    )
-    for i, points in enumerate(chordwise_points):
-        for j, point in enumerate(points):
-            force_aero_wing_VSM_distributed_chordwise[i, j] = (
-                force_aero_wing_VSM[i] * percentage_distribution[j]
-            )
-
-    ## Step 3: Map the aerodynamic mesh to the to the wing segment corners aerodynamic orderded
-    force_aero_wing_segment_cornes_aero_mesh = map_aerodynamic_to_structural(
-        chordwise_points.reshape(-1, 3),
-        points_wing_segment_corners_aero_orderded,
-        force_aero_wing_VSM_distributed_chordwise.reshape(-1, 3),
+    # Quiver plot for the forces (red arrows)
+    ax.quiver(
+        flat_chordwise_points[:, 0],
+        flat_chordwise_points[:, 1],
+        flat_chordwise_points[:, 2],
+        flat_force_aero_wing_VSM_distributed_chordwise[:, 0],
+        flat_force_aero_wing_VSM_distributed_chordwise[:, 1],
+        flat_force_aero_wing_VSM_distributed_chordwise[:, 2],
+        length=1,
+        normalize=True,
+        color="red",
+        label="Force Vectors",
     )
 
-    ## Step 4: Change the segment corners from aero-orderded too struc-orderded
-    force_aero_wing_segment_corners_struc_mesh = np.zeros_like(points_structural_nodes)
-    for key, value in index_transformation_aero_to_struc_dict.items():
-        force_aero_wing_segment_corners_struc_mesh[key] = (
-            force_aero_wing_segment_cornes_aero_mesh[value]
-        )
+    # Scatter plot of structural nodes (wing segment corners) (green)
+    ax.scatter(
+        points_wing_segment_corners_aero_orderded[:, 0],
+        points_wing_segment_corners_aero_orderded[:, 1],
+        points_wing_segment_corners_aero_orderded[:, 2],
+        color="green",
+        label="Wing Segment Corners",
+    )
 
-    return force_aero_wing_segment_corners_struc_mesh
+    # Annotate each point with its index
+    for idx, point in enumerate(points_wing_segment_corners_aero_orderded):
+        ax.text(point[0], point[1], point[2], f"{idx}", color="black")
+
+    # Set equal scale for all axes
+    bb = points_wing_segment_corners_aero_orderded.max(
+        axis=0
+    ) - points_wing_segment_corners_aero_orderded.min(axis=0)
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Z")
+    ax.set_box_aspect(bb)
+    ax.set_title("Aerodynamic Forces and Structural Nodes")
+    ax.legend()
+    plt.show()
+
+
+def map_idw(aero_nodes, aero_forces, struct_nodes, p=2, eps=1e-6):
+    """
+    Inverse-distance weighting:
+    weightᵢⱼ = 1 / (dist(aeroᵢ, structⱼ) ** p + eps)
+    F_structⱼ = sum_i weightᵢⱼ * F_aeroᵢ  / sum_i weightᵢⱼ
+    """
+    # distances: shape (n_struct, n_aero)
+    diff = struct_nodes[:, None, :] - aero_nodes[None, :, :]
+    d2 = np.sum(diff**2, axis=2)
+    w = 1.0 / (d2 ** (p / 2) + eps)  # shape (n_struct, n_aero)
+
+    # normalize rows to sum to 1
+    w_sum = np.sum(w, axis=1, keepdims=True)
+    w_norm = w / w_sum  # (n_struct, n_aero)
+
+    # weighted sum of forces
+    F_struct = w_norm @ aero_forces  # (n_struct, 3)
+    return F_struct
 
 
 def aero2struc_NN_vsm(
@@ -362,8 +294,9 @@ def aero2struc_NN_vsm(
     wing_aero,
     force_aero_wing_VSM,
     points_wing_segment_corners_aero_orderded,
-    index_transformation_aero_to_struc_dict,
     points_structural_nodes,
+    plate_point_indices,
+    is_with_coupling_plot,
 ):
 
     ## Step 1: Define a chordwise distribution
@@ -385,11 +318,6 @@ def aero2struc_NN_vsm(
         point_mid_te = panel.control_point - 0.5 * vec_from_ac_to_cp_half_chord_length
         midpoints.append({"point_mid_te": point_mid_te, "point_mid_le": point_mid_le})
 
-    # flipping the points to the right-order
-    logging.debug(f"midpoints-before-flip {midpoints[0]} \n")
-    midpoints = midpoints[::-1]
-    logging.debug(f"midpoints-new {midpoints[0]} \n")
-
     # 1.2) Interpolate chordwise points, creating a chordwise aero-mesh component
     chordwise_points = interpolate_chordwise_points(midpoints, n_chordwise_aero_nodes)
     # 1.3) Generate a distribution
@@ -407,18 +335,33 @@ def aero2struc_NN_vsm(
                 force_aero_wing_VSM[i] * percentage_distribution[j]
             )
 
-    ## Step 3: Map the aerodynamic mesh to the to the wing segment corners aerodynamic orderded
-    force_aero_wing_segment_cornes_aero_mesh = map_aerodynamic_to_structural(
-        chordwise_points.reshape(-1, 3),
-        points_wing_segment_corners_aero_orderded,
-        force_aero_wing_VSM_distributed_chordwise.reshape(-1, 3),
-    )
-
-    ## Step 4: Change the segment corners from aero-orderded too struc-orderded
-    force_aero_wing_segment_corners_struc_mesh = np.zeros_like(points_structural_nodes)
-    for key, value in index_transformation_aero_to_struc_dict.items():
-        force_aero_wing_segment_corners_struc_mesh[key] = (
-            force_aero_wing_segment_cornes_aero_mesh[value]
+    if is_with_coupling_plot:
+        plot_aerodynamic_forces_chordwise_distributed(
+            flat_chordwise_points=chordwise_points.reshape(-1, 3),
+            flat_force_aero_wing_VSM_distributed_chordwise=force_aero_wing_VSM_distributed_chordwise.reshape(
+                -1, 3
+            ),
+            points_wing_segment_corners_aero_orderded=points_wing_segment_corners_aero_orderded,
         )
+
+    force_aero_wing_segment_corners_struc_mesh = np.zeros_like(points_structural_nodes)
+    # looping over each panel
+    for i, (force_arr, chordwise_point_arr) in enumerate(
+        zip(force_aero_wing_VSM_distributed_chordwise, chordwise_points)
+    ):
+        LAPs_of_this_panel = []
+        for index in plate_point_indices[i]:
+            LAPs_of_this_panel.append(points_structural_nodes[index])
+
+        f_LAPs_of_this_panel = map_idw(
+            chordwise_point_arr,
+            force_arr,
+            np.array(LAPs_of_this_panel).reshape(-1, 3),
+        )
+        # add these forces to the structural mesh
+        for idx, index in enumerate(plate_point_indices[i]):
+            force_aero_wing_segment_corners_struc_mesh[index] += f_LAPs_of_this_panel[
+                idx
+            ]
 
     return force_aero_wing_segment_corners_struc_mesh

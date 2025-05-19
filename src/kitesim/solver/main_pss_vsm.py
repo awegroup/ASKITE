@@ -94,7 +94,11 @@ def plot_psm(particles, pss_kite_connectivity, f_ext=None, title="PSM State"):
     ax = fig.add_subplot(projection="3d")
     # scatter free vs fixed
     ax.scatter(*(xs[~fixed].T), color="blue", label="Free nodes", s=20)
-    ax.scatter(*(xs[fixed].T), color="red", label="Fixed nodes", s=20)
+    ax.scatter(*(xs[fixed].T), color="black", label="Fixed nodes", s=20)
+
+    # add the index to each scatter point
+    for i, pos in enumerate(xs):
+        ax.text(pos[0], pos[1], pos[2], str(i), color="black", fontsize=8)
 
     # draw springs
     for i, j, *rest in connectivity_matrix:
@@ -109,7 +113,7 @@ def plot_psm(particles, pss_kite_connectivity, f_ext=None, title="PSM State"):
         if arr.ndim == 1:
             arr = arr.reshape(-1, 3)
         for pos, frc in zip(xs, arr):
-            ax.quiver(*pos, *frc, length=0.01, normalize=True)
+            ax.quiver(*pos, *frc, length=1, normalize=True, color="red")
 
     # set aspect ratio to equal
     bb = xs.max(axis=0) - xs.min(axis=0)
@@ -274,7 +278,7 @@ def run_aerostructural_solver(config_dict, config_kite_dict, PROJECT_DIR, result
     ) = coupling_struc2aero.extract_wingpanel_corners_L_to_R(
         points, np.array(config_kite_dict["plate_point_indices"], dtype=int)
     )
-    logging.info(
+    logging.debug(
         f"points_wing_segment_corners_aero_orderded: {points_wing_segment_corners_aero_orderded}"
     )
     ### creating a dict with key value pairs, to transform from aero to struc
@@ -338,25 +342,56 @@ def run_aerostructural_solver(config_dict, config_kite_dict, PROJECT_DIR, result
                     aero_input_type="reuse_initial_polar_data",
                     initial_polar_data=initial_polar_data,
                 )
-            ### AERO --> STRUC
-            if coupling_method == "NN":
-                f_aero_wing = coupling_aero2struc.aero2struc_NN_vsm(
-                    n_chordwise_aero_nodes,
-                    body_aero,
-                    f_aero_wing_VSM,
-                    points_wing_segment_corners_aero_orderded,
-                    index_transformation_aero_to_struc_dict,
-                    points,
+                ### AERO --> STRUC
+                if coupling_method == "NN":
+                    f_aero_wing = coupling_aero2struc.aero2struc_NN_vsm(
+                        n_chordwise_aero_nodes,
+                        body_aero,
+                        f_aero_wing_VSM,
+                        points_wing_segment_corners_aero_orderded,
+                        points,
+                        config_kite_dict["plate_point_indices"],
+                        config_dict["is_with_coupling_plot"],
+                    )
+                else:
+                    raise ValueError(
+                        "Coupling method not recognized; wrong name or typo"
+                    )
+
+                # TODO: get bridle line forces back in to play
+                f_aero_bridle = np.zeros(points.shape)
+                f_aero = f_aero_wing + f_aero_bridle
+
+                ## summing up
+                f_external = f_aero + force_gravity
+                ## rounding the forces to 5 decimal points
+                f_external = np.round(f_external, 5)
+
+                # Checking symmetry in the forces
+                print(
+                    f"np.sum(f_external): {np.sum(f_external[:, 0])}, {np.sum(f_external[:, 1])}, {np.sum(f_external[:, 2])}"
                 )
-            else:
-                raise ValueError("Coupling method not recognized; wrong name or typo")
 
-            # TODO: get bridle line forces back in to play
-            f_aero_bridle = np.zeros(points.shape)
-            f_aero = f_aero_wing + f_aero_bridle
+            # Compute rest-lengths between the points, using the kite_connectivity
+            plot_psm(
+                psystem.particles,
+                pss_kite_connectivity,
+                f_ext=f_external,
+                title=f"i: {i}",
+            )
 
-            ## summing up
-            f_external = f_aero + force_gravity
+            # def compute_delta_rest_lengths(psystem):
+            #     rest_lengths = []
+            #     delta_rest_lengths = []
+            #     for i, element in enumerate(psystem.springdampers):
+            #         delta = element.l - element.l0
+            #         rest_lengths.append(element.l0)
+            #         delta_rest_lengths.append(delta)
+            #         if delta > 0:
+            #             print(f"i: {i} | delta: {delta} | l0: {element.l0}")
+            #     # print(f"delta_rest_lengths: {delta_rest_lengths}")
+
+            # compute_delta_rest_lengths(psystem)
 
             ### STRUC
             ### f_external is flat, and f_external is 2D, ##TODO: could add this to the name?

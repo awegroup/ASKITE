@@ -12,8 +12,8 @@ depower_tape_extension_percentage: !!float 8.0
 # steering
 delta_ls_ini: !!float 0.00
 ## NEW - in meters
-depower_tape_extension_step: !!float 0.1
-depower_tape_final_extension: !!float 0.2
+depower_tape_extension_step: !!float 0.01
+depower_tape_final_extension: !!float 0.05
 steering_tape_extension_step: !!float 0
 steering_tape_final_extension: !!float 0
 
@@ -28,7 +28,7 @@ aero:
   cd_cylinder: !!float 1.1
   cd_shear_cylinder: !!float 0.02
   cd_multiplier: !!float 1.0
-  n_chordwise_aero_nodes: !!int 10
+  n_chordwise_aero_nodes: !!int 10 #TODO: more would better
 
 # Solve -  ChildClass: solver
 solver:
@@ -39,7 +39,7 @@ solver:
   newton_rtol: !!float 10.0
   newton_max_iter: !!int 2000
   newton_disp: !!bool false
-  damping_constant: !!float 1.0
+  damping_constant: !!float 0.9
   is_with_visc_damping: !!bool true
   dt: !!float 1.0
   n_time_steps: !!int 50
@@ -65,6 +65,7 @@ tether: # set to zero, if you don't want tether force
 is_print_mid_results: !!bool true
 ##TODO: currently not working
 is_with_initial_plot: !!bool false
+is_with_coupling_plot: !!bool false
 is_with_final_plot: !!bool true
 is_with_plotly_plot: !!bool false
 is_with_aero_geometry: !!bool false
