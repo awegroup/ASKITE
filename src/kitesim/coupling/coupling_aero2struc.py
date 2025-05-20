@@ -208,11 +208,146 @@ def generate_distribution(n_chordwise_aero_nodes):
     return x, y / np.sum(y)
 
 
+# def aero2struc_NN_vsm(
+#     n_chordwise_aero_nodes,
+#     wing_aero,
+#     force_aero_wing_VSM,
+#     points_wing_segment_corners_aero_orderded,
+#     points_structural_nodes,
+#     plate_point_indices,
+#     is_with_coupling_plot,
+#     le_idx,
+#     te_idx,
+#     results_aero,
+# ):
+
+#     ## Step 1: Define a chordwise distribution
+#     # 1.1) Calculate midpoints of the wingpanels
+#     # midpoints = calculate_midpoints(wingpanels)
+#     # THIS SHOULD NOT BE MIDPOINTS, BUT SHOULD BE THE POINTS ON THE AC TO CP LINE
+#     # (AS THIS LINE IS NOT NECESSARILY IN THE MIDDLE OF THE PANEL)
+#     midpoints = []
+#     for panel in wing_aero.panels:
+#         # define a vector from the aerodynamic center to the control point
+#         vec_from_ac_to_cp_half_chord_length = (
+#             panel.aerodynamic_center - panel.control_point
+#         )
+
+#         # define a leading-edge and trailing-edge point
+#         point_mid_le = (
+#             panel.aerodynamic_center + 0.5 * vec_from_ac_to_cp_half_chord_length
+#         )
+#         point_mid_te = panel.control_point - 0.5 * vec_from_ac_to_cp_half_chord_length
+#         midpoints.append({"point_mid_te": point_mid_te, "point_mid_le": point_mid_le})
+
+#     # 1.2) Interpolate chordwise points, creating a chordwise aero-mesh component
+#     chordwise_points = interpolate_chordwise_points(midpoints, n_chordwise_aero_nodes)
+#     # 1.3) Generate a distribution
+#     chordwise_distribution, percentage_distribution = generate_distribution(
+#         n_chordwise_aero_nodes
+#     )
+
+#     ## Step 2: Distribute the aerodynamic forces chordwise
+#     force_aero_wing_VSM_distributed_chordwise = np.zeros(
+#         (len(force_aero_wing_VSM), n_chordwise_aero_nodes, 3)
+#     )
+#     for i, points in enumerate(chordwise_points):
+#         for j, point in enumerate(points):
+#             force_aero_wing_VSM_distributed_chordwise[i, j] = (
+#                 force_aero_wing_VSM[i] * percentage_distribution[j]
+#             )
+
+#     if is_with_coupling_plot:
+#         plot_aerodynamic_forces_chordwise_distributed(
+#             points_aero_chordwise=chordwise_points.reshape(-1, 3),
+#             force_aero_chordwise=force_aero_wing_VSM_distributed_chordwise.reshape(
+#                 -1, 3
+#             ),
+#             points_struc=points_wing_segment_corners_aero_orderded,
+#         )
+
+#     # force_aero_wing_segment_corners_struc_mesh = np.zeros_like(points_structural_nodes)
+#     # # looping over each panel
+#     # for i, (force_arr, chordwise_point_arr) in enumerate(
+#     #     zip(force_aero_wing_VSM_distributed_chordwise, chordwise_points)
+#     # ):
+#     #     LAPs_of_this_panel = []
+#     #     for index in plate_point_indices[i]:
+#     #         LAPs_of_this_panel.append(points_structural_nodes[index])
+
+#     #     f_LAPs_of_this_panel = map_idw(
+#     #         chordwise_point_arr,
+#     #         force_arr,
+#     #         np.array(LAPs_of_this_panel).reshape(-1, 3),
+#     #     )
+#     #     # add these forces to the structural mesh
+#     #     for idx, index in enumerate(plate_point_indices[i]):
+#     #         force_aero_wing_segment_corners_struc_mesh[index] += f_LAPs_of_this_panel[
+#     #             idx
+#     #         ]
+
+#     # return force_aero_wing_segment_corners_struc_mesh
+
+#     from sklearn.neighbors import NearestNeighbors
+
+#     force_struc = np.zeros_like(points_structural_nodes)
+
+#     # Build two small KD-trees once per panel
+#     for panel_i, (force_arr, chord_pts) in enumerate(
+#         zip(force_aero_wing_VSM_distributed_chordwise, chordwise_points)
+#     ):
+
+#         # 1) find the two nearest LE nodes for *every* chordwise pt at once
+#         le_coords = points_structural_nodes[le_idx]  # (n_le,3)
+#         le_tree = NearestNeighbors(n_neighbors=2).fit(le_coords)
+#         _, le_inds = le_tree.kneighbors(chord_pts)  # (n_chordwise, 2)
+#         sel_le_glob = np.array(le_idx)[le_inds]  # (n_chordwise, 2)
+
+#         # 2) same for TE
+#         te_coords = points_structural_nodes[te_idx]
+#         te_tree = NearestNeighbors(n_neighbors=2).fit(te_coords)
+#         _, te_inds = te_tree.kneighbors(chord_pts)
+#         sel_te_glob = np.array(te_idx)[te_inds]  # (n_chordwise, 2)
+
+#         # 3) concatenate once
+#         #    shape (n_chordwise, 4), each row = [le1,le2,te1,te2]
+#         sel_idx = np.hstack((sel_le_glob, sel_te_glob))
+
+#         # 4) for each chordwise pt, scatter to its 4 chosen nodes
+#         for pt, frc, idx4 in zip(chord_pts, force_arr, sel_idx):
+#             sel_coords = points_structural_nodes[idx4]  # (4,3)
+#             f4 = map_idw(
+#                 aero_nodes=pt[np.newaxis, :],  # (1,3)
+#                 aero_forces=frc[np.newaxis, :],  # (1,3)
+#                 struct_nodes=sel_coords,  # (4,3)
+#             )  # returns (4,3)
+#             for local_j, global_j in enumerate(idx4):
+#                 force_struc[global_j] += f4[local_j]
+
+#     if is_with_coupling_plot:
+
+#         plot_aerodynamic_forces_chordwise_distributed(
+#             points_aero_chordwise=chordwise_points.reshape(-1, 3),
+#             force_aero_chordwise=force_aero_wing_VSM_distributed_chordwise.reshape(
+#                 -1, 3
+#             ),
+#             points_struc=points_structural_nodes,
+#             force_struc=force_struc,
+#         )
+
+#     # at the end:
+#     return force_struc
+
+
+# %% above is part of the old method, that used chordwise distributed nodes to handle the mapping.
+
+
 # TODO: this should be placed in a more general plotting place/module
 def plot_aerodynamic_forces_chordwise_distributed(
-    flat_chordwise_points,
-    flat_force_aero_wing_VSM_distributed_chordwise,
-    points_wing_segment_corners_aero_orderded,
+    points_aero_chordwise,
+    force_aero_chordwise,
+    points_struc,
+    force_struc=None,
 ):
     import matplotlib.pyplot as plt
 
@@ -222,44 +357,69 @@ def plot_aerodynamic_forces_chordwise_distributed(
 
     # Scatter plot of chordwise points (blue)
     ax.scatter(
-        flat_chordwise_points[:, 0],
-        flat_chordwise_points[:, 1],
-        flat_chordwise_points[:, 2],
-        color="blue",
+        points_aero_chordwise[:, 0],
+        points_aero_chordwise[:, 1],
+        points_aero_chordwise[:, 2],
+        color="black",
         label="Chordwise Points",
     )
 
     # Quiver plot for the forces (red arrows)
     ax.quiver(
-        flat_chordwise_points[:, 0],
-        flat_chordwise_points[:, 1],
-        flat_chordwise_points[:, 2],
-        flat_force_aero_wing_VSM_distributed_chordwise[:, 0],
-        flat_force_aero_wing_VSM_distributed_chordwise[:, 1],
-        flat_force_aero_wing_VSM_distributed_chordwise[:, 2],
-        length=1,
-        normalize=True,
-        color="red",
+        points_aero_chordwise[:, 0],
+        points_aero_chordwise[:, 1],
+        points_aero_chordwise[:, 2],
+        force_aero_chordwise[:, 0],
+        force_aero_chordwise[:, 1],
+        force_aero_chordwise[:, 2],
+        # length=1,
+        # normalize=True,
+        length=0.01,
+        color="black",
         label="Force Vectors",
     )
 
-    # Scatter plot of structural nodes (wing segment corners) (green)
-    ax.scatter(
-        points_wing_segment_corners_aero_orderded[:, 0],
-        points_wing_segment_corners_aero_orderded[:, 1],
-        points_wing_segment_corners_aero_orderded[:, 2],
-        color="green",
-        label="Wing Segment Corners",
-    )
+    if force_struc is None:
+        # Scatter plot of structural nodes (wing segment corners) (green)
+        ax.scatter(
+            points_struc[:, 0],
+            points_struc[:, 1],
+            points_struc[:, 2],
+            color="black",
+            label="Wing Segment Corners",
+        )
 
-    # Annotate each point with its index
-    for idx, point in enumerate(points_wing_segment_corners_aero_orderded):
-        ax.text(point[0], point[1], point[2], f"{idx}", color="black")
+        # Annotate each point with its index
+        for idx, point in enumerate(points_struc):
+            ax.text(point[0], point[1], point[2], f"{idx}", color="black")
+    else:
+        # Scatter plot of structural nodes (wing segment corners) (green)
+        ax.scatter(
+            points_struc[:, 0],
+            points_struc[:, 1],
+            points_struc[:, 2],
+            color="blue",
+            label="Wing Segment Corners",
+        )
+
+        # Quiver plot for the forces on structural nodes (yellow arrows)
+        ax.quiver(
+            points_struc[:, 0],
+            points_struc[:, 1],
+            points_struc[:, 2],
+            force_struc[:, 0],
+            force_struc[:, 1],
+            force_struc[:, 2],
+            # length=1,
+            length=0.01,
+            # normalize=True,
+            color="red",
+            label="Force Vectors on Structural Nodes",
+        )
 
     # Set equal scale for all axes
-    bb = points_wing_segment_corners_aero_orderded.max(
-        axis=0
-    ) - points_wing_segment_corners_aero_orderded.min(axis=0)
+    points_all = np.concatenate((points_aero_chordwise, points_struc), axis=0)
+    bb = points_all.max(axis=0) - points_all.min(axis=0)
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
     ax.set_zlabel("Z")
@@ -269,99 +429,43 @@ def plot_aerodynamic_forces_chordwise_distributed(
     plt.show()
 
 
-def map_idw(aero_nodes, aero_forces, struct_nodes, p=2, eps=1e-6):
-    """
-    Inverse-distance weighting:
-    weightᵢⱼ = 1 / (dist(aeroᵢ, structⱼ) ** p + eps)
-    F_structⱼ = sum_i weightᵢⱼ * F_aeroᵢ  / sum_i weightᵢⱼ
-    """
-    # distances: shape (n_struct, n_aero)
-    diff = struct_nodes[:, None, :] - aero_nodes[None, :, :]
-    d2 = np.sum(diff**2, axis=2)
-    w = 1.0 / (d2 ** (p / 2) + eps)  # shape (n_struct, n_aero)
-
-    # normalize rows to sum to 1
-    w_sum = np.sum(w, axis=1, keepdims=True)
-    w_norm = w / w_sum  # (n_struct, n_aero)
-
-    # weighted sum of forces
-    F_struct = w_norm @ aero_forces  # (n_struct, 3)
-    return F_struct
-
-
 def aero2struc_NN_vsm(
-    n_chordwise_aero_nodes,
-    wing_aero,
-    force_aero_wing_VSM,
-    points_wing_segment_corners_aero_orderded,
-    points_structural_nodes,
-    plate_point_indices,
-    is_with_coupling_plot,
+    force_aero_wing_VSM: np.ndarray,  # (n_panels,3)
+    points_structural_nodes: np.ndarray,  # (n_struc,3)
+    panel_cps: np.ndarray,  # (n_panels,3)
+    panel_corner_map: np.ndarray,  # (n_panels,4)
+    p: float = 2,
+    eps: float = 1e-6,
+    is_with_coupling_plot: bool = False,
 ):
+    """
+    Distribute each panel's resultant force (at its CoP) onto the four
+    structural corner nodes given in panel_corner_map.
+    """
+    n_struc = len(points_structural_nodes)
+    force_struc = np.zeros((n_struc, 3), dtype=float)
 
-    ## Step 1: Define a chordwise distribution
-    # 1.1) Calculate midpoints of the wingpanels
-    # midpoints = calculate_midpoints(wingpanels)
-    # THIS SHOULD NOT BE MIDPOINTS, BUT SHOULD BE THE POINTS ON THE AC TO CP LINE
-    # (AS THIS LINE IS NOT NECESSARILY IN THE MIDDLE OF THE PANEL)
-    midpoints = []
-    for panel in wing_aero.panels:
-        # define a vector from the aerodynamic center to the control point
-        vec_from_ac_to_cp_half_chord_length = (
-            panel.aerodynamic_center - panel.control_point
-        )
+    for i, (cp, frc) in enumerate(zip(panel_cps, force_aero_wing_VSM)):
+        sel_idx = panel_corner_map[i]  # [le_lo, le_hi, te_lo, te_hi]
+        sel_coords = points_structural_nodes[sel_idx]  # (4,3)
 
-        # define a leading-edge and trailing-edge point
-        point_mid_le = (
-            panel.aerodynamic_center + 0.5 * vec_from_ac_to_cp_half_chord_length
-        )
-        point_mid_te = panel.control_point - 0.5 * vec_from_ac_to_cp_half_chord_length
-        midpoints.append({"point_mid_te": point_mid_te, "point_mid_le": point_mid_le})
+        # true inverse-distance weighting across the 4 nodes
+        d = np.linalg.norm(sel_coords - cp[None, :], axis=1)
+        w = 1.0 / (d**p + eps)
+        w /= np.sum(w)
 
-    # 1.2) Interpolate chordwise points, creating a chordwise aero-mesh component
-    chordwise_points = interpolate_chordwise_points(midpoints, n_chordwise_aero_nodes)
-    # 1.3) Generate a distribution
-    chordwise_distribution, percentage_distribution = generate_distribution(
-        n_chordwise_aero_nodes
-    )
+        f_vals = w[:, None] * frc[None, :]  # (4,3)
 
-    ## Step 2: Distribute the aerodynamic forces chordwise
-    force_aero_wing_VSM_distributed_chordwise = np.zeros(
-        (len(force_aero_wing_VSM), n_chordwise_aero_nodes, 3)
-    )
-    for i, points in enumerate(chordwise_points):
-        for j, point in enumerate(points):
-            force_aero_wing_VSM_distributed_chordwise[i, j] = (
-                force_aero_wing_VSM[i] * percentage_distribution[j]
-            )
+        # accumulate
+        for local_j, glob_j in enumerate(sel_idx):
+            force_struc[glob_j] += f_vals[local_j]
 
     if is_with_coupling_plot:
         plot_aerodynamic_forces_chordwise_distributed(
-            flat_chordwise_points=chordwise_points.reshape(-1, 3),
-            flat_force_aero_wing_VSM_distributed_chordwise=force_aero_wing_VSM_distributed_chordwise.reshape(
-                -1, 3
-            ),
-            points_wing_segment_corners_aero_orderded=points_wing_segment_corners_aero_orderded,
+            points_aero_chordwise=panel_cps,
+            force_aero_chordwise=force_aero_wing_VSM,
+            points_struc=points_structural_nodes,
+            force_struc=force_struc,
         )
 
-    force_aero_wing_segment_corners_struc_mesh = np.zeros_like(points_structural_nodes)
-    # looping over each panel
-    for i, (force_arr, chordwise_point_arr) in enumerate(
-        zip(force_aero_wing_VSM_distributed_chordwise, chordwise_points)
-    ):
-        LAPs_of_this_panel = []
-        for index in plate_point_indices[i]:
-            LAPs_of_this_panel.append(points_structural_nodes[index])
-
-        f_LAPs_of_this_panel = map_idw(
-            chordwise_point_arr,
-            force_arr,
-            np.array(LAPs_of_this_panel).reshape(-1, 3),
-        )
-        # add these forces to the structural mesh
-        for idx, index in enumerate(plate_point_indices[i]):
-            force_aero_wing_segment_corners_struc_mesh[index] += f_LAPs_of_this_panel[
-                idx
-            ]
-
-    return force_aero_wing_segment_corners_struc_mesh
+    return force_struc

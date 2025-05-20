@@ -20,16 +20,6 @@ stiffness_tube: !!float 5e4
 stiffness_trailing_edge: !!float 5e4
 stiffness_canopy: !!float 1e3
 
-tubular_frame_stiffness: !!float 5e4
-bridle_line_stiffness: !!float 5e4
-trailing_edge_stiffness: !!float 5e4
-canopy_stiffness: !!float 1e3
-
-tubular_frame_damping: !!float 0.0
-bridle_line_damping: !!float 0.0
-trailing_edge_damping: !!float 0.0
-canopy_damping: !!float 0.0
-
 # structural settings
 is_with_elongation_limit: !!bool true
 elongation_limit: !!float 1.15
@@ -257,18 +247,18 @@ bridle_nodes:
     - [36, -0.09211118715063556, -1.267408888894257,    7.827716375899725,  knot,  ""]
 
 
-bridle_lines:
+bridle_connectivity:
   ci: [0, 21, 21, 21, 22, 22, 23, 23, 27, 27,
-       24, 24, 28, 28, 25, 25, 29, 29, 26, 26,
-       30, 30, 0, 0, 31, 31, 34, 34, 32, 32,
-       35, 35, 33, 33, 36, 36, 24, 28, 31, 34]
+        24, 24, 28, 28, 25, 25, 29, 29, 26, 26,
+        30, 30, 0, 0, 31, 31, 34, 34, 32, 32,
+        35, 35, 33, 33, 36, 36, 24, 28, 31, 34]
 
-  cj: [21, 22, 23, 27, 24, 28, 24, 2, 28, 20,
-       25, 26, 29, 30, 4, 6, 18, 16, 8, 10,
-       14, 12, 31, 34, 32, 33, 35, 36, 3, 5,
-       17, 15, 7, 9, 13, 11, 1, 19, 1, 19]
+  cj: [21, 22, 23, 27, 24, 28, 24, 1, 28, 10,
+        25, 26, 29, 30, 18, 17, 11, 12, 16, 15,
+        13, 14, 31, 34, 32, 33, 35, 36, 2, 3,
+        9, 8, 4, 5, 7, 6, 19, 20, 19, 20]
 
-is_with_bridle_line_system_surfplan: false
+
 bridle_line_system_surfplan:
   headers: [p1_x, p1_y, p1_z, p2_x, p2_y, p2_z, diameter, p1_type, p2_type]
   data:

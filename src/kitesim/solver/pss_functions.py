@@ -179,18 +179,20 @@ def extract_pulley_connectivity(points, bridle_ci, bridle_cj, pulley_data):
     return pulley_data
 
 
-def define_param_dict_input_to_pss(
+def instantiate_psystem(
+    config_dict,
+    config_kite_dict,
     points_ini,
     wing_connectivity,
     kite_connectivity,
-    config_dict,
-    config_kite_dict,
     rest_lengths,
+    m_array,
+    tubular_frame_line_idx_list,
+    te_line_idx_list,
 ):
-    n_wing_elements = len(wing_connectivity)
 
-    # Transform pulley.other_line_pair to a dict
-    # data_struc is [["3",value],["5", value], ...]
+    ## PARAMS
+    n_wing_elements = len(wing_connectivity)
 
     pulley_data_from_config_kite_dict = {
         "point_indices": config_kite_dict["pulley"]["point_indices"],
@@ -199,7 +201,6 @@ def define_param_dict_input_to_pss(
             "number_of_pulleys_in_back_lines"
         ],
     }
-
     pulley_data = extract_pulley_connectivity(
         points_ini,
         config_kite_dict["bridle_connectivity"]["ci"],
@@ -217,137 +218,60 @@ def define_param_dict_input_to_pss(
         corrected_key = str(int(key_i) + n_wing_elements)
         other_line_pair_corrected_dict[corrected_key] = other_line_pair_dict[key_i]
 
-    # initializing connectivity lists
-    canopy_indices = []
-    tube_indices = [i for i, conn in enumerate(wing_connectivity)]
-
-    # initializing empty lists
-    is_compression_list = []
-    is_tension_list = []
-    is_rotational_list = []
-    stiffness_list = []
-    is_pulley_list = []
-
-    for i, conn in enumerate(kite_connectivity):
-        # if wing elements
-        if float(i) < len(wing_connectivity):
-            is_tension_list.append(True)
-            is_pulley_list.append(False)
-
-            if i in config_kite_dict["te_line_indices"]:
-                stiffness_list.append(config_kite_dict["stiffness_trailing_edge"])
-                is_compression_list.append(False)
-                is_rotational_list.append(False)
-            elif i in config_kite_dict["tube_line_indices"]:
-                stiffness_list.append(config_kite_dict["stiffness_tube"])
-                is_compression_list.append(True)
-                is_rotational_list.append(True)
-            else:  # must be a canopy element
-                stiffness_list.append(config_kite_dict["stiffness_canopy"])
-                is_compression_list.append(False)
-                is_rotational_list.append(False)
-
-        # if bridle-lines
-        else:
-            is_compression_list.append(False)
-            is_tension_list.append(True)
-            is_rotational_list.append(True)
-            stiffness_list.append(config_kite_dict["stiffness_bridle"])
-
-            # TODO: might be better to use one index style/structure?
-            # the (i - n_wing_elements) is to correct the indices
-            if (i - n_wing_elements) in config_kite_dict["pulley_line_indices"]:
-                # print(f'pulley, i: {i}')
-                # print(f'connection[i]: {kite_connectivity[i]}')
-                is_pulley_list.append(True)
-            else:
-                is_pulley_list.append(False)
-
-    params = {
+    pss_param_dict = {
         "pulley_other_line_pair": other_line_pair_corrected_dict,
-        "k": np.array(stiffness_list),
-        "is_compression": np.array(is_compression_list),
-        "is_tension": np.array(is_tension_list),
-        "is_pulley": np.array(is_pulley_list),
-        "is_rotational": np.array(is_rotational_list),
         "l0": rest_lengths,
+        "c": config_dict["solver"]["damping_constant"],
+        "dt": config_dict["solver"]["dt"],
+        "t_steps": config_dict["solver"]["n_time_steps"],
+        "abs_tol": config_dict["solver"]["abs_tol"],
+        "rel_tol": config_dict["solver"]["rel_tol"],
+        "max_iter": config_dict["solver"]["max_iter"],
+        "n": len(config_kite_dict["points"]),
+        "aerostructural_tol": config_dict["aero_structural"]["tol"],
+        "is_with_visc_damping": config_dict["solver"]["is_with_visc_damping"],
+        "g": -config_dict["grav_constant"][2],
     }
-    params.update(
-        {
-            "c": config_dict["solver"]["damping_constant"],
-            "dt": config_dict["solver"]["dt"],
-            "t_steps": config_dict["solver"]["n_time_steps"],
-            "abs_tol": config_dict["solver"]["abs_tol"],
-            "rel_tol": config_dict["solver"]["rel_tol"],
-            "max_iter": config_dict["solver"]["max_iter"],
-            "n": len(config_kite_dict["points"]),
-            "aerostructural_tol": config_dict["aero_structural"]["tol"],
-            "is_with_visc_damping": config_dict["solver"]["is_with_visc_damping"],
-        }
-    )
 
-    return params
-
-
-def instantiate_psystem(
-    config_dict,
-    config_kite_dict,
-    points_ini,
-    wing_connectivity,
-    kite_connectivity,
-    rest_lengths,
-    m_array,
-):
-    ## PARAMS
-    pss_param_dict = define_param_dict_input_to_pss(
-        points_ini,
-        wing_connectivity,
-        kite_connectivity,
-        config_dict,
-        config_kite_dict,
-        rest_lengths,
-    )
-    pss_param_dict.update({"g": -config_dict["grav_constant"][2]})
-
-    # restructuring connectivity matrix
+    # creating PSS style connectivity matrix
     pss_kite_connectivity = []
     for idx, _ in enumerate(kite_connectivity):
-        if pss_param_dict["is_compression"][idx] and pss_param_dict["is_tension"][idx]:
+        if idx in tubular_frame_line_idx_list:
+            # compression and tension
+            k = config_kite_dict["tubular_frame_stiffness"]
+            c = config_kite_dict["tubular_frame_damping"]
             linktype = "default"
-        elif (
-            pss_param_dict["is_compression"][idx]
-            and not pss_param_dict["is_tension"][idx]
-        ):
-            linktype = "nontensile"
-        elif pss_param_dict["is_pulley"][idx]:
-            linktype = "pulley"
-        elif (
-            pss_param_dict["is_tension"][idx]
-            and not pss_param_dict["is_compression"][idx]
-        ):
+        elif idx in te_line_idx_list:
+            # only tension
+            k = config_kite_dict["trailing_edge_stiffness"]
+            c = config_kite_dict["trailing_edge_damping"]
             linktype = "noncompressive"
-
-        logging.debug(f"idx: {idx}")
-        logging.debug(f"kite_connectivity[idx]: {kite_connectivity[idx]}")
-        logging.debug(f"pss_param_dict['k'][idx]: {pss_param_dict['k'][idx]}")
-        logging.debug(f"pss_param_dict['c']: {pss_param_dict['c']}")
-        logging.debug(f"linktype: {linktype}")
+        elif idx in pulley_data["line_indices"]:
+            # pulley
+            k = config_kite_dict["stiffness_bridle"]
+            c = config_kite_dict["bridle_line_damping"]
+            linktype = "pulley"
+        else:
+            # only compression
+            k = config_kite_dict["stiffness_bridle"]
+            c = config_kite_dict["canopy_damping"]
+            linktype = "nontensile"
 
         pss_kite_connectivity.append(
             [
                 int(kite_connectivity[idx][0]),
                 int(kite_connectivity[idx][1]),
-                float(pss_param_dict["k"][idx]),
-                float(pss_param_dict["c"]),
+                float(k),
+                float(c),
                 SpringDamperType(linktype.lower()),
             ]
         )
 
     ## INITIAL CONDITIONS
     if config_dict["is_with_initial_point_velocity"]:
-        print("Error: initial point velocity has never been defined")
+        raise ValueError("Error: initial point velocity has never been defined")
     else:
-        vel_ini = np.zeros(points_ini.shape)
+        vel_ini = np.zeros((len(points_ini), 3))
 
     fixed_nodes = np.array(config_kite_dict["bridle"]["bridle_point_index"])
     pss_initial_conditions = []
@@ -394,3 +318,198 @@ def run_pss(psystem, params, f_external):
             # print("Kinetic damping PS converged", step_internal)
             break
     return psystem
+
+
+# def define_param_dict_input_to_pss(
+#     points_ini,
+#     wing_connectivity,
+#     kite_connectivity,
+#     config_dict,
+#     config_kite_dict,
+#     rest_lengths,
+# ):
+#     n_wing_elements = len(wing_connectivity)
+
+#     # Transform pulley.other_line_pair to a dict
+#     # data_struc is [["3",value],["5", value], ...]
+
+#     pulley_data_from_config_kite_dict = {
+#         "point_indices": config_kite_dict["pulley"]["point_indices"],
+#         "mass": config_kite_dict["pulley"]["mass"],
+#         "number_of_pulleys_in_back_lines": config_kite_dict["pulley"][
+#             "number_of_pulleys_in_back_lines"
+#         ],
+#     }
+
+#     pulley_data = extract_pulley_connectivity(
+#         points_ini,
+#         config_kite_dict["bridle_connectivity"]["ci"],
+#         config_kite_dict["bridle_connectivity"]["cj"],
+#         pulley_data_from_config_kite_dict,
+#     )
+
+#     other_line_pair_dict = {}
+#     for entry in pulley_data["other_line_pair"]:
+#         other_line_pair_dict[entry[0]] = entry[1]
+
+#     # Correct the key
+#     other_line_pair_corrected_dict = {}
+#     for key_i in other_line_pair_dict.keys():
+#         corrected_key = str(int(key_i) + n_wing_elements)
+#         other_line_pair_corrected_dict[corrected_key] = other_line_pair_dict[key_i]
+
+#     # initializing connectivity lists
+#     canopy_indices = []
+#     tube_indices = [i for i, conn in enumerate(wing_connectivity)]
+
+#     # initializing empty lists
+#     is_compression_list = []
+#     is_tension_list = []
+#     is_rotational_list = []
+#     stiffness_list = []
+#     is_pulley_list = []
+
+#     for i, conn in enumerate(kite_connectivity):
+#         # if wing elements
+#         if float(i) < len(wing_connectivity):
+#             is_tension_list.append(True)
+#             is_pulley_list.append(False)
+
+#             if i in config_kite_dict["te_line_indices"]:
+#                 stiffness_list.append(config_kite_dict["stiffness_trailing_edge"])
+#                 is_compression_list.append(False)
+#                 is_rotational_list.append(False)
+#             elif i in config_kite_dict["tube_line_indices"]:
+#                 stiffness_list.append(config_kite_dict["stiffness_tube"])
+#                 is_compression_list.append(True)
+#                 is_rotational_list.append(True)
+#             else:  # must be a canopy element
+#                 stiffness_list.append(config_kite_dict["stiffness_canopy"])
+#                 is_compression_list.append(False)
+#                 is_rotational_list.append(False)
+
+#         # if bridle-lines
+#         else:
+#             is_compression_list.append(False)
+#             is_tension_list.append(True)
+#             is_rotational_list.append(True)
+#             stiffness_list.append(config_kite_dict["stiffness_bridle"])
+
+#             # TODO: might be better to use one index style/structure?
+#             # the (i - n_wing_elements) is to correct the indices
+#             if (i - n_wing_elements) in config_kite_dict["pulley_line_indices"]:
+#                 # print(f'pulley, i: {i}')
+#                 # print(f'connection[i]: {kite_connectivity[i]}')
+#                 is_pulley_list.append(True)
+#             else:
+#                 is_pulley_list.append(False)
+
+#     params = {
+#         "pulley_other_line_pair": other_line_pair_corrected_dict,
+#         "k": np.array(stiffness_list),
+#         "is_compression": np.array(is_compression_list),
+#         "is_tension": np.array(is_tension_list),
+#         "is_pulley": np.array(is_pulley_list),
+#         "is_rotational": np.array(is_rotational_list),
+#         "l0": rest_lengths,
+#     }
+#     params.update(
+#         {
+#             "c": config_dict["solver"]["damping_constant"],
+#             "dt": config_dict["solver"]["dt"],
+#             "t_steps": config_dict["solver"]["n_time_steps"],
+#             "abs_tol": config_dict["solver"]["abs_tol"],
+#             "rel_tol": config_dict["solver"]["rel_tol"],
+#             "max_iter": config_dict["solver"]["max_iter"],
+#             "n": len(config_kite_dict["points"]),
+#             "aerostructural_tol": config_dict["aero_structural"]["tol"],
+#             "is_with_visc_damping": config_dict["solver"]["is_with_visc_damping"],
+#         }
+#     )
+
+#     return params
+
+
+# def instantiate_psystem(
+#     config_dict,
+#     config_kite_dict,
+#     points_ini,
+#     wing_connectivity,
+#     kite_connectivity,
+#     rest_lengths,
+#     m_array,
+# ):
+#     ## PARAMS
+#     pss_param_dict = define_param_dict_input_to_pss(
+#         points_ini,
+#         wing_connectivity,
+#         kite_connectivity,
+#         config_dict,
+#         config_kite_dict,
+#         rest_lengths,
+#     )
+#     pss_param_dict.update({"g": -config_dict["grav_constant"][2]})
+
+#     print(f'pss_param_dict["is_pulley"]: {pss_param_dict["is_pulley"]}')
+#     print(
+#         f'pss_param_dict["pulley_other_line_pair"]: {pss_param_dict["pulley_other_line_pair"]}'
+#     )
+#     breakpoint()
+
+#     # restructuring connectivity matrix
+#     pss_kite_connectivity = []
+#     for idx, _ in enumerate(kite_connectivity):
+#         if pss_param_dict["is_compression"][idx] and pss_param_dict["is_tension"][idx]:
+#             linktype = "default"
+#         elif (
+#             pss_param_dict["is_compression"][idx]
+#             and not pss_param_dict["is_tension"][idx]
+#         ):
+#             linktype = "nontensile"
+#         elif pss_param_dict["is_pulley"][idx]:
+#             linktype = "pulley"
+#         elif (
+#             pss_param_dict["is_tension"][idx]
+#             and not pss_param_dict["is_compression"][idx]
+#         ):
+#             linktype = "noncompressive"
+
+#         logging.debug(f"idx: {idx}")
+#         logging.debug(f"kite_connectivity[idx]: {kite_connectivity[idx]}")
+#         logging.debug(f"pss_param_dict['k'][idx]: {pss_param_dict['k'][idx]}")
+#         logging.debug(f"pss_param_dict['c']: {pss_param_dict['c']}")
+#         logging.debug(f"linktype: {linktype}")
+
+#         pss_kite_connectivity.append(
+#             [
+#                 int(kite_connectivity[idx][0]),
+#                 int(kite_connectivity[idx][1]),
+#                 float(pss_param_dict["k"][idx]),
+#                 float(pss_param_dict["c"]),
+#                 SpringDamperType(linktype.lower()),
+#             ]
+#         )
+
+#     ## INITIAL CONDITIONS
+#     if config_dict["is_with_initial_point_velocity"]:
+#         raise ValueError("Error: initial point velocity has never been defined")
+#     else:
+#         vel_ini = np.zeros((len(points_ini), 3))
+
+#     fixed_nodes = np.array(config_kite_dict["bridle"]["bridle_point_index"])
+#     pss_initial_conditions = []
+#     n = len(points_ini)
+#     for i in range(n):
+#         if i in fixed_nodes:
+#             pss_initial_conditions.append([points_ini[i], vel_ini[i], m_array[i], True])
+#         else:
+#             pss_initial_conditions.append(
+#                 [points_ini[i], vel_ini[i], m_array[i], False]
+#             )
+
+#     psystem = ParticleSystem(
+#         pss_kite_connectivity,
+#         pss_initial_conditions,
+#         pss_param_dict,
+#     )
+#     return psystem, pss_param_dict, pss_kite_connectivity
