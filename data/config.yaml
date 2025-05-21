@@ -19,6 +19,7 @@ steering_tape_final_extension: !!float 0
 
 # Aerodynamic -ChildClass: aero
 aero:
+  n_aero_panels_per_struc_section: !!int 2
   ring_geometry: !!str "5fil"
   model: !!str "VSM"
   n_iter: !!int 1500
@@ -63,10 +64,10 @@ tether: # set to zero, if you don't want tether force
 
 ## output_settings:
 is_print_mid_results: !!bool true
-##TODO: currently not working
-is_with_initial_plot: !!bool true
+is_with_initial_structure_plot: !!bool true
 is_with_coupling_plot: !!bool true
 is_with_plot_per_iteration: !!bool true
+is_with_aero_plot_per_iteration: !!bool true
 is_with_final_plot: !!bool true
 is_with_plotly_plot: !!bool false
 is_with_aero_geometry: !!bool false

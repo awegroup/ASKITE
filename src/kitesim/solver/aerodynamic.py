@@ -114,6 +114,7 @@ def run_vsm_package(
     aero_input_type="reuse_initial_polar_data",
     initial_polar_data=None,
     yaw_rate=0.0,
+    is_with_plot=False,
 ):
     """
     Run the VSM simulation with updated geometry and velocity.
@@ -130,6 +131,9 @@ def run_vsm_package(
     )
     # set again where velocity vector is coming from
     body_aero.va = (va_vector, yaw_rate)
+    if is_with_plot:
+        plot_vsm_geometry(body_aero)
+
     # solve the problem
     results = solver.solve(body_aero)
     return np.array(results["F_distribution"]), body_aero, results

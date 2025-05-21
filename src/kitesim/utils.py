@@ -49,6 +49,15 @@ def load_and_save_config_files(PROJECT_DIR):
     return config, config_kite, results_dir
 
 
+def save_results(tracking, meta, filename):
+    with h5py.File(filename, "w") as f:
+        grp = f.create_group("tracking")
+        for name, arr in tracking.items():
+            grp.create_dataset(name, data=arr[: meta["n_iter"]], compression="gzip")
+        for k, v in meta.items():
+            grp.attrs[k] = v
+
+
 def load_sim_output(h5_path):
     """
     Load simulation results and metadata from an HDF5 file written with h5py.

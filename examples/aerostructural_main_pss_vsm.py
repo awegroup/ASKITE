@@ -20,7 +20,7 @@ from pathlib import Path
 from kitesim.solver import main_pss_vsm
 from kitesim.post_processing import post_processing_main
 from kitesim.logging_config import *
-from kitesim.utils import load_and_save_config_files, load_sim_output
+from kitesim.utils import load_and_save_config_files, load_sim_output, save_results
 
 # TODO: could add a function somewhere that always finds the right root dir
 # # Find the root directory of the repository
@@ -43,12 +43,14 @@ def main():
     print(f"config files saved in {results_dir}\n")
 
     # run AeroStructural simulation
-    sim_output = main_pss_vsm.run_aerostructural_solver(
+    tracking_data, meta = main_pss_vsm.run_aerostructural_solver(
         config, config_kite, PROJECT_DIR, results_dir
     )
+    h5_path = Path(results_dir) / "sim_output.h5"
+    save_results(tracking_data, meta, h5_path)
 
     # Load results
-    meta_data_dict, track = load_sim_output(Path(results_dir) / "sim_output.h5")
+    meta_data_dict, track = load_sim_output(h5_path)
 
     print(f"n_iter: {meta_data_dict['n_iter']}")
     # print(f"track: {track}")
