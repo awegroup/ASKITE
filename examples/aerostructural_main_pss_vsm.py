@@ -30,7 +30,7 @@ def main():
     save_results(tracking_data, meta, h5_path)
 
     # Load results
-    meta_data_dict, track = load_sim_output(h5_path)
+    meta_data_dict, tracking_data = load_sim_output(h5_path)
 
     logging.info(f"meta_data: {meta_data_dict}")
 
@@ -38,7 +38,7 @@ def main():
     # - here you could add functions to plot the tracking of f_int, f_ext and f_residual over the iterations
     # - functions that make an animation of the kite going through the iterations
     # - etc.
-    f_int = track["f_residual"] - track["f_external"]
+    f_residual = tracking_data["f_int"] - tracking_data["f_ext"]
 
 
 if __name__ == "__main__":

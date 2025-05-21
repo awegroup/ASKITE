@@ -192,13 +192,6 @@ def run_aerostructural_solver(
             f_ext = f_aero + f_ext_gravity
             f_ext = np.round(f_ext, 5)
 
-            # Checking symmetry in the forces
-            print(
-                f"np.sum(f_aero): {np.sum(f_aero[:, 0])}, {np.sum(f_aero[:, 1])}, {np.sum(f_aero[:, 2])}"
-            )
-            print(
-                f"np.sum(f_ext): {np.sum(f_ext[:, 0])}, {np.sum(f_ext[:, 1])}, {np.sum(f_ext[:, 2])}"
-            )
             if config_dict["is_with_plot_per_iteration"]:
                 plotting.main(
                     struc_nodes, pss_kite_connectivity, f_ext=f_ext, title=f"i: {i}"
@@ -209,17 +202,12 @@ def run_aerostructural_solver(
             end_time_f_ext = time.time()
             begin_time_f_int = time.time()
             psystem = structural.run_pss(psystem, params, f_ext_flat)
-            # position.loc[step], _ = psystem.x_v_current
             end_time_f_int = time.time()
 
             # logging.debug(f"position.loc[step].shape: {position.loc[step].shape}")
             logging.debug(f"internal force: {psystem.f_int}")
             logging.debug(f"external force: {f_ext}")
 
-            # # TODO: ideally you don't need this here and have aero-also work with the flat format, as this should be faster
-            # # saving points in different format
-            # points = psystem.x_current_2D
-            ## TODO: replacing this function inside the src code to inhere
             # Updating the points
             struc_nodes = np.array([particle.x for particle in psystem.particles])
             f_residual = psystem.f_int + f_ext_flat
