@@ -18,7 +18,8 @@ import os
 from pathlib import Path
 
 from kitesim.solver import main_pss_vsm
-from kitesim.post_processing import post_processing_main
+
+# from kitesim.post_processing import post_processing_main
 from kitesim.logging_config import *
 from kitesim.utils import load_and_save_config_files, load_sim_output, save_results
 
