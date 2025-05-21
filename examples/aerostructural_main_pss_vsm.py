@@ -7,31 +7,10 @@ License: ... \
 Github: ...
 """
 
-### Initialisation
-
-# Making things autoreload - needed for Jupyter Kernel/Interactive env.
-# %load_ext autoreload
-# %autoreload 2
-# %matplotlib widget
-
-import os
 from pathlib import Path
-
 from kitesim.solver import main_pss_vsm
-
-# from kitesim.post_processing import post_processing_main
 from kitesim.logging_config import *
 from kitesim.utils import load_and_save_config_files, load_sim_output, save_results
-
-# TODO: could add a function somewhere that always finds the right root dir
-# # Find the root directory of the repository
-# root_dir = os.path.abspath(os.path.dirname(__file__))
-# while not os.path.isfile(os.path.join(root_dir, ".gitignore")):
-#     root_dir = os.path.abspath(os.path.join(root_dir, ".."))
-#     if root_dir == "/":
-#         raise FileNotFoundError(
-#             "Could not find the root directory of the repository."
-#         )
 
 
 # Import modules
@@ -41,7 +20,7 @@ def main():
 
     # load and save config files
     config, config_kite, results_dir = load_and_save_config_files(PROJECT_DIR)
-    print(f"config files saved in {results_dir}\n")
+    logging.info(f"config files saved in {results_dir}\n")
 
     # run AeroStructural simulation
     tracking_data, meta = main_pss_vsm.run_aerostructural_solver(
@@ -53,19 +32,13 @@ def main():
     # Load results
     meta_data_dict, track = load_sim_output(h5_path)
 
-    print(f"n_iter: {meta_data_dict['n_iter']}")
-    # print(f"track: {track}")
-    f_internal = track["f_residual"] - track["f_external"]
+    logging.info(f"meta_data: {meta_data_dict}")
 
-    # # Save outputs
-    # post_processing_main.saving_all_dict_entries(
-    #     sim_output, "output", path_results_folder_run
-    # )
-
-    # # Create interpretable results
-    # loaded_data_input = post_processing_main.processing_output(
-    #     path_results_folder_run,
-    # )
+    # TODO:
+    # - here you could add functions to plot the tracking of f_int, f_ext and f_residual over the iterations
+    # - functions that make an animation of the kite going through the iterations
+    # - etc.
+    f_int = track["f_residual"] - track["f_external"]
 
 
 if __name__ == "__main__":

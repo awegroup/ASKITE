@@ -1,18 +1,9 @@
-# %% Defing the spring-damper system function
-# defining function for the spring-damper system
-
 import time
 from tqdm import tqdm
 import numpy as np
-import pandas as pd
 import logging
-import matplotlib.pyplot as plt
-import os
-import sys
 from pathlib import Path
 import copy
-import h5py
-from kitesim.utils import save_results
 from kitesim.solver import (
     aerodynamic,
     initialisation,
@@ -20,126 +11,26 @@ from kitesim.solver import (
     aero2struc,
     structural,
     tracking,
+    plotting,
 )
 
 
-def plot_psm(particles, pss_kite_connectivity, f_ext=None, title="PSM State"):
+def run_aerostructural_solver(
+    config_dict: dict, config_kite_dict: dict, PROJECT_DIR: Path, results_dir: Path
+):
     """
-    Plot a ParticleSystem snapshot in 3D.
+    Runs the aero-structural solver for the given input parameters.
 
     Args:
-        particles: list of particle objects with attributes
-                   .x (np.array shape (3,)), .fixed (bool)
-        connectivity_matrix: list of [i, j, ...] giving springs
-        f_ext: optional external forces, either:
-               – flat array shape (n_pts*3,)
-               – array shape (n_pts,3)
-        title: figure title
+        config_dict (dict): Main configuration dictionary.
+        config_kite_dict (dict): Kite-specific configuration dictionary.
+        PROJECT_DIR (Path): Path to the project directory.
+        results_dir (Path): Path to the results directory.
+
+    Returns:
+        tracking_data (dict): Dictionary containing time histories of positions, forces, etc.
+        meta (dict): Dictionary with meta information about the simulation (timing, convergence, etc).
     """
-    connectivity_matrix = pss_kite_connectivity
-    # unpack positions & fixed mask
-    xs = np.array([p.x for p in particles])
-    fixed = np.array([p.fixed for p in particles])
-
-    fig = plt.figure()
-    ax = fig.add_subplot(projection="3d")
-    # scatter free vs fixed
-    ax.scatter(*(xs[~fixed].T), color="blue", label="Free nodes", s=20)
-    ax.scatter(*(xs[fixed].T), color="black", label="Fixed nodes", s=20)
-
-    # add the index to each scatter point
-    for i, pos in enumerate(xs):
-        ax.text(pos[0], pos[1], pos[2], str(i), color="black", fontsize=8)
-
-    # draw springs
-    for i, j, *rest in connectivity_matrix:
-        p1, p2 = xs[i], xs[j]
-        ax.plot(
-            [p1[0], p2[0]], [p1[1], p2[1]], [p1[2], p2[2]], color="gray", linewidth=1
-        )
-
-    # optionally draw external forces
-    if f_ext is not None:
-        arr = np.array(f_ext)
-        if arr.ndim == 1:
-            arr = arr.reshape(-1, 3)
-        for pos, frc in zip(xs, arr):
-            ax.quiver(*pos, *frc, length=1, normalize=True, color="red")
-
-    # set aspect ratio to equal
-    bb = xs.max(axis=0) - xs.min(axis=0)
-    ax.set_box_aspect(bb)
-    ax.set_xlabel("X")
-    ax.set_ylabel("Y")
-    ax.set_zlabel("Z")
-    ax.set_title(title)
-    ax.legend()
-    plt.show()
-
-
-def plot_psm_final_vs_initial(initial_positions, final_positions, connectivity_matrix):
-    """
-    Compare initial vs final PSM states in one 3D plot.
-
-    Args:
-        initial_positions: list of [x, v, m, fixed] or objects with .x/.fixed
-        final_positions:   same format as initial_positions
-        connectivity_matrix: list of [i, j, ...] giving springs
-    """
-
-    # unpack coords
-    def unpack(pos_list):
-        out = []
-        for item in pos_list:
-            if hasattr(item, "x"):
-                out.append(item.x)
-            else:
-                out.append(item[0])
-        return np.array(out)
-
-    xi = unpack(initial_positions)
-    xf = unpack(final_positions)
-
-    fig = plt.figure()
-    ax = fig.add_subplot(projection="3d")
-
-    ax.scatter(*(xi.T), color="black", marker="o", s=10, label="Initial")
-    ax.scatter(*(xf.T), color="red", marker="o", s=10, label="Final")
-
-    # draw lines
-    for i, j, *rest in connectivity_matrix:
-        p1i, p2i = xi[i], xi[j]
-        p1f, p2f = xf[i], xf[j]
-        ax.plot(
-            [p1i[0], p2i[0]],
-            [p1i[1], p2i[1]],
-            [p1i[2], p2i[2]],
-            color="black",
-            linewidth=1,
-        )
-        ax.plot(
-            [p1f[0], p2f[0]],
-            [p1f[1], p2f[1]],
-            [p1f[2], p2f[2]],
-            color="red",
-            linewidth=1,
-        )
-
-    # equal aspect
-    all_pts = np.vstack((xi, xf))
-    bb = all_pts.max(axis=0) - all_pts.min(axis=0)
-    ax.set_box_aspect(bb)
-
-    ax.set_title("PSM: Initial (black) vs Final (red)")
-    ax.set_xlabel("X")
-    ax.set_ylabel("Y")
-    ax.set_zlabel("Z")
-    ax.legend()
-    plt.show()
-
-
-def run_aerostructural_solver(config_dict, config_kite_dict, PROJECT_DIR, results_dir):
-    """Runs the aero-structural solver for the given input parameters"""
 
     ## INIT
     (
@@ -161,6 +52,7 @@ def run_aerostructural_solver(config_dict, config_kite_dict, PROJECT_DIR, result
         bridle_rest_lengths_initial,
         wing_rest_lengths_initial,
         rest_lengths,
+        pulley_data,
     ) = initialisation.main(config_kite_dict)
 
     ## AERO
@@ -202,6 +94,7 @@ def run_aerostructural_solver(config_dict, config_kite_dict, PROJECT_DIR, result
         tubular_frame_line_idx_list,
         te_line_idx_list,
         pulley_point_indices,
+        pulley_data,
     )
 
     ## ACTUATION
@@ -224,11 +117,11 @@ def run_aerostructural_solver(config_dict, config_kite_dict, PROJECT_DIR, result
 
     ## PRELOOP
     if config_dict["is_with_gravity"]:
-        force_gravity = np.array(
+        f_ext_gravity = np.array(
             [np.array(config_dict["grav_constant"]) * m_pt for m_pt in m_array]
         )
     else:
-        force_gravity = np.zeros(struc_nodes.shape)
+        f_ext_gravity = np.zeros(struc_nodes.shape)
     initial_particles = copy.deepcopy(psystem.particles)
     t_vector = np.linspace(
         params["dt"], params["t_steps"] * params["dt"], params["t_steps"]
@@ -263,24 +156,26 @@ def run_aerostructural_solver(config_dict, config_kite_dict, PROJECT_DIR, result
             )
 
             ### AERO
-            f_aero_wing_VSM, body_aero, results_aero = aerodynamic.run_vsm_package(
-                body_aero=body_aero,
-                solver=vsm_solver,
-                le_arr=le_arr,
-                te_arr=te_arr,
-                va_vector=vel_app,
-                aero_input_type="reuse_initial_polar_data",
-                initial_polar_data=initial_polar_data,
-                is_with_plot=config_dict["is_with_aero_plot_per_iteration"],
+            f_aero_wing_vsm_format, body_aero, results_aero = (
+                aerodynamic.run_vsm_package(
+                    body_aero=body_aero,
+                    solver=vsm_solver,
+                    le_arr=le_arr,
+                    te_arr=te_arr,
+                    va_vector=vel_app,
+                    aero_input_type="reuse_initial_polar_data",
+                    initial_polar_data=initial_polar_data,
+                    is_with_plot=config_dict["is_with_aero_plot_per_iteration"],
+                )
             )
             logging.debug(
-                f"Aero symmetry check, aero_force_y: { np.sum([force[1] for force in f_aero_wing_VSM])}"
+                f"Aero symmetry check, f_aero_y: { np.sum([force[1] for force in f_aero_wing_vsm_format])}"
             )
 
             ### AERO --> STRUC
             f_aero_wing = aero2struc.main(
                 config_dict["coupling_method"],
-                f_aero_wing_VSM,
+                f_aero_wing_vsm_format,
                 struc_nodes,
                 np.array(results_aero["panel_cp_locations"]),
                 aero2struc_mapping,
@@ -294,40 +189,32 @@ def run_aerostructural_solver(config_dict, config_kite_dict, PROJECT_DIR, result
             f_aero = f_aero_wing + f_aero_bridle
 
             ## summing up
-            f_external = f_aero + force_gravity
-            ## rounding the forces to 5 decimal points
-            f_external = np.round(f_external, 5)
+            f_ext = f_aero + f_ext_gravity
+            f_ext = np.round(f_ext, 5)
 
             # Checking symmetry in the forces
             print(
-                f"np.sum(f_aero_wing_VSM): {np.sum(f_aero_wing_VSM[:, 0])}, {np.sum(f_aero_wing_VSM[:, 1])}, {np.sum(f_aero_wing_VSM[:, 2])}"
+                f"np.sum(f_aero): {np.sum(f_aero[:, 0])}, {np.sum(f_aero[:, 1])}, {np.sum(f_aero[:, 2])}"
             )
-
             print(
-                f"np.sum(f_external): {np.sum(f_external[:, 0])}, {np.sum(f_external[:, 1])}, {np.sum(f_external[:, 2])}"
+                f"np.sum(f_ext): {np.sum(f_ext[:, 0])}, {np.sum(f_ext[:, 1])}, {np.sum(f_ext[:, 2])}"
             )
-
             if config_dict["is_with_plot_per_iteration"]:
-                # Compute rest-lengths between the points, using the kite_connectivity
-                plot_psm(
-                    psystem.particles,
-                    pss_kite_connectivity,
-                    f_ext=f_external,
-                    title=f"i: {i}",
+                plotting.main(
+                    struc_nodes, pss_kite_connectivity, f_ext=f_ext, title=f"i: {i}"
                 )
 
             ### STRUC
-            ### f_external is flat, and f_external is 2D, ##TODO: could add this to the name?
-            f_external = f_external.flatten()
+            f_ext_flat = f_ext.flatten()
             end_time_f_ext = time.time()
             begin_time_f_int = time.time()
-            psystem = structural.run_pss(psystem, params, f_external)
+            psystem = structural.run_pss(psystem, params, f_ext_flat)
             # position.loc[step], _ = psystem.x_v_current
             end_time_f_int = time.time()
 
             # logging.debug(f"position.loc[step].shape: {position.loc[step].shape}")
             logging.debug(f"internal force: {psystem.f_int}")
-            logging.debug(f"external force: {f_external}")
+            logging.debug(f"external force: {f_ext}")
 
             # # TODO: ideally you don't need this here and have aero-also work with the flat format, as this should be faster
             # # saving points in different format
@@ -335,7 +222,7 @@ def run_aerostructural_solver(config_dict, config_kite_dict, PROJECT_DIR, result
             ## TODO: replacing this function inside the src code to inhere
             # Updating the points
             struc_nodes = np.array([particle.x for particle in psystem.particles])
-            f_residual = psystem.f_int + f_external
+            f_residual = psystem.f_int + f_ext_flat
             f_residual_list.append(np.linalg.norm(np.abs(f_residual)))
 
             # Update unified tracking dataframe (replaces position update)
@@ -345,7 +232,7 @@ def run_aerostructural_solver(config_dict, config_kite_dict, PROJECT_DIR, result
                 psystem,
                 struc_nodes,
                 struc_nodes_prev,
-                f_external,
+                f_ext_flat,
                 f_residual,
             )
             ## calculating delta tape lengths
@@ -430,8 +317,11 @@ def run_aerostructural_solver(config_dict, config_kite_dict, PROJECT_DIR, result
     ## END OF SIMULATION FOR LOOP
     ######################################################################
     if config_dict["is_with_final_plot"]:
-        plot_psm_final_vs_initial(
-            initial_particles, psystem.particles, pss_kite_connectivity
+        plotting.main(
+            np.array([particle.x for particle in psystem.particles]),
+            pss_kite_connectivity,
+            struc_nodes_initial=np.array([p.x for p in initial_particles]),
+            title="PSM: Initial (black) vs Final (red)",
         )
     meta = {
         "total_time_s": time.time() - start_time,

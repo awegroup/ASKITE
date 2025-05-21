@@ -4,6 +4,20 @@ import numpy as np
 def main(
     struc_nodes, struc_le_idx_list, struc_te_idx_list, n_aero_panels_per_struc_section
 ):
+    """
+    Generate arrays of leading and trailing edge points for the aerodynamic solver,
+    interpolating if needed.
+
+    Args:
+        struc_nodes (np.ndarray): Structural node positions (n_nodes, 3).
+        struc_le_idx_list (list): Indices of leading edge nodes.
+        struc_te_idx_list (list): Indices of trailing edge nodes.
+        n_aero_panels_per_struc_section (int): Number of aerodynamic panels per structural section.
+
+    Returns:
+        le_arr (np.ndarray): Interpolated leading edge points.
+        te_arr (np.ndarray): Interpolated trailing edge points.
+    """
 
     le_arr = struc_nodes[struc_le_idx_list]
     te_arr = struc_nodes[struc_te_idx_list]
@@ -19,6 +33,20 @@ def main(
             struc_te_idx_list,
             n_aero_panels_per_struc_section,
         ):
+            """
+            Interpolate leading and trailing edge points to create a denser array of points.
+
+            Args:
+                struc_nodes (np.ndarray): Structural node positions (n_nodes, 3).
+                struc_le_idx_list (list): Indices of leading edge nodes.
+                struc_te_idx_list (list): Indices of trailing edge nodes.
+                n_aero_panels_per_struc_section (int): Number of aerodynamic panels per structural section.
+
+            Returns:
+                le_dense (np.ndarray): Densely sampled leading edge points.
+                te_dense (np.ndarray): Densely sampled trailing edge points.
+            """
+
             # Extract original LE and TE arrays
             le_arr = np.array([struc_nodes[i] for i in struc_le_idx_list])
             te_arr = np.array([struc_nodes[i] for i in struc_te_idx_list])

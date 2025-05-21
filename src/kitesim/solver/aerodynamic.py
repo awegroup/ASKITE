@@ -1,23 +1,19 @@
-from pathlib import Path
-import yaml
 import numpy as np
 import pandas as pd
 from VSM.BodyAerodynamics import BodyAerodynamics
 from VSM.WingGeometry import Wing
 from VSM.Solver import Solver
-from VSM.interactive import interactive_plot
-from kitesim.utils import load_yaml
+from VSM.plotting import plot_geometry
 
 
 def initialize_vsm(
     config_kite, n_panels: int, spanwise_panel_distribution: str
 ) -> BodyAerodynamics:
     """
-    Load kite configuration from a YAML file and initialize the VSM BodyAerodynamics
-    object with one Wing instance constructed from the 'airfoils' data.
+    Load kite configuration and initialize the VSM BodyAerodynamics object with one Wing instance.
 
     Args:
-        config_path (Path): Path to the YAML configuration file.
+        config_kite (dict): Kite configuration dictionary.
         n_panels (int): Number of panels for the wing.
         spanwise_panel_distribution (str): Type of spanwise distribution.
 
@@ -50,22 +46,15 @@ def initialize_vsm(
 
 
 def plot_vsm_geometry(body_aero):
-    # angle_of_attack = np.rad2deg(np.arctan(vel_app[2] / vel_app[0]))
-    # interactive_plot(
-    #     body_aero,
-    #     np.linalg.norm(vel_app),
-    #     angle_of_attack=angle_of_attack,
-    #     side_slip=0,
-    #     yaw_rate=0,
-    #     title="Interactive plot",
-    #     is_with_aerodynamic_details=False,
-    #     save_path=None,
-    #     is_save=False,
-    #     filename="wing_geometry",
-    #     is_show=True,
-    # )
-    from VSM.plotting import plot_geometry
+    """
+    Plot the VSM geometry using the provided aerodynamic body.
 
+    Args:
+        body_aero (BodyAerodynamics): Aerodynamic body object.
+
+    Returns:
+        None. Displays a 3D plot.
+    """
     plot_geometry(
         body_aero,
         title="VSM Geometry",
@@ -76,33 +65,6 @@ def plot_vsm_geometry(body_aero):
         view_elevation=15,
         view_azimuth=-120,
     )
-
-
-# def initialize_vsm(
-#     geometry_csv_path,
-#     polar_data_dir,
-#     n_panels,
-#     spanwise_panel_distribution="uniform",
-#     is_half_wing=True,
-#     is_with_corrected_polar=True,
-# ):
-#     """
-#     Initialize VSM simulation components.
-
-#     Returns:
-#         (body_aero, solver): Instantiated aerodynamic body and solver objects.
-#     """
-#     body_aero = BodyAerodynamics.from_file(
-#         geometry_csv_path,
-#         n_panels=n_panels,
-#         spanwise_panel_distribution=spanwise_panel_distribution,
-#         is_with_corrected_polar=is_with_corrected_polar,
-#         polar_data_dir=polar_data_dir,
-#         is_half_wing=is_half_wing,
-#     )
-
-#     solver = Solver()
-#     return body_aero, solver
 
 
 def run_vsm_package(
@@ -119,8 +81,21 @@ def run_vsm_package(
     """
     Run the VSM simulation with updated geometry and velocity.
 
+    Args:
+        body_aero (BodyAerodynamics): Aerodynamic body object.
+        solver (Solver): VSM solver object.
+        le_arr (np.ndarray): Leading edge points (n,3).
+        te_arr (np.ndarray): Trailing edge points (n,3).
+        va_vector (np.ndarray): Apparent wind vector (3,).
+        aero_input_type (str): Type of aerodynamic input.
+        initial_polar_data (list or None): Initial polar data for panels.
+        yaw_rate (float): Yaw rate for the simulation.
+        is_with_plot (bool): If True, plot the geometry.
+
     Returns:
-        force_distribution: Nx3 array of aerodynamic force vectors.
+        np.ndarray: Aerodynamic force distribution (n_panels,3).
+        BodyAerodynamics: Updated aerodynamic body.
+        dict: Results dictionary from the solver.
     """
     # redefine the points
     body_aero.update_from_points(
