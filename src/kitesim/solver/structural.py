@@ -6,7 +6,7 @@ from PSS.particleSystem import ParticleSystem
 
 
 def plot_3d_kite_structure(
-    struc_nodes, connectivity, fixed_nodes=None, pulley_nodes=None
+    struc_nodes, connectivity, depower_tape_index, fixed_nodes=None, pulley_nodes=None
 ):
     """
     Plot the 3D structure of a kite with enhanced visualization features.
@@ -217,6 +217,9 @@ def plot_3d_kite_structure(
         midpoint = (p1 + p2) / 2
         # label = f"{line_type.name}\nk={k:.1e}"
         label = f"{idx}"
+        # compute distance between p1 and p2
+        distance = np.linalg.norm(p2 - p1)
+        label = f"{1e3*distance:.1f} mm"
 
         # Add label slightly offset from midpoint
         offset = 0.02 * np.linalg.norm(p2 - p1)
@@ -228,6 +231,19 @@ def plot_3d_kite_structure(
             fontsize=6,
             color="blue",
         )
+        if depower_tape_index == idx:
+            # Highlight the depower tape line
+            ax.plot(
+                [p1[0], p2[0]],
+                [p1[1], p2[1]],
+                [p1[2], p2[2]],
+                color="red",
+                linestyle="-",
+                linewidth=3,
+                label="Depower Tape",
+            )
+            if "Depower Tape" not in used_labels:
+                used_labels.add("Depower Tape")
 
     # Set labels and title
     ax.set_xlabel("X")
@@ -279,7 +295,9 @@ def instantiate_psystem(
     tubular_frame_line_idx_list,
     te_line_idx_list,
     pulley_point_indices,
-    pulley_data,
+    pulley_line_indices,
+    pulley_line_to_other_node_pair_dict,
+    depower_tape_index,
 ):
     """
     Instantiate the particle system for the structural solver.
@@ -304,7 +322,7 @@ def instantiate_psystem(
     """
 
     pss_param_dict = {
-        "pulley_other_line_pair": pulley_data["other_line_pair_corrected_dict"],
+        "pulley_other_line_pair": pulley_line_to_other_node_pair_dict,
         "l0": rest_lengths,
         "c": config_dict["solver"]["damping_constant"],
         "dt": config_dict["solver"]["dt"],
@@ -331,7 +349,7 @@ def instantiate_psystem(
             k = config_kite_dict["trailing_edge_stiffness"]
             c = config_kite_dict["trailing_edge_damping"]
             linktype = "noncompressive"
-        elif idx in pulley_data["line_indices"]:
+        elif idx in pulley_line_indices:
             # pulley
             k = config_kite_dict["stiffness_bridle"]
             c = config_kite_dict["bridle_line_damping"]
@@ -375,15 +393,27 @@ def instantiate_psystem(
         plot_3d_kite_structure(
             struc_nodes,
             pss_kite_connectivity,
+            depower_tape_index,
             fixed_nodes=fixed_nodes,
             pulley_nodes=pulley_point_indices,
         )
-
     psystem = ParticleSystem(
         pss_kite_connectivity,
         pss_initial_conditions,
         pss_param_dict,
     )
+
+    # # updating all the rest lengths to the user input, instead of based on initial node-to-node distance
+    # set_rest_lengths = psystem.extract_rest_length
+
+    # for idx, set_res_len in enumerate(set_rest_lengths):
+    #     delta = rest_lengths[idx] - set_res_len
+    #     if np.abs(delta) > 0.25:
+    #         print(f"\nci,cj: {kite_connectivity[idx][0]}, {kite_connectivity[idx][1]}")
+    #         print(f"set res len: {set_res_len}")
+    #         print(f"rest length: {rest_lengths[idx]}")
+    #         print(f"Delta l0: {rest_lengths[idx] - set_res_len}")
+    #     psystem.update_rest_length(idx, rest_lengths[idx] - set_res_len)
 
     return psystem, pss_param_dict, pss_kite_connectivity
 

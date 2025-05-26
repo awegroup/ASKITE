@@ -12,8 +12,8 @@ depower_tape_extension_percentage: !!float 8.0
 # steering
 delta_ls_ini: !!float 0.00
 ## NEW - in meters
-depower_tape_extension_step: !!float 0.01
-depower_tape_final_extension: !!float 0.05
+depower_tape_extension_step: !!float 0.00 #0.01
+depower_tape_final_extension: !!float 0.00 #0.05
 steering_tape_extension_step: !!float 0
 steering_tape_final_extension: !!float 0
 

@@ -39,11 +39,14 @@ def load_and_save_config_files(PROJECT_DIR):
     )
 
     # create a results folder on this date and time and save the config files
+    kite_name = config["kite_name"]
+    if kite_name is None:
+        raise ValueError("kite_name must be specified in the config.yaml file.")
     results_dir = (
         Path(PROJECT_DIR)
         / "results"
-        / f'{config["kite_name"]}'
-        / f'{datetime.now().strftime("%Y_%m_%d_%H")}h'
+        / f"{kite_name}"
+        / f'{datetime.now().strftime("%Y_%m_%d_%H%M")}h'
     )
     results_dir.mkdir(parents=True, exist_ok=True)
     with open(results_dir / "config.yaml", "w") as f:

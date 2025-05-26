@@ -52,7 +52,10 @@ def run_aerostructural_solver(
         bridle_rest_lengths_initial,
         wing_rest_lengths_initial,
         rest_lengths,
-        pulley_data,
+        pulley_point_indices,
+        pulley_line_indices,
+        pulley_line_to_other_node_pair_dict,
+        depower_tape_index,
     ) = initialisation.main(config_kite_dict)
 
     ## AERO
@@ -94,20 +97,26 @@ def run_aerostructural_solver(
         tubular_frame_line_idx_list,
         te_line_idx_list,
         pulley_point_indices,
-        pulley_data,
+        pulley_line_indices,
+        pulley_line_to_other_node_pair_dict,
+        depower_tape_index,
     )
 
     ## ACTUATION
     len_wing_rest_length = len(wing_rest_lengths_initial)
-    index_depower_tape = (
-        len_wing_rest_length + config_kite_dict["bridle"]["depower_tape_index"]
-    )
+    # index_depower_tape = (
+    #     len_wing_rest_length + config_kite_dict["bridle"]["depower_tape_index"]
+    # )
+    index_depower_tape = depower_tape_index
     initial_length_depower_tape = params["l0"][index_depower_tape]
     depower_tape_extension_step = config_dict["depower_tape_extension_step"]
     depower_tape_final_extension = config_dict["depower_tape_final_extension"]
-    n_depower_tape_steps = int(
-        depower_tape_final_extension / depower_tape_extension_step
-    )
+    if depower_tape_extension_step != 0:
+        n_depower_tape_steps = int(
+            depower_tape_final_extension / depower_tape_extension_step
+        )
+    else:
+        n_depower_tape_steps = 0
     logging.info(
         f"Initial depower tape length: {psystem.extract_rest_length[index_depower_tape]:.3f}m"
     )
@@ -168,8 +177,8 @@ def run_aerostructural_solver(
                     is_with_plot=config_dict["is_with_aero_plot_per_iteration"],
                 )
             )
-            logging.debug(
-                f"Aero symmetry check, f_aero_y: { np.sum([force[1] for force in f_aero_wing_vsm_format])}"
+            logging.info(
+                f"Aero symmetry check, f_aero_y: {np.sum([force[1] for force in f_aero_wing_vsm_format])}"
             )
 
             ### AERO --> STRUC
@@ -197,6 +206,20 @@ def run_aerostructural_solver(
                     struc_nodes, pss_kite_connectivity, f_ext=f_ext, title=f"i: {i}"
                 )
 
+            ##TODO: remove this slower updating of the rest-lengths stuff
+            # updating all the rest lengths to the user input, instead of based on initial node-to-node distance
+            curr_rest_lengths = psystem.extract_rest_length
+            # also remove this!!
+            n_depower_tape_steps = 5
+
+            for idx, curr_res_len in enumerate(curr_rest_lengths):
+                delta = rest_lengths[idx] - curr_res_len
+                if np.abs(delta) > 0.02:
+                    print(
+                        f"ci,cj: {kite_connectivity[idx][0]}, {kite_connectivity[idx][1]}: Delta l0: {delta}"
+                    )
+                    psystem.update_rest_length(idx, delta / 2)
+
             ### STRUC
             f_ext_flat = f_ext.flatten()
             end_time_f_ext = time.time()
@@ -210,8 +233,42 @@ def run_aerostructural_solver(
 
             # Updating the points
             struc_nodes = np.array([particle.x for particle in psystem.particles])
+
+            # TODO: remove this symmetry stuff
+            # Check for symmetry in the y-direction
+            symmetry_pairs_dict = {
+                1: 19,
+                2: 20,
+                3: 17,
+                4: 18,
+                5: 15,
+                6: 16,
+                7: 13,
+                8: 14,
+                9: 11,
+                10: 12,
+                # bridles
+                21: 24,
+                22: 23,
+                25: 26,
+                27: 30,
+                28: 29,
+                31: 32,
+                33: 35,
+                36: 37,
+            }
+
+            for key, value in symmetry_pairs_dict.items():
+                struc_nodes[value] = np.array(
+                    [struc_nodes[key][0], -struc_nodes[key][1], struc_nodes[key][2]]
+                )
+            struc_nodes[34][1] = 0
+
             f_residual = psystem.f_int + f_ext_flat
             f_residual_list.append(np.linalg.norm(np.abs(f_residual)))
+            logging.info(
+                f"residual force in y-direction: {np.sum([f_residual[1::3]]):.3f}N"
+            )
 
             # Update unified tracking dataframe (replaces position update)
             tracking.update_tracking_arrays(
@@ -276,6 +333,11 @@ def run_aerostructural_solver(
             # special case for running the simulation for only one timestep
             elif config_dict["is_run_only_1_time_step"]:
                 break
+            # when aero does not converge
+            elif np.sum([force[1] for force in f_aero_wing_vsm_format]) == np.nan:
+                is_convergence = False
+                logging.info("Classic PS non-converging - aero forces are NaN")
+                break
 
             ## if convergenced and not yet at desired depower-tape length
             elif (
@@ -322,4 +384,5 @@ def run_aerostructural_solver(
             len_wing_rest_length:
         ].tolist(),
     }
+    print(f"structural nodes: {struc_nodes}")
     return tracking_data, meta
