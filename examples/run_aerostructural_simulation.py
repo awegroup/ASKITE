@@ -8,7 +8,7 @@ Github: ...
 """
 
 from pathlib import Path
-from kitesim.solver import main_pss_vsm
+from kitesim import solver
 from kitesim.logging_config import *
 from kitesim.utils import load_and_save_config_files, load_sim_output, save_results
 
@@ -23,9 +23,7 @@ def main():
     logging.info(f"config files saved in {results_dir}\n")
 
     # run AeroStructural simulation
-    tracking_data, meta = main_pss_vsm.run_aerostructural_solver(
-        config, config_kite, PROJECT_DIR, results_dir
-    )
+    tracking_data, meta = solver.main(config, config_kite)
     h5_path = Path(results_dir) / "sim_output.h5"
     save_results(tracking_data, meta, h5_path)
 

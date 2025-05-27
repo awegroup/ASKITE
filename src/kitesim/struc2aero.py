@@ -2,7 +2,11 @@ import numpy as np
 
 
 def main(
-    struc_nodes, struc_le_idx_list, struc_te_idx_list, n_aero_panels_per_struc_section
+    struc_nodes,
+    n_wing_nodes,
+    struc_le_idx_list,
+    struc_te_idx_list,
+    n_aero_panels_per_struc_section,
 ):
     """
     Generate arrays of leading and trailing edge points for the aerodynamic solver,
@@ -18,6 +22,15 @@ def main(
         le_arr (np.ndarray): Interpolated leading edge points.
         te_arr (np.ndarray): Interpolated trailing edge points.
     """
+
+    # Correct for smaller chord length structural section than aerodynamic section
+    for idx, _ in enumerate(struc_nodes[1:n_wing_nodes]):
+        # if LE
+        if i in struc_le_idx_list:
+            print(f"")
+        # if TE
+        elif i in struc_te_idx_list:
+            print(f"")
 
     le_arr = struc_nodes[struc_le_idx_list]
     te_arr = struc_nodes[struc_te_idx_list]

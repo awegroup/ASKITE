@@ -4,7 +4,7 @@ import numpy as np
 import logging
 from pathlib import Path
 import copy
-from kitesim.solver import (
+from kitesim import (
     aerodynamic,
     initialisation,
     struc2aero,
@@ -15,9 +15,42 @@ from kitesim.solver import (
 )
 
 
-def run_aerostructural_solver(
-    config_dict: dict, config_kite_dict: dict, PROJECT_DIR: Path, results_dir: Path
-):
+def forcing_symmetry(struc_nodes):
+    """
+    Forcing symmetry in the y-direction for the kite structure nodes.
+    This is a temporary solution to ensure symmetry in the simulation.
+    """
+    symmetry_pairs_dict = {
+        1: 19,
+        2: 20,
+        3: 17,
+        4: 18,
+        5: 15,
+        6: 16,
+        7: 13,
+        8: 14,
+        9: 11,
+        10: 12,
+        # bridles
+        21: 24,
+        22: 23,
+        25: 26,
+        27: 30,
+        28: 29,
+        31: 32,
+        33: 35,
+        36: 37,
+    }
+
+    for key, value in symmetry_pairs_dict.items():
+        struc_nodes[value] = np.array(
+            [struc_nodes[key][0], -struc_nodes[key][1], struc_nodes[key][2]]
+        )
+    struc_nodes[34][1] = 0
+    return struc_nodes
+
+
+def main(config_dict: dict, config_kite_dict: dict):
     """
     Runs the aero-structural solver for the given input parameters.
 
@@ -143,6 +176,7 @@ def run_aerostructural_solver(
     is_residual_below_tol = False
     struc_nodes_prev = None  # Initialize previous points for tracking
     start_time = time.time()
+    n_wing_nodes = 2 * n_struc_ribs
 
     ######################################################################
     # SIMULATION LOOP
@@ -159,6 +193,7 @@ def run_aerostructural_solver(
             ### STRUC --> AERO
             le_arr, te_arr = struc2aero.main(
                 struc_nodes,
+                n_wing_nodes,
                 struc_le_idx_list,
                 struc_te_idx_list,
                 n_aero_panels_per_struc_section,
@@ -210,20 +245,6 @@ def run_aerostructural_solver(
                     title=f"i: {i}",
                 )
 
-            ##TODO: remove this slower updating of the rest-lengths stuff
-            # updating all the rest lengths to the user input, instead of based on initial node-to-node distance
-            curr_rest_lengths = psystem.extract_rest_length
-            # also remove this!!
-            n_depower_tape_steps = 5
-
-            # for idx, curr_res_len in enumerate(curr_rest_lengths):
-            #     delta = rest_lengths[idx] - curr_res_len
-            #     if np.abs(delta) > 0.02:
-            #         print(
-            #             f"ci,cj: {kite_connectivity[idx][0]}, {kite_connectivity[idx][1]}: Delta l0: {delta}"
-            #         )
-            #         psystem.update_rest_length(idx, delta / 10)
-
             ### STRUC
             f_ext_flat = f_ext.flatten()
             end_time_f_ext = time.time()
@@ -238,35 +259,9 @@ def run_aerostructural_solver(
             # Updating the points
             struc_nodes = np.array([particle.x for particle in psystem.particles])
 
-            # TODO: remove this symmetry stuff
-            # Check for symmetry in the y-direction
-            symmetry_pairs_dict = {
-                1: 19,
-                2: 20,
-                3: 17,
-                4: 18,
-                5: 15,
-                6: 16,
-                7: 13,
-                8: 14,
-                9: 11,
-                10: 12,
-                # bridles
-                21: 24,
-                22: 23,
-                25: 26,
-                27: 30,
-                28: 29,
-                31: 32,
-                33: 35,
-                36: 37,
-            }
-
-            for key, value in symmetry_pairs_dict.items():
-                struc_nodes[value] = np.array(
-                    [struc_nodes[key][0], -struc_nodes[key][1], struc_nodes[key][2]]
-                )
-            struc_nodes[34][1] = 0
+            # TODO: remove?
+            # Forcing symmetry
+            struc_nodes = forcing_symmetry(struc_nodes)
 
             f_residual = psystem.f_int + f_ext_flat
             f_residual_list.append(np.linalg.norm(np.abs(f_residual)))
@@ -384,5 +379,4 @@ def run_aerostructural_solver(
         "converged": is_convergence,
         "rest_lengths": psystem.extract_rest_length.tolist(),
     }
-    print(f"structural nodes: {struc_nodes}")
     return tracking_data, meta

@@ -141,9 +141,10 @@ bridle_lines:
   - [BR35, 2.080, 0.002, dyneema,970]
   - [BRI, .700, 0.002, dyneema,970]
   - [brmain, 2.410, 0.002, dyneema,970]
-  - [S, 1.730, 0.002, dyneema,970]
-  # - [M, 3.330, 0.002, polyester]
-  - [M, 3.100, 0.002, dyneema,970]
+  # - [S, 1.730, 0.002, dyneema,970] # measured
+  # - [M, 3.330, 0.002, polyester] # measured
+  - [S, 1.530, 0.002, dyneema,970] # trying 0.2m smalller
+  - [M, 3.100, 0.002, dyneema,970] # trying 0.2m smaller
 
 bridle_connections:
   # name, ci, cj, ck (this is the third node, only exist when a pulley)

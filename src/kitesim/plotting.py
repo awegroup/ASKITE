@@ -87,6 +87,8 @@ def main(
     bb = all_pts.max(axis=0) - all_pts.min(axis=0)
     ax.set_box_aspect(bb)
     ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Z")
     ax.set_title(title)
     ax.legend()
     # Add colorbar if initial state was plotted
