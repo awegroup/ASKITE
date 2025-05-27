@@ -203,7 +203,11 @@ def run_aerostructural_solver(
 
             if config_dict["is_with_plot_per_iteration"]:
                 plotting.main(
-                    struc_nodes, pss_kite_connectivity, f_ext=f_ext, title=f"i: {i}"
+                    struc_nodes,
+                    pss_kite_connectivity,
+                    psystem.extract_rest_length,
+                    f_ext=f_ext,
+                    title=f"i: {i}",
                 )
 
             ##TODO: remove this slower updating of the rest-lengths stuff
@@ -212,13 +216,13 @@ def run_aerostructural_solver(
             # also remove this!!
             n_depower_tape_steps = 5
 
-            for idx, curr_res_len in enumerate(curr_rest_lengths):
-                delta = rest_lengths[idx] - curr_res_len
-                if np.abs(delta) > 0.02:
-                    print(
-                        f"ci,cj: {kite_connectivity[idx][0]}, {kite_connectivity[idx][1]}: Delta l0: {delta}"
-                    )
-                    psystem.update_rest_length(idx, delta / 2)
+            # for idx, curr_res_len in enumerate(curr_rest_lengths):
+            #     delta = rest_lengths[idx] - curr_res_len
+            #     if np.abs(delta) > 0.02:
+            #         print(
+            #             f"ci,cj: {kite_connectivity[idx][0]}, {kite_connectivity[idx][1]}: Delta l0: {delta}"
+            #         )
+            #         psystem.update_rest_length(idx, delta / 10)
 
             ### STRUC
             f_ext_flat = f_ext.flatten()
@@ -370,6 +374,7 @@ def run_aerostructural_solver(
         plotting.main(
             np.array([particle.x for particle in psystem.particles]),
             pss_kite_connectivity,
+            rest_lengths=psystem.extract_rest_length,
             struc_nodes_initial=np.array([p.x for p in initial_particles]),
             title="PSM: Initial (black) vs Final (red)",
         )
@@ -377,12 +382,7 @@ def run_aerostructural_solver(
         "total_time_s": time.time() - start_time,
         "n_iter": n_iter,
         "converged": is_convergence,
-        "wing_rest_lengths": psystem.extract_rest_length[
-            :len_wing_rest_length
-        ].tolist(),
-        "bridle_rest_lengths": psystem.extract_rest_length[
-            len_wing_rest_length:
-        ].tolist(),
+        "rest_lengths": psystem.extract_rest_length.tolist(),
     }
     print(f"structural nodes: {struc_nodes}")
     return tracking_data, meta

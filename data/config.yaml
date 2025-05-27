@@ -66,7 +66,7 @@ tether: # set to zero, if you don't want tether force
 is_print_mid_results: !!bool true
 is_with_initial_structure_plot: !!bool true
 is_with_coupling_plot: !!bool false
-is_with_plot_per_iteration: !!bool false
+is_with_plot_per_iteration: !!bool true
 is_with_aero_plot_per_iteration: !!bool false
 is_with_final_plot: !!bool true
 is_with_plotly_plot: !!bool false

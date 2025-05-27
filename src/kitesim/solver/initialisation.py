@@ -3,6 +3,24 @@ import pandas as pd
 from collections import defaultdict
 
 
+def calculate_edge_lengths(ci, cj, pos):
+    """
+    Calculate edge lengths between nodes for given connectivity.
+
+    Args:
+        ci (np.ndarray): Start node indices.
+        cj (np.ndarray): End node indices.
+        pos (np.ndarray): Node positions (n_nodes,3).
+
+    Returns:
+        np.ndarray: Edge lengths for each connection.
+    """
+    springL = np.zeros(ci.shape)
+    for idx, (ci, cj) in enumerate(zip(ci, cj)):
+        springL[idx] = np.linalg.norm(pos[cj, :] - pos[ci, :])
+    return springL
+
+
 def initialize_wing_structure(config_kite_dict):
     """
     Create the structural nodes and connectivity for the kite structure.
@@ -97,9 +115,14 @@ def initialize_wing_structure(config_kite_dict):
     struc_te_idx_list = []
     struc_nodes_list = [[0, 0, 0]]
     pulley_point_indices = []
-    for idx, (node_id, x, y, z, node_type) in enumerate(
+    node_masses_wing = np.zeros(n_wing_nodes + 1)
+    for _, (node_id, x, y, z, node_type) in enumerate(
         config_kite_dict["wing_nodes"]["data"]
     ):
+        # TODO: Improve distribution to preserve inertia
+        # Distributing wing mass uniformly
+        node_masses_wing[node_id] = config_kite_dict["wing_mass"] / n_wing_nodes
+
         struc_nodes_list.append([x, y, z])
         if node_type == "pulley":
             pulley_point_indices.append(node_id)
@@ -224,11 +247,16 @@ def initialize_wing_structure(config_kite_dict):
         te_line_idx_list,
         int(n_wing_nodes / 2),
         pulley_point_indices,
+        node_masses_wing,
     )
 
 
 def initialize_bridle_line_system(
-    struc_nodes_list, n_wing_lines, pulley_point_indices, config_kite_dict
+    struc_nodes_list,
+    node_masses_wing,
+    n_wing_lines,
+    pulley_point_indices,
+    config_kite_dict,
 ):
     """
     Initialize the bridle line system for the kite.
@@ -352,6 +380,8 @@ def initialize_bridle_line_system(
         # Use first index of each data row as key, and the rest as value
         bridle_lines_dict[row[0]] = np.array(row[1:])
 
+    node_masses = np.concatenate((node_masses_wing, np.zeros(len(bridle_nodes_data))))
+    print(f"node_masses: {node_masses.shape}, {node_masses}")
     bridle_ci = []
     bridle_cj = []
     pulley_line_indices = []
@@ -363,6 +393,20 @@ def initialize_bridle_line_system(
         cj = int(bridle_data_i[2])
         bridle_ci.append(ci)
         bridle_cj.append(cj)
+
+        # TODO: if rest lengths are off, then you are currently not adding the correct mass
+        # add mass
+        line_density = float(bridle_lines_dict[line_name][3])  # density in kg/m^3
+        line_diameter = float(bridle_lines_dict[line_name][1])  # diameter in m
+        line_length = np.linalg.norm(
+            np.array(struc_nodes_list[ci]) - np.array(struc_nodes_list[cj])
+        )
+        line_mass = line_density * np.pi * (line_diameter / 2) ** 2 * line_length
+        node_masses[ci] += line_mass / 2
+        node_masses[cj] += line_mass / 2
+        print(
+            f"line_name: {line_name}, line_density: {line_density}, line_diameter: {line_diameter}, line_length: {line_length}, line_mass: {line_mass}, node_masses[ci]: {node_masses[ci]}, node_masses[cj]: {node_masses[cj]}"
+        )
 
         if line_name == "M":
             depower_tape_index = idx + n_wing_lines
@@ -390,9 +434,7 @@ def initialize_bridle_line_system(
             total_point_to_point_line_len = (
                 point_to_point_line_len_current + point_to_point_line_len_other
             )
-            total_pulley_len = (
-                float(bridle_lines_dict[line_name][0]) / 1000
-            )  # Convert from mm to meters
+            total_pulley_len = float(bridle_lines_dict[line_name][0])
             line_len_current = (
                 point_to_point_line_len_current / total_point_to_point_line_len
             ) * total_pulley_len
@@ -414,9 +456,11 @@ def initialize_bridle_line_system(
             bridle_rest_lengths_initial.append(line_len_current)
 
         else:
-            bridle_rest_lengths_initial.append(
-                float(bridle_lines_dict[line_name][0]) / 1000
-            )  # Convert from mm to meters
+            bridle_rest_lengths_initial.append(float(bridle_lines_dict[line_name][0]))
+
+    for idx in pulley_point_indices:
+        # Add pulley mass to the node mass
+        node_masses[idx] += config_kite_dict["pulley_mass"]
 
     bridle_connectivity = np.column_stack(
         (
@@ -435,96 +479,79 @@ def initialize_bridle_line_system(
         pulley_line_indices,
         pulley_line_to_other_node_pair_dict,
         depower_tape_index,
+        node_masses,
     )
 
 
-def distribute_mass(
-    struc_nodes,
-    bridle_ci,
-    bridle_cj,
-    wing_ci,
-    wing_cj,
-    pulley_point_indices,
-    config_kite_dict,
-):
-    """
-    Distribute mass to each node based on structural and bridle configuration.
+# def distribute_mass(
+#     struc_nodes,
+#     bridle_ci,
+#     bridle_cj,
+#     wing_ci,
+#     wing_cj,
+#     pulley_point_indices,
+#     config_kite_dict,
+# ):
+#     """
+#     Distribute mass to each node based on structural and bridle configuration.
 
-    Args:
-        struc_nodes (np.ndarray): Structural node positions (n_nodes,3).
-        bridle_ci, bridle_cj (list): Bridle connectivity indices.
-        wing_ci, wing_cj (list): Wing connectivity indices.
-        pulley_point_indices (list): Indices of pulley nodes.
-        config_kite_dict (dict): Kite configuration dictionary.
+#     Args:
+#         struc_nodes (np.ndarray): Structural node positions (n_nodes,3).
+#         bridle_ci, bridle_cj (list): Bridle connectivity indices.
+#         wing_ci, wing_cj (list): Wing connectivity indices.
+#         pulley_point_indices (list): Indices of pulley nodes.
+#         config_kite_dict (dict): Kite configuration dictionary.
 
-    Returns:
-        np.ndarray: Mass array for each node (n_nodes,).
-    """
+#     Returns:
+#         np.ndarray: Mass array for each node (n_nodes,).
+#     """
 
-    WING_MASS = config_kite_dict["wing_mass"]
-    BRIDLE_RHO = config_kite_dict["bridle"]["density"]
-    BRIDLE_DIAMETER = config_kite_dict["bridle"]["diameter"]
-    KCU_MASS = config_kite_dict["kcu"]["mass"]
-    KCU_INDEX = config_kite_dict["kcu"]["index"]
-    PULLEY_MASS = config_kite_dict["pulley"]["mass"]
+#     WING_MASS = config_kite_dict["wing_mass"]
+#     BRIDLE_RHO = config_kite_dict["bridle"]["density"]
+#     BRIDLE_DIAMETER = config_kite_dict["bridle"]["diameter"]
+#     KCU_MASS = config_kite_dict["kcu"]["mass"]
+#     KCU_INDEX = config_kite_dict["kcu"]["index"]
+#     PULLEY_MASS = config_kite_dict["pulley"]["mass"]
 
-    # Define a spring force matrix of the right size
-    node_masses = np.zeros(
-        struc_nodes.shape[0]
-    )  # Initialising with zero matrix in same shape as points
+#     # Define a spring force matrix of the right size
+#     node_masses = np.zeros(
+#         struc_nodes.shape[0]
+#     )  # Initialising with zero matrix in same shape as points
 
-    ## Bridle lines
-    for idx, (idx_bridle_node_i, idx_bridle_node_j) in enumerate(
-        zip(bridle_ci, bridle_cj)
-    ):  # loop through each bridle line
-        # Calculate the len of the bridle line
-        len_bridle = np.linalg.norm(
-            struc_nodes[idx_bridle_node_i] - struc_nodes[idx_bridle_node_j]
-        )
-        # Calculate the mass of the bridle line
-        mass_bridle = BRIDLE_RHO * np.pi * (BRIDLE_DIAMETER / 2) ** 2 * len_bridle
-        # Add the mass of the bridle line to the nodes
-        node_masses[idx_bridle_node_i] += mass_bridle / 2
-        node_masses[idx_bridle_node_j] += mass_bridle / 2
+#     ## Bridle lines
+#     for idx, (idx_bridle_node_i, idx_bridle_node_j) in enumerate(
+#         zip(bridle_ci, bridle_cj)
+#     ):  # loop through each bridle line
+#         # Calculate the len of the bridle line
+#         len_bridle = np.linalg.norm(
+#             struc_nodes[idx_bridle_node_i] - struc_nodes[idx_bridle_node_j]
+#         )
+#         # Calculate the mass of the bridle line
+#         mass_bridle = BRIDLE_RHO * np.pi * (BRIDLE_DIAMETER / 2) ** 2 * len_bridle
+#         # Add the mass of the bridle line to the nodes
+#         node_masses[idx_bridle_node_i] += mass_bridle / 2
+#         node_masses[idx_bridle_node_j] += mass_bridle / 2
 
-    # print(f'bridle node_masses: {np.sum(node_masses)}')
-    ## Pulleys
-    for idx in pulley_point_indices:
-        node_masses[idx] += PULLEY_MASS
+#     # print(f'bridle node_masses: {np.sum(node_masses)}')
+#     ## Pulleys
+#     for idx in pulley_point_indices:
+#         node_masses[idx] += PULLEY_MASS
 
-    # print(f'pulley& bridle node_masses: {np.sum(node_masses)}')
-    ## KCU
-    node_masses[KCU_INDEX] += KCU_MASS
+#     # print(f'pulley& bridle node_masses: {np.sum(node_masses)}')
+#     ## KCU
+#     node_masses[KCU_INDEX] += KCU_MASS
 
-    # print(f'pulley& bridle & KCU node_masses: {np.sum(node_masses)}')
+#     # print(f'pulley& bridle & KCU node_masses: {np.sum(node_masses)}')
 
-    ## Wing
-    for idx, (idx_wing_node_i, idx_wing_node_i) in enumerate(
-        zip(set(wing_ci), set(wing_cj))
-    ):  # making them sets, to have it unique
-        node_masses[idx] += WING_MASS / len(set(wing_ci))
+#     ## Wing
+#     for idx, (idx_wing_node_i, idx_wing_node_i) in enumerate(
+#         zip(set(wing_ci), set(wing_cj))
+#     ):  # making them sets, to have it unique
+#         node_masses[idx] += WING_MASS / len(set(wing_ci))
 
-    # print(f'pulley& bridle & KCU & wing node_masses: {np.sum(node_masses)}')
+#     # print(f'pulley& bridle & KCU & wing node_masses: {np.sum(node_masses)}')
 
-    return node_masses
-
-
-def calculate_edge_lengths(ci, cj, pos):
-    """
-    Calculate edge lengths between nodes for given connectivity.
-
-    Args:
-        ci (np.ndarray): Start node indices.
-        cj (np.ndarray): End node indices.
-        pos (np.ndarray): Node positions (n_nodes,3).
-
-    Returns:
-        np.ndarray: Edge lengths for each connection.
-    """
-    springL = np.zeros(ci.shape)
-    for idx, (ci, cj) in enumerate(zip(ci, cj)):
-        springL[idx] = np.linalg.norm(pos[cj, :] - pos[ci, :])
-    return springL
+#     return node_masses
 
 
 # # TODO: this function is way to bulky, it should be possible to make this simpler
@@ -759,6 +786,7 @@ def main(config_kite_dict):
         te_line_idx_list,
         n_struc_ribs,
         pulley_point_indices,
+        node_masses_wing,
     ) = initialize_wing_structure(config_kite_dict)
 
     (
@@ -771,23 +799,28 @@ def main(config_kite_dict):
         pulley_line_indices,
         pulley_line_to_other_node_pair_dict,
         depower_tape_index,
+        node_masses,
     ) = initialize_bridle_line_system(
-        struc_nodes, len(wing_connectivity), pulley_point_indices, config_kite_dict
+        struc_nodes,
+        node_masses_wing,
+        len(wing_connectivity),
+        pulley_point_indices,
+        config_kite_dict,
     )
 
     kite_connectivity = np.vstack((wing_connectivity, bridle_connectivity))
     rest_lengths = np.concatenate(
         (wing_rest_lengths_initial, bridle_rest_lengths_initial)
     )
-    m_array = distribute_mass(
-        struc_nodes,
-        bridle_ci,
-        bridle_cj,
-        wing_ci,
-        wing_cj,
-        pulley_point_indices,
-        config_kite_dict,
-    )
+    # m_array = distribute_mass(
+    #     struc_nodes,
+    #     bridle_ci,
+    #     bridle_cj,
+    #     wing_ci,
+    #     wing_cj,
+    #     pulley_point_indices,
+    #     config_kite_dict,
+    # )
 
     return (
         struc_nodes,
@@ -804,7 +837,7 @@ def main(config_kite_dict):
         wing_connectivity,
         bridle_connectivity,
         kite_connectivity,
-        m_array,
+        node_masses,
         bridle_rest_lengths_initial,
         wing_rest_lengths_initial,
         rest_lengths,

@@ -330,7 +330,7 @@ def instantiate_psystem(
         "abs_tol": config_dict["solver"]["abs_tol"],
         "rel_tol": config_dict["solver"]["rel_tol"],
         "max_iter": config_dict["solver"]["max_iter"],
-        "n": len(config_kite_dict["points"]),
+        "n": len(struc_nodes),
         "aerostructural_tol": config_dict["aero_structural"]["tol"],
         "is_with_visc_damping": config_dict["solver"]["is_with_visc_damping"],
         "g": -config_dict["grav_constant"][2],
@@ -351,12 +351,12 @@ def instantiate_psystem(
             linktype = "noncompressive"
         elif idx in pulley_line_indices:
             # pulley
-            k = config_kite_dict["stiffness_bridle"]
+            k = config_kite_dict["bridle_line_stiffness"]
             c = config_kite_dict["bridle_line_damping"]
             linktype = "pulley"
         else:
             # only compression
-            k = config_kite_dict["stiffness_bridle"]
+            k = config_kite_dict["bridle_line_stiffness"]
             c = config_kite_dict["canopy_damping"]
             linktype = "noncompressive"
 
@@ -376,7 +376,7 @@ def instantiate_psystem(
     else:
         vel_ini = np.zeros((len(struc_nodes), 3))
 
-    fixed_nodes = np.array(config_kite_dict["bridle"]["bridle_point_index"])
+    fixed_nodes = np.array(config_kite_dict["fixed_node_indices"])
     pss_initial_conditions = []
     n = len(struc_nodes)
     for i in range(n):
@@ -403,17 +403,59 @@ def instantiate_psystem(
         pss_param_dict,
     )
 
-    # # updating all the rest lengths to the user input, instead of based on initial node-to-node distance
-    # set_rest_lengths = psystem.extract_rest_length
+    # updating all the rest lengths to the user input, instead of based on initial node-to-node distance
+    set_rest_lengths = psystem.extract_rest_length
 
-    # for idx, set_res_len in enumerate(set_rest_lengths):
-    #     delta = rest_lengths[idx] - set_res_len
-    #     if np.abs(delta) > 0.25:
-    #         print(f"\nci,cj: {kite_connectivity[idx][0]}, {kite_connectivity[idx][1]}")
-    #         print(f"set res len: {set_res_len}")
-    #         print(f"rest length: {rest_lengths[idx]}")
-    #         print(f"Delta l0: {rest_lengths[idx] - set_res_len}")
-    #     psystem.update_rest_length(idx, rest_lengths[idx] - set_res_len)
+    # update rest lengths to original wing rest lengths
+    wing_rest_lengths = np.array(
+        [
+            0.34867407,
+            1.51367733,
+            0.88927689,
+            1.72113939,
+            1.32426864,
+            1.32890591,
+            2.24038103,
+            1.32801374,
+            1.31377741,
+            2.49418968,
+            1.32335236,
+            1.31128284,
+            2.61551116,
+            1.328504,
+            1.321442,
+            2.61551116,
+            1.32335236,
+            1.31128284,
+            2.49418968,
+            1.32801374,
+            1.31377741,
+            2.24038103,
+            1.32426864,
+            1.32890591,
+            1.72113939,
+            1.51367733,
+            0.88927689,
+            0.34867407,
+        ]
+    )
+    # rest_lengths[1:29] = wing_rest_lengths
+
+    for idx, set_res_len in enumerate(set_rest_lengths):
+        # delta = rest_lengths[idx] - set_res_len
+        # if np.abs(delta) > 0.25:
+        #     print(f"\nci,cj: {kite_connectivity[idx][0]}, {kite_connectivity[idx][1]}")
+        #     print(f"set res len: {set_res_len}")
+        #     print(f"rest length: {rest_lengths[idx]}")
+        #     print(f"Delta l0: {rest_lengths[idx] - set_res_len}")
+        # psystem.update_rest_length(idx, rest_lengths[idx] - set_res_len)
+        print(
+            f"ci,cj: {kite_connectivity[idx][0]}, {kite_connectivity[idx][1]},curr rest length: {set_res_len:.3f}, set rest length: {rest_lengths[idx]:.3f}"
+        )
+
+    # # 3% of TE canopy billowing induced extra rest length
+    # if idx in te_line_idx_list:
+    #     psystem.update_rest_length(idx, 0.03 * set_res_len)
 
     return psystem, pss_param_dict, pss_kite_connectivity
 
