@@ -9,6 +9,7 @@ def main(
     struc_nodes_initial=None,
     f_ext=None,
     title="PSM State",
+    body_aero=None,
 ):
     """
     Plot the current (and optionally initial) structure state in 3D.
@@ -77,6 +78,18 @@ def main(
     if struc_nodes_initial is not None:
         for i, pos in enumerate(struc_nodes_initial):
             ax.text(pos[0], pos[1], pos[2], str(i), color="blue", fontsize=8)
+
+    # If aero mesh nodes are provided, plot them
+    if body_aero is not None:
+        aero_mesh_nodes = []
+        for panel in body_aero.panels:
+            for cp in panel.corner_points:
+                aero_mesh_nodes.append(cp)
+        # make unique
+        aero_mesh_nodes = np.unique(np.array(aero_mesh_nodes), axis=0)
+        ax.scatter(
+            *(aero_mesh_nodes.T), color="green", marker="^", s=15, label="Aero Mesh"
+        )
 
     # Set aspect ratio to equal
     all_pts = (

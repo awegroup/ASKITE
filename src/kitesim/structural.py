@@ -6,7 +6,7 @@ from PSS.particleSystem import ParticleSystem
 
 
 def plot_3d_kite_structure(
-    struc_nodes, connectivity, depower_tape_index, fixed_nodes=None, pulley_nodes=None
+    struc_nodes, connectivity, power_tape_index, fixed_nodes=None, pulley_nodes=None
 ):
     """
     Plot the 3D structure of a kite with enhanced visualization features.
@@ -231,8 +231,8 @@ def plot_3d_kite_structure(
             fontsize=6,
             color="blue",
         )
-        if depower_tape_index == idx:
-            # Highlight the depower tape line
+        if power_tape_index == idx:
+            # Highlight the power tape line
             ax.plot(
                 [p1[0], p2[0]],
                 [p1[1], p2[1]],
@@ -240,10 +240,10 @@ def plot_3d_kite_structure(
                 color="red",
                 linestyle="-",
                 linewidth=3,
-                label="Depower Tape",
+                label="Power Tape",
             )
-            if "Depower Tape" not in used_labels:
-                used_labels.add("Depower Tape")
+            if "Power Tape" not in used_labels:
+                used_labels.add("Power Tape")
 
     # Set labels and title
     ax.set_xlabel("X")
@@ -297,7 +297,7 @@ def instantiate_psystem(
     pulley_point_indices,
     pulley_line_indices,
     pulley_line_to_other_node_pair_dict,
-    depower_tape_index,
+    power_tape_index,
 ):
     """
     Instantiate the particle system for the structural solver.
@@ -324,15 +324,14 @@ def instantiate_psystem(
     pss_param_dict = {
         "pulley_other_line_pair": pulley_line_to_other_node_pair_dict,
         "l0": rest_lengths,
-        "c": config_dict["solver"]["damping_constant"],
-        "dt": config_dict["solver"]["dt"],
-        "t_steps": config_dict["solver"]["n_time_steps"],
-        "abs_tol": config_dict["solver"]["abs_tol"],
-        "rel_tol": config_dict["solver"]["rel_tol"],
-        "max_iter": config_dict["solver"]["max_iter"],
+        "c": config_dict["structural"]["damping_constant"],
+        "is_with_visc_damping": config_dict["structural"]["is_with_visc_damping"],
+        "dt": config_dict["structural"]["dt"],
+        "t_steps": config_dict["structural"]["n_internal_time_steps"],
+        "abs_tol": config_dict["structural"]["abs_tol"],
+        "rel_tol": config_dict["structural"]["rel_tol"],
+        "max_iter": config_dict["structural"]["max_iter"],
         "n": len(struc_nodes),
-        "aerostructural_tol": config_dict["aero_structural"]["tol"],
-        "is_with_visc_damping": config_dict["solver"]["is_with_visc_damping"],
         "g": -config_dict["grav_constant"][2],
     }
 
@@ -454,7 +453,7 @@ def instantiate_psystem(
         plot_3d_kite_structure(
             struc_nodes,
             pss_kite_connectivity,
-            depower_tape_index,
+            power_tape_index,
             fixed_nodes=fixed_nodes,
             pulley_nodes=pulley_point_indices,
         )

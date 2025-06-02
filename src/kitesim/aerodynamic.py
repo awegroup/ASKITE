@@ -7,13 +7,15 @@ from VSM.plotting import plot_geometry
 
 
 def initialize_vsm(
-    config_kite, n_panels: int, spanwise_panel_distribution: str
+    config_kite_dict,
+    config_dict,
+    n_panels: int,
 ) -> BodyAerodynamics:
     """
     Load kite configuration and initialize the VSM BodyAerodynamics object with one Wing instance.
 
     Args:
-        config_kite (dict): Kite configuration dictionary.
+        config_kite_dict (dict): Kite configuration dictionary.
         n_panels (int): Number of panels for the wing.
         spanwise_panel_distribution (str): Type of spanwise distribution.
 
@@ -23,7 +25,7 @@ def initialize_vsm(
     """
 
     # 1) Extract airfoil table
-    af = config_kite["airfoils"]
+    af = config_kite_dict["airfoils"]
     headers = af["headers"]  # e.g. ["LE_x", "LE_y", ...]
     data = af["data"]  # list of lists
 
@@ -32,7 +34,10 @@ def initialize_vsm(
 
     # 3) Create Wing instance
     wing = Wing(
-        n_panels=n_panels, spanwise_panel_distribution=spanwise_panel_distribution
+        n_panels=n_panels,
+        spanwise_panel_distribution=config_dict["aerodynamic"][
+            "spanwise_panel_distribution"
+        ],
     )
 
     # 4) Add each airfoil section to the wing
@@ -42,7 +47,16 @@ def initialize_vsm(
         airfoil_data = ["lei_airfoil_breukels", [row["d_tube"], row["y_camber"]]]
         wing.add_section(LE, TE, airfoil_data)
 
-    return BodyAerodynamics([wing]), Solver()
+    vsm_solver = Solver(
+        max_iterations=config_dict["aerodynamic"]["max_iterations"],
+        allowed_error=config_dict["aerodynamic"]["allowed_error"],
+        relaxation_factor=config_dict["aerodynamic"]["relaxation_factor"],
+        reference_point=config_dict["aerodynamic"]["reference_point"],
+        mu=config_dict["mu"],
+        density=config_dict["rho"],
+    )
+
+    return BodyAerodynamics([wing]), vsm_solver
 
 
 def plot_vsm_geometry(body_aero):

@@ -125,6 +125,7 @@ def initialize_bridle_line_system(
     pulley_line_indices = []
     pulley_line_to_other_node_pair_dict = {}
     bridle_rest_lengths_initial = []
+    steering_tape_indices = []
     for idx, bridle_data_i in enumerate(config_kite_dict["bridle_connections"]["data"]):
         line_name = bridle_data_i[0]
         ci = int(bridle_data_i[1])
@@ -143,8 +144,11 @@ def initialize_bridle_line_system(
         node_masses[ci] += line_mass / 2
         node_masses[cj] += line_mass / 2
 
-        if line_name == "M":
-            depower_tape_index = idx + n_wing_lines
+        if line_name == "Power Tape":
+            power_tape_index = idx + n_wing_lines
+
+        if line_name == "Steering Tape":
+            steering_tape_indices.append(idx + n_wing_lines)
 
         if len(bridle_data_i) > 3:
             # if the connection ck exists, i.e. if there is a third connection, this line is a pulley
@@ -213,7 +217,8 @@ def initialize_bridle_line_system(
         pulley_point_indices,
         pulley_line_indices,
         pulley_line_to_other_node_pair_dict,
-        depower_tape_index,
+        power_tape_index,
+        steering_tape_indices,
         node_masses,
     )
 
@@ -253,7 +258,8 @@ def main(config_kite_dict):
         pulley_point_indices,
         pulley_line_indices,
         pulley_line_to_other_node_pair_dict,
-        depower_tape_index,
+        power_tape_index,
+        steering_tape_indices,
         node_masses,
     ) = initialize_bridle_line_system(
         struc_nodes,
@@ -290,5 +296,6 @@ def main(config_kite_dict):
         pulley_point_indices,
         pulley_line_indices,
         pulley_line_to_other_node_pair_dict,
-        depower_tape_index,
+        power_tape_index,
+        steering_tape_indices,
     )

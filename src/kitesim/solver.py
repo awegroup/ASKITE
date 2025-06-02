@@ -88,19 +88,18 @@ def main(config_dict: dict, config_kite_dict: dict):
         pulley_point_indices,
         pulley_line_indices,
         pulley_line_to_other_node_pair_dict,
-        depower_tape_index,
+        power_tape_index,
+        steering_tape_indices,
     ) = initialisation.main(config_kite_dict)
 
     ## AERO
-    n_aero_panels_per_struc_section = config_dict["aero"][
+    n_aero_panels = (n_struc_ribs - 1) * config_dict["aerodynamic"][
         "n_aero_panels_per_struc_section"
     ]
-    n_struc_sections = n_struc_ribs - 1
-    n_aero_panels = n_struc_sections * n_aero_panels_per_struc_section
     body_aero, vsm_solver = aerodynamic.initialize_vsm(
-        config_kite=config_kite_dict,
+        config_kite_dict=config_kite_dict,
+        config_dict=config_dict,
         n_panels=n_aero_panels,
-        spanwise_panel_distribution="uniform",
     )
     vel_app = np.array(config_dict["vel_wind"]) - np.array(config_dict["vel_kite"])
     body_aero.va = (vel_app, 0)
@@ -132,31 +131,38 @@ def main(config_dict: dict, config_kite_dict: dict):
         pulley_point_indices,
         pulley_line_indices,
         pulley_line_to_other_node_pair_dict,
-        depower_tape_index,
+        power_tape_index,
     )
 
     ## ACTUATION
     len_wing_rest_length = len(wing_rest_lengths_initial)
-    # index_depower_tape = (
-    #     len_wing_rest_length + config_kite_dict["bridle"]["depower_tape_index"]
-    # )
-    index_depower_tape = depower_tape_index
-    initial_length_depower_tape = params["l0"][index_depower_tape]
-    depower_tape_extension_step = config_dict["depower_tape_extension_step"]
-    depower_tape_final_extension = config_dict["depower_tape_final_extension"]
-    if depower_tape_extension_step != 0:
-        n_depower_tape_steps = int(
-            depower_tape_final_extension / depower_tape_extension_step
+    initial_length_power_tape = params["l0"][power_tape_index]
+    power_tape_extension_step = config_dict["power_tape_extension_step"]
+    power_tape_final_extension = config_dict["power_tape_final_extension"]
+    if power_tape_extension_step != 0:
+        n_power_tape_steps = int(power_tape_final_extension / power_tape_extension_step)
+    else:
+        n_power_tape_steps = 0
+    logging.info(
+        f"Initial depower tape length: {psystem.extract_rest_length[power_tape_index]:.3f}m"
+    )
+    logging.info(
+        f"Desired depower tape length: {initial_length_power_tape + power_tape_final_extension:.3f}m"
+    )
+    initial_length_steering_left = params["l0"][steering_tape_indices[0]]
+    initial_length_steering_right = params["l0"][steering_tape_indices[1]]
+    steering_tape_extension_step = config_dict["steering_tape_extension_step"]
+    steering_tape_final_extension = config_dict["steering_tape_final_extension"]
+    if steering_tape_extension_step != 0:
+        n_steering_tape_steps = int(
+            steering_tape_final_extension / steering_tape_extension_step
         )
     else:
-        n_depower_tape_steps = 0
-    logging.info(
-        f"Initial depower tape length: {psystem.extract_rest_length[index_depower_tape]:.3f}m"
-    )
-    logging.info(
-        f"Desired depower tape length: {initial_length_depower_tape + depower_tape_final_extension:.3f}m"
-    )
+        n_steering_tape_steps = 0
 
+    print(f"steering_tape_indices: {steering_tape_indices}")
+    psystem.update_rest_length(steering_tape_indices[0], -steering_tape_final_extension)
+    psystem.update_rest_length(steering_tape_indices[1], steering_tape_final_extension)
     ## PRELOOP
     if config_dict["is_with_gravity"]:
         f_ext_gravity = np.array(
@@ -166,7 +172,10 @@ def main(config_dict: dict, config_kite_dict: dict):
         f_ext_gravity = np.zeros(struc_nodes.shape)
     initial_particles = copy.deepcopy(psystem.particles)
     t_vector = np.linspace(
-        params["dt"], params["t_steps"] * params["dt"], params["t_steps"]
+        config_dict["aero_structural_solver"]["dt_iter_size"],
+        config_dict["aero_structural_solver"]["max_iter"]
+        * config_dict["aero_structural_solver"]["dt_iter_size"],
+        config_dict["aero_structural_solver"]["max_iter"],
     )
     tracking_data = tracking.setup_tracking_arrays(len(struc_nodes), t_vector)
     vel_app = np.array(config_dict["vel_wind"]) - np.array(config_dict["vel_kite"])
@@ -196,7 +205,7 @@ def main(config_dict: dict, config_kite_dict: dict):
                 n_wing_nodes,
                 struc_le_idx_list,
                 struc_te_idx_list,
-                n_aero_panels_per_struc_section,
+                config_dict["aerodynamic"]["n_aero_panels_per_struc_section"],
             )
 
             ### AERO
@@ -215,7 +224,6 @@ def main(config_dict: dict, config_kite_dict: dict):
             logging.info(
                 f"Aero symmetry check, f_aero_y: {np.sum([force[1] for force in f_aero_wing_vsm_format])}"
             )
-
             ### AERO --> STRUC
             f_aero_wing = aero2struc.main(
                 config_dict["coupling_method"],
@@ -243,6 +251,7 @@ def main(config_dict: dict, config_kite_dict: dict):
                     psystem.extract_rest_length,
                     f_ext=f_ext,
                     title=f"i: {i}",
+                    body_aero=body_aero,
                 )
 
             ### STRUC
@@ -280,9 +289,9 @@ def main(config_dict: dict, config_kite_dict: dict):
                 f_residual,
             )
             ## calculating delta tape lengths
-            delta_depower_tape = (
-                psystem.extract_rest_length[index_depower_tape]
-                - initial_length_depower_tape
+            delta_power_tape = (
+                psystem.extract_rest_length[power_tape_index]
+                - initial_length_power_tape
             )
 
             pbar.set_postfix(
@@ -297,8 +306,9 @@ def main(config_dict: dict, config_kite_dict: dict):
             ### All the convergence checks, are be done in if-elif because only 1 should hold at once
             # if convergence (residual below set tolerance)
             if (
-                i > n_depower_tape_steps
-                and np.linalg.norm(f_residual) <= params["aerostructural_tol"]
+                i > n_power_tape_steps
+                and np.linalg.norm(f_residual)
+                <= config_dict["aero_structural_solver"]["tol"]
             ):
                 is_residual_below_tol = True
                 is_convergence = True
@@ -313,20 +323,18 @@ def main(config_dict: dict, config_kite_dict: dict):
                 break
             # if residual forces are not changing anymore
             elif (
-                i > 200
-                and np.abs(np.mean(f_residual_list[i - 25]) - f_residual_list[i]) < 1
-                and np.abs(np.mean(f_residual_list[i - 10]) - f_residual_list[i]) < 1
-                and np.abs(np.mean(f_residual_list[i - 5]) - f_residual_list[i]) < 1
-                and np.abs(np.mean(f_residual_list[i - 2]) - f_residual_list[i]) < 1
+                i > 15
+                and np.abs(np.mean(f_residual_list[i - 15]) - f_residual_list[i - 10])
+                < 1
             ):
                 is_convergence = False
                 logging.info("Classic PS non-converging - residual no longer changes")
                 break
             # if to many iterations are needed
-            elif i > config_dict["aero_structural"]["max_iter"]:
+            elif i > config_dict["aero_structural_solver"]["max_iter"]:
                 is_convergence = False
                 logging.info(
-                    f"Classic PS non-converging - more than max ({config_dict["aero_structural"]["max_iter"]}) iterations needed"
+                    f"Classic PS non-converging - more than max ({config_dict['aero_structural_solver']['max_iter']}) iterations needed"
                 )
                 break
             # special case for running the simulation for only one timestep
@@ -340,18 +348,15 @@ def main(config_dict: dict, config_kite_dict: dict):
 
             ## if convergenced and not yet at desired depower-tape length
             elif (
-                is_residual_below_tol
-                and delta_depower_tape <= depower_tape_final_extension
+                is_residual_below_tol and delta_power_tape <= power_tape_final_extension
             ):
-                psystem.update_rest_length(
-                    index_depower_tape, depower_tape_extension_step
-                )
-                delta_depower_tape = (
-                    psystem.extract_rest_length[index_depower_tape]
-                    - initial_length_depower_tape
+                psystem.update_rest_length(power_tape_index, power_tape_extension_step)
+                delta_power_tape = (
+                    psystem.extract_rest_length[power_tape_index]
+                    - initial_length_power_tape
                 )
                 logging.info(
-                    f"||--- delta l_d: {delta_depower_tape:.3f}m | new l_d: {psystem.extract_rest_length[index_depower_tape]:.3f}m | Steps required: {n_depower_tape_steps}"
+                    f"||--- delta l_d: {delta_power_tape:.3f}m | new l_d: {psystem.extract_rest_length[power_tape_index]:.3f}m | Steps required: {n_power_tape_steps}"
                 )
                 is_residual_below_tol = False
 
