@@ -19,8 +19,6 @@ def setup_tracking_arrays(n_pts, t_vector):
         "f_int": np.zeros((nt, n_pts, 3)),
         "residual_norm": np.zeros(nt),
         "max_residual": np.zeros(nt),
-        "pos_change": np.zeros(nt),
-        "vel_change": np.zeros(nt),
     }
 
 
@@ -60,12 +58,3 @@ def update_tracking_arrays(
     # 3) Norms
     tracking_data["residual_norm"][idx] = np.linalg.norm(f_int_flat)
     tracking_data["max_residual"][idx] = np.max(np.abs(f_int_flat))
-
-    # 4) Deltas
-    if nodes_struc_prev is not None:
-        dp = struc_nodes - nodes_struc_prev
-        tracking_data["pos_change"][idx] = np.linalg.norm(dp)
-
-        if hasattr(psystem, "v_current_2D") and hasattr(psystem, "v_prev_2D"):
-            dv = psystem.v_current_2D - psystem.v_prev_2D
-            tracking_data["vel_change"][idx] = np.linalg.norm(dv)

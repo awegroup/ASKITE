@@ -1,22 +1,35 @@
-# kite name
 kite_name: !!str "V3_25"
 
-# sim_name, straight/crosswind/circular
-# sim_name: !!str "straight"  # <-- NOT USED
+### inflow conditions
+vel_wind: !!seq [12, 0, 5]
+vel_kite: !!seq [0, 0, 0]
+acc_kite: !!seq [0, 0, 0]
 
-## Actuation
-##TODO: remove these old ones (first 3) you don't actually use them
-# depower
-# u_p: !!float 1.0  # <-- NOT USED
-# power_tape_extension_percentage: !!float 8.0  # <-- NOT USED
-# steering
-# delta_ls_ini: !!float 0.00  # <-- NOT USED
-## NEW - in meters
+## case settings
+is_with_gravity: !!bool true
+is_with_aero_bridle: !!bool false
+is_with_aero_tether: !!bool false
+is_run_only_1_time_step: !!bool false
+is_with_initial_point_velocity: !!bool false
+is_with_forcing_symmetry: !!bool false
+
+## actuation settings
 power_tape_extension_step: !!float 0.00 #0.01
 power_tape_final_extension: !!float 0.00 #0.05
 steering_tape_extension_step: !!float 0
 steering_tape_final_extension: !!float 0.0
 
+## output settings
+is_with_initial_structure_plot: !!bool false
+is_with_coupling_plot_per_iteration: !!bool false
+is_with_struc_plot_per_iteration: !!bool false
+is_with_aero_plot_per_iteration: !!bool false
+is_with_final_plot: !!bool true
+
+## physical_constants:
+grav_constant: !!seq [0, 0, 9.81]
+rho: !!float 1.225 # air density in kg/m^3
+mu: !!float 1.789e-05 # dynamic viscosity in kg/(m*s)
 
 aerodynamic:
   n_aero_panels_per_struc_section: !!int 3
@@ -35,11 +48,33 @@ structural:
   rel_tol: !!float 1.0e-5
   max_iter: !!int 500
 
+aero2struc:
+  coupling_method: !!str "NN"
+
 aero_structural_solver:
-  dt_iter_size: !!float 0.01
-  max_iter: !!int 25
+  max_iter: !!int 100
   it_check: !!int 5
   tol: !!float 25
+
+
+# sim_name, straight/crosswind/circular
+# sim_name: !!str "straight"  # <-- NOT USED
+
+## Actuation
+##TODO: remove these old ones (first 3) you don't actually use them
+# depower
+# u_p: !!float 1.0  # <-- NOT USED
+# power_tape_extension_percentage: !!float 8.0  # <-- NOT USED
+# steering
+# delta_ls_ini: !!float 0.00  # <-- NOT USED
+# ## NEW - in meters
+# power_tape_extension_step: !!float 0.00 #0.01
+# power_tape_final_extension: !!float 0.00 #0.05
+# steering_tape_extension_step: !!float 0
+# steering_tape_final_extension: !!float 0.0
+
+
+
   # crosswind_max_iter: !!int 50
   # crosswind_tol: !!float 0.01
   # crosswind_relax_factor: !!float 0.5
@@ -50,49 +85,41 @@ aero_structural_solver:
 #   density: !!float 1.0    # <-- NOT USED
 
 ## output_settings:
-is_print_mid_results: !!bool true
-is_with_initial_structure_plot: !!bool true
-is_with_coupling_plot: !!bool false
-is_with_plot_per_iteration: !!bool true
-is_with_aero_plot_per_iteration: !!bool false
-is_with_final_plot: !!bool true
-is_with_plotly_plot: !!bool false
-is_with_aero_geometry: !!bool false
-is_with_printing: !!bool false
+# is_print_mid_results: !!bool true
+
+# is_with_plotly_plot: !!bool false
+# is_with_aero_geometry: !!bool false
+# is_with_printing: !!bool false
 
 ## plotting
-is_with_plotting: !!bool false
-plot_format: !!str "png"
-plot_elev: !!seq [9.14, 9.14]
-plot_azim: !!seq [90, 230]
+# is_with_plotting: !!bool false
+# plot_format: !!str "png"
+# plot_elev: !!seq [9.14, 9.14]
+# plot_azim: !!seq [90, 230]
 
 ## animation
-is_with_animation: !!bool false
-animation_fps: !!int 10
-animation_dpi: !!int 100
-animation_bitrate: !!int 2000
-animation_elev: !!float 9.14
-animation_azim: !!float 230.0
+# is_with_animation: !!bool false
+# animation_fps: !!int 10
+# animation_dpi: !!int 100
+# animation_bitrate: !!int 2000
+# animation_elev: !!float 9.14
+# animation_azim: !!float 230.0
 
 ## simulation_settings
-is_run_only_1_time_step: !!bool false
-is_with_velocity_initialisation: !!bool false
-n_vel_initialisation_steps: !!int 10
-coupling_method: !!str "NN"
-is_from_filename: !!bool false
-is_with_initial_point_velocity: !!bool false
-is_billowing_on: !!bool true
-is_with_gravity: !!bool true
-is_with_aero_bridle: !!bool true
-is_with_aero_tether: !!bool true
-bridle_initial_compression_factor: !!float 1.0
-geometric_scaling_factor: !!float 1.0
+# is_with_velocity_initialisation: !!bool false
+# n_vel_initialisation_steps: !!int 10
+# coupling_method: !!str "NN"
+# is_from_filename: !!bool false
+# is_with_initial_point_velocity: !!bool false
+# is_billowing_on: !!bool true
+# is_with_gravity: !!bool true
+# is_with_aero_bridle: !!bool true
+# is_with_aero_tether: !!bool true
+# bridle_initial_compression_factor: !!float 1.0
+# geometric_scaling_factor: !!float 1.0
 
 
-## physical_constants:
-grav_constant: !!seq [0, 0, 9.81]
-rho: !!float 1.225 # air density in kg/m^3
-mu: !!float 1.789e-05 # dynamic viscosity in kg/(m*s)
+
 
 #TODO: these are now hardcoded in "solver_utils"
 ## crosswind flight settings
@@ -111,10 +138,10 @@ mu: !!float 1.789e-05 # dynamic viscosity in kg/(m*s)
 # is_circular_case: false         # <-- NOT USED
 # is_print_intermediate_results: true  # <-- NOT USED
 # is_with_gravity: false          # <-- NOT USED
-### inflow conditions
-vel_wind: !!seq [12, 0, 2]
-vel_kite: !!seq [0, 0, 0]
-acc_kite: !!seq [0, 0, 0]
+# ### inflow conditions
+# vel_wind: !!seq [12, 0, 2]
+# vel_kite: !!seq [0, 0, 0]
+# acc_kite: !!seq [0, 0, 0]
 
 # # Crosswind case
 # is_with_vk_optimization: true

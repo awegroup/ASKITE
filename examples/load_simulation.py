@@ -8,9 +8,10 @@ Github: ...
 """
 
 from pathlib import Path
-from kitesim.solver import main_pss_vsm
 from kitesim.logging_config import *
 from kitesim.utils import load_sim_output
+from kitesim import plotting  # Add this import
+import numpy as np
 
 
 # Import modules
@@ -19,7 +20,7 @@ def main():
     PROJECT_DIR = Path(__file__).resolve().parents[1]
 
     # load files
-    results_dir = Path(PROJECT_DIR) / "results" / f"V3_25" / f"2025_05_26_1709h"
+    results_dir = Path(PROJECT_DIR) / "results" / f"V3_25" / f"2025_06_03_1027h"
     h5_path = Path(results_dir) / "sim_output.h5"
     meta_data_dict, tracking_data = load_sim_output(h5_path)
 
@@ -34,6 +35,18 @@ def main():
     # - functions that make an animation of the kite going through the iterations
     # - etc.
     f_residual = tracking_data["f_int"] - tracking_data["f_ext"]
+
+    # --- Interactive plot ---
+    plotting.interactive_plot(
+        tracking_data=tracking_data,
+        kite_connectivity=np.array(meta_data_dict["kite_connectivity"]),
+        rest_lengths=np.array(meta_data_dict["rest_lengths"]),
+        f_ext=tracking_data["f_ext"],
+        title="PSM Interactive",
+        elev=0,
+        azim=0,
+        t_per_step=0.1,
+    )
 
 
 if __name__ == "__main__":

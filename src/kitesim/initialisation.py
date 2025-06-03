@@ -9,8 +9,8 @@ def initialize_wing_structure(config_kite_dict):
         config_kite_dict (dict): Kite configuration dictionary.
 
     Returns:
-        tuple: (struc_nodes, wing_ci, wing_cj, bridle_ci, bridle_cj, struc_le_idx_list,
-                struc_te_idx_list, pulley_point_indices, tubular_frame_line_idx_list,
+        tuple: (struc_nodes, wing_ci, wing_cj, bridle_ci, bridle_cj, struc_node_le_indices,
+                struc_node_te_indices, pulley_point_indices, tubular_frame_line_idx_list,
                 te_line_idx_list, n_struc_ribs)
     """
     n_wing_nodes = len(config_kite_dict["wing_nodes"]["data"])
@@ -18,8 +18,8 @@ def initialize_wing_structure(config_kite_dict):
     wing_cj = []
     tubular_frame_line_idx_list = []
     te_line_idx_list = []
-    struc_le_idx_list = []
-    struc_te_idx_list = []
+    struc_node_le_indices = []
+    struc_node_te_indices = []
     struc_nodes_list = [[0, 0, 0]]
     pulley_point_indices = []
     node_masses_wing = np.zeros(n_wing_nodes + 1)
@@ -40,8 +40,8 @@ def initialize_wing_structure(config_kite_dict):
             curr_te = node_id + 1
             nxt_le = node_id + 2
             nxt_te = node_id + 3
-            struc_le_idx_list.append(curr_le)
-            struc_te_idx_list.append(curr_te)
+            struc_node_le_indices.append(curr_le)
+            struc_node_te_indices.append(curr_te)
             # if not the last point
             if node_id < (n_wing_nodes - 1):
                 # --- For first to up to second to last panel only connect to the next ---
@@ -81,8 +81,8 @@ def initialize_wing_structure(config_kite_dict):
         wing_cj,
         wing_connectivity,
         wing_rest_lengths_initial,
-        struc_le_idx_list,
-        struc_te_idx_list,
+        struc_node_le_indices,
+        struc_node_te_indices,
         tubular_frame_line_idx_list,
         te_line_idx_list,
         int(n_wing_nodes / 2),
@@ -240,8 +240,8 @@ def main(config_kite_dict):
         wing_cj,
         wing_connectivity,
         wing_rest_lengths_initial,
-        struc_le_idx_list,
-        struc_te_idx_list,
+        struc_node_le_indices,
+        struc_node_te_indices,
         tubular_frame_line_idx_list,
         te_line_idx_list,
         n_struc_ribs,
@@ -280,8 +280,8 @@ def main(config_kite_dict):
         wing_cj,
         bridle_ci,
         bridle_cj,
-        struc_le_idx_list,
-        struc_te_idx_list,
+        struc_node_le_indices,
+        struc_node_te_indices,
         pulley_point_indices,
         tubular_frame_line_idx_list,
         te_line_idx_list,

@@ -577,8 +577,8 @@ def aero2struc_NN_vsm(
 def initialize_mapping(
     panels: np.ndarray,
     struc_nodes: np.ndarray,
-    struc_le_idx_list: np.ndarray,
-    struc_te_idx_list: np.ndarray,
+    struc_node_le_indices: np.ndarray,
+    struc_node_te_indices: np.ndarray,
 ) -> np.ndarray:
     """
     For each panel CP, find the two LE and two TE structural‐node indices
@@ -588,25 +588,25 @@ def initialize_mapping(
     Args:
         panels (np.ndarray): Array of panel objects with .aerodynamic_center attribute.
         struc_nodes (np.ndarray): Structural node positions (n_nodes,3).
-        struc_le_idx_list (np.ndarray): Indices of leading edge nodes.
-        struc_te_idx_list (np.ndarray): Indices of trailing edge nodes.
+        struc_node_le_indices (np.ndarray): Indices of leading edge nodes.
+        struc_node_te_indices (np.ndarray): Indices of trailing edge nodes.
 
     Returns:
         np.ndarray: Mapping array (n_panels, 4).
     """
 
     # extract and sort LE candidates by their y
-    le_coords = struc_nodes[struc_le_idx_list]
+    le_coords = struc_nodes[struc_node_le_indices]
     le_y = le_coords[:, 1]
     le_order = np.argsort(le_y)
-    le_sorted_idx = np.array(struc_le_idx_list)[le_order]
+    le_sorted_idx = np.array(struc_node_le_indices)[le_order]
     le_sorted_y = le_y[le_order]
 
     # same for TE
-    te_coords = struc_nodes[struc_te_idx_list]
+    te_coords = struc_nodes[struc_node_te_indices]
     te_y = te_coords[:, 1]
     te_order = np.argsort(te_y)
-    te_sorted_idx = np.array(struc_te_idx_list)[te_order]
+    te_sorted_idx = np.array(struc_node_te_indices)[te_order]
     te_sorted_y = te_y[te_order]
 
     n = len(panels)

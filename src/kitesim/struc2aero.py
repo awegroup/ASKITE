@@ -46,9 +46,8 @@ def interpolate_points(arr, n_aero_panels_per_struc_section):
 
 def main(
     struc_nodes,
-    n_wing_nodes,
-    struc_le_idx_list,
-    struc_te_idx_list,
+    struc_node_le_indices,
+    struc_node_te_indices,
     n_aero_panels_per_struc_section,
 ):
     """
@@ -57,8 +56,8 @@ def main(
 
     Args:
         struc_nodes (np.ndarray): Structural node positions (n_nodes, 3).
-        struc_le_idx_list (list): Indices of leading edge nodes.
-        struc_te_idx_list (list): Indices of trailing edge nodes.
+        struc_node_le_indices (list): Indices of leading edge nodes.
+        struc_node_te_indices (list): Indices of trailing edge nodes.
         n_aero_panels_per_struc_section (int): Number of aerodynamic panels per structural section.
 
     Returns:
@@ -66,8 +65,8 @@ def main(
         te_arr (np.ndarray): Interpolated trailing edge points.
     """
 
-    le_arr = np.array([struc_nodes[i] for i in struc_le_idx_list])
-    te_arr = np.array([struc_nodes[i] for i in struc_te_idx_list])
+    le_arr = np.array([struc_nodes[i] for i in struc_node_le_indices])
+    te_arr = np.array([struc_nodes[i] for i in struc_node_te_indices])
 
     # TODO: remove hardcoded values
     ## Correct leading edge and trailing edge points for the full wing

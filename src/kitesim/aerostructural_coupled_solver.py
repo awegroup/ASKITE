@@ -15,6 +15,7 @@ from kitesim import (
 )
 
 
+# TODO: remove hardcoded values, when changing away from V3
 def forcing_symmetry(struc_nodes):
     """
     Forcing symmetry in the y-direction for the kite structure nodes.
@@ -72,8 +73,8 @@ def main(config_dict: dict, config_kite_dict: dict):
         wing_cj,
         bridle_ci,
         bridle_cj,
-        struc_le_idx_list,
-        struc_te_idx_list,
+        struc_node_le_indices,  # was le_node_indices
+        struc_node_te_indices,  # was te_node_indices
         pulley_point_indices,
         tubular_frame_line_idx_list,
         te_line_idx_list,
@@ -113,8 +114,8 @@ def main(config_dict: dict, config_kite_dict: dict):
     aero2struc_mapping = aero2struc.initialize_mapping(
         body_aero.panels,
         struc_nodes,
-        struc_le_idx_list,
-        struc_te_idx_list,
+        struc_node_le_indices,
+        struc_node_te_indices,
     )
 
     ## STRUC
@@ -135,7 +136,6 @@ def main(config_dict: dict, config_kite_dict: dict):
     )
 
     ## ACTUATION
-    len_wing_rest_length = len(wing_rest_lengths_initial)
     initial_length_power_tape = params["l0"][power_tape_index]
     power_tape_extension_step = config_dict["power_tape_extension_step"]
     power_tape_final_extension = config_dict["power_tape_final_extension"]
@@ -160,7 +160,6 @@ def main(config_dict: dict, config_kite_dict: dict):
     else:
         n_steering_tape_steps = 0
 
-    print(f"steering_tape_indices: {steering_tape_indices}")
     psystem.update_rest_length(steering_tape_indices[0], -steering_tape_final_extension)
     psystem.update_rest_length(steering_tape_indices[1], steering_tape_final_extension)
     ## PRELOOP
@@ -172,9 +171,8 @@ def main(config_dict: dict, config_kite_dict: dict):
         f_ext_gravity = np.zeros(struc_nodes.shape)
     initial_particles = copy.deepcopy(psystem.particles)
     t_vector = np.linspace(
-        config_dict["aero_structural_solver"]["dt_iter_size"],
-        config_dict["aero_structural_solver"]["max_iter"]
-        * config_dict["aero_structural_solver"]["dt_iter_size"],
+        1,
+        config_dict["aero_structural_solver"]["max_iter"],
         config_dict["aero_structural_solver"]["max_iter"],
     )
     tracking_data = tracking.setup_tracking_arrays(len(struc_nodes), t_vector)
@@ -185,7 +183,7 @@ def main(config_dict: dict, config_kite_dict: dict):
     is_residual_below_tol = False
     struc_nodes_prev = None  # Initialize previous points for tracking
     start_time = time.time()
-    n_wing_nodes = 2 * n_struc_ribs
+    plotting.set_plot_style()
 
     ######################################################################
     # SIMULATION LOOP
@@ -202,9 +200,8 @@ def main(config_dict: dict, config_kite_dict: dict):
             ### STRUC --> AERO
             le_arr, te_arr = struc2aero.main(
                 struc_nodes,
-                n_wing_nodes,
-                struc_le_idx_list,
-                struc_te_idx_list,
+                struc_node_le_indices,
+                struc_node_te_indices,
                 config_dict["aerodynamic"]["n_aero_panels_per_struc_section"],
             )
 
@@ -221,19 +218,21 @@ def main(config_dict: dict, config_kite_dict: dict):
                     is_with_plot=config_dict["is_with_aero_plot_per_iteration"],
                 )
             )
-            logging.info(
+            logging.debug(
                 f"Aero symmetry check, f_aero_y: {np.sum([force[1] for force in f_aero_wing_vsm_format])}"
             )
             ### AERO --> STRUC
             f_aero_wing = aero2struc.main(
-                config_dict["coupling_method"],
+                config_dict["aero2struc"]["coupling_method"],
                 f_aero_wing_vsm_format,
                 struc_nodes,
                 np.array(results_aero["panel_cp_locations"]),
                 aero2struc_mapping,
                 p=2,
                 eps=1e-6,
-                is_with_coupling_plot=config_dict["is_with_coupling_plot"],
+                is_with_coupling_plot=config_dict[
+                    "is_with_coupling_plot_per_iteration"
+                ],
             )
 
             # TODO: get bridle line forces back in to play
@@ -244,7 +243,7 @@ def main(config_dict: dict, config_kite_dict: dict):
             f_ext = f_aero + f_ext_gravity
             f_ext = np.round(f_ext, 5)
 
-            if config_dict["is_with_plot_per_iteration"]:
+            if config_dict["is_with_struc_plot_per_iteration"]:
                 plotting.main(
                     struc_nodes,
                     pss_kite_connectivity,
@@ -252,6 +251,8 @@ def main(config_dict: dict, config_kite_dict: dict):
                     f_ext=f_ext,
                     title=f"i: {i}",
                     body_aero=body_aero,
+                    chord_length=2.6,
+                    is_with_node_indices=False,
                 )
 
             ### STRUC
@@ -268,13 +269,14 @@ def main(config_dict: dict, config_kite_dict: dict):
             # Updating the points
             struc_nodes = np.array([particle.x for particle in psystem.particles])
 
-            # TODO: remove?
             # Forcing symmetry
-            struc_nodes = forcing_symmetry(struc_nodes)
+            if config_dict["is_with_forcing_symmetry"]:
+                logging.info("Forcing symmetry in y-direction")
+                struc_nodes = forcing_symmetry(struc_nodes)
 
             f_residual = psystem.f_int + f_ext_flat
             f_residual_list.append(np.linalg.norm(np.abs(f_residual)))
-            logging.info(
+            logging.debug(
                 f"residual force in y-direction: {np.sum([f_residual[1::3]]):.3f}N"
             )
 
@@ -365,7 +367,6 @@ def main(config_dict: dict, config_kite_dict: dict):
                 is_convergence = True
 
             if is_convergence:
-                n_iter = i + 1
                 break
     ######################################################################
     ## END OF SIMULATION FOR LOOP
@@ -378,10 +379,19 @@ def main(config_dict: dict, config_kite_dict: dict):
             struc_nodes_initial=np.array([p.x for p in initial_particles]),
             title="PSM: Initial (black) vs Final (red)",
         )
+    # Convert kite_connectivity to a numeric array for HDF5 compatibility
+    kite_connectivity_numeric = np.array(pss_kite_connectivity)
+    # If it is not 2D and numeric, try to extract only the first two columns (node indices)
+    if kite_connectivity_numeric.dtype == object or kite_connectivity_numeric.ndim != 2:
+        kite_connectivity_numeric = np.array(
+            [[int(row[0]), int(row[1])] for row in pss_kite_connectivity],
+            dtype=np.int32,
+        )
     meta = {
         "total_time_s": time.time() - start_time,
-        "n_iter": n_iter,
+        "n_iter": i + 1,
         "converged": is_convergence,
-        "rest_lengths": psystem.extract_rest_length.tolist(),
+        "rest_lengths": np.array(psystem.extract_rest_length),  # ensure numeric array
+        "kite_connectivity": kite_connectivity_numeric,
     }
     return tracking_data, meta
