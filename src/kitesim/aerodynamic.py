@@ -1,21 +1,76 @@
 import numpy as np
 import pandas as pd
-from VSM.BodyAerodynamics import BodyAerodynamics
-from VSM.WingGeometry import Wing
-from VSM.Solver import Solver
-from VSM.plotting import plot_geometry
+from pathlib import Path
+from VSM.core.BodyAerodynamics import BodyAerodynamics
+from VSM.core.WingGeometry import Wing
+from VSM.core.Solver import Solver
+from VSM.plot_geometry_matplotlib import plot_geometry
 
 
-def initialize_vsm(
-    config_kite_dict,
+# def initialize_vsm(
+#     geometry_dict,
+#     config_dict,
+#     n_panels: int,
+# ) -> BodyAerodynamics:
+#     """
+#     Load kite configuration and initialize the VSM BodyAerodynamics object with one Wing instance.
+
+#     Args:
+#         geometry_dict (dict): Kite configuration dictionary.
+#         n_panels (int): Number of panels for the wing.
+#         spanwise_panel_distribution (str): Type of spanwise distribution.
+
+#     Returns:
+#         BodyAerodynamics: Initialized body aerodynamic model.
+#         Solver: Initialized solver object.
+#     """
+
+#     # 1) Extract airfoil table
+#     af = geometry_dict["airfoils"]
+#     headers = af["headers"]  # e.g. ["LE_x", "LE_y", ...]
+#     data = af["data"]  # list of lists
+
+#     # 2) Build DataFrame for convenience
+#     df = pd.DataFrame(data, columns=headers)
+
+#     # 3) Create Wing instance
+#     wing = Wing(
+#         n_panels=n_panels,
+#         spanwise_panel_distribution=config_dict["aerodynamic"][
+#             "spanwise_panel_distribution"
+#         ],
+#     )
+
+#     # 4) Add each airfoil section to the wing
+#     for _, row in df.iterrows():
+#         LE = np.array([row["LE_x"], row["LE_y"], row["LE_z"]])
+#         TE = np.array([row["TE_x"], row["TE_y"], row["TE_z"]])
+#         airfoil_data = ["lei_airfoil_breukels", [row["d_tube"], row["y_camber"]]]
+#         wing.add_section(LE, TE, airfoil_data)
+
+#     vsm_solver = Solver(
+#         max_iterations=config_dict["aerodynamic"]["max_iterations"],
+#         allowed_error=config_dict["aerodynamic"]["allowed_error"],
+#         relaxation_factor=config_dict["aerodynamic"]["relaxation_factor"],
+#         reference_point=config_dict["aerodynamic"]["reference_point"],
+#         mu=config_dict["mu"],
+#         density=config_dict["rho"],
+#     )
+
+#     return BodyAerodynamics([wing]), vsm_solver
+
+
+def initialize(
+    kite_name,
+    PROJECT_DIR,
     config_dict,
-    n_panels: int,
+    n_struc_ribs: int,
 ) -> BodyAerodynamics:
     """
     Load kite configuration and initialize the VSM BodyAerodynamics object with one Wing instance.
 
     Args:
-        config_kite_dict (dict): Kite configuration dictionary.
+        geometry_dict (dict): Kite configuration dictionary.
         n_panels (int): Number of panels for the wing.
         spanwise_panel_distribution (str): Type of spanwise distribution.
 
@@ -23,29 +78,17 @@ def initialize_vsm(
         BodyAerodynamics: Initialized body aerodynamic model.
         Solver: Initialized solver object.
     """
-
-    # 1) Extract airfoil table
-    af = config_kite_dict["airfoils"]
-    headers = af["headers"]  # e.g. ["LE_x", "LE_y", ...]
-    data = af["data"]  # list of lists
-
-    # 2) Build DataFrame for convenience
-    df = pd.DataFrame(data, columns=headers)
-
-    # 3) Create Wing instance
-    wing = Wing(
-        n_panels=n_panels,
+    n_aero_panels = (n_struc_ribs - 1) * config_dict["aerodynamic"][
+        "n_aero_panels_per_struc_section"
+    ]
+    body_aero = BodyAerodynamics.instantiate(
+        n_panels=n_aero_panels,
+        file_path=(Path(PROJECT_DIR) / "data" / f"{kite_name}" / "geometry.yaml"),
         spanwise_panel_distribution=config_dict["aerodynamic"][
             "spanwise_panel_distribution"
         ],
+        is_with_bridles=False,
     )
-
-    # 4) Add each airfoil section to the wing
-    for _, row in df.iterrows():
-        LE = np.array([row["LE_x"], row["LE_y"], row["LE_z"]])
-        TE = np.array([row["TE_x"], row["TE_y"], row["TE_z"]])
-        airfoil_data = ["lei_airfoil_breukels", [row["d_tube"], row["y_camber"]]]
-        wing.add_section(LE, TE, airfoil_data)
 
     vsm_solver = Solver(
         max_iterations=config_dict["aerodynamic"]["max_iterations"],
@@ -53,10 +96,18 @@ def initialize_vsm(
         relaxation_factor=config_dict["aerodynamic"]["relaxation_factor"],
         reference_point=config_dict["aerodynamic"]["reference_point"],
         mu=config_dict["mu"],
-        density=config_dict["rho"],
+        rho=config_dict["rho"],
     )
 
-    return BodyAerodynamics([wing]), vsm_solver
+    vel_app = np.array(config_dict["vel_wind"]) - np.array(config_dict["vel_kite"])
+    body_aero.va = (vel_app, 0)
+    wing = body_aero.wings[0]
+    new_sections = wing.refine_aerodynamic_mesh()
+    initial_polar_data = []
+    for new_section in new_sections:
+        initial_polar_data.append(new_section.polar_data)
+
+    return body_aero, vsm_solver, vel_app, initial_polar_data
 
 
 def plot_vsm_geometry(body_aero):

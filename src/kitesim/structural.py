@@ -286,7 +286,7 @@ def plot_3d_kite_structure(
 
 def instantiate_psystem(
     config_dict,
-    config_kite_dict,
+    geometry_dict,
     struc_nodes,
     wing_connectivity,
     kite_connectivity,
@@ -304,7 +304,7 @@ def instantiate_psystem(
 
     Args:
         config_dict (dict): Main configuration dictionary.
-        config_kite_dict (dict): Kite-specific configuration dictionary.
+        geometry_dict (dict): Kite-specific configuration dictionary.
         struc_nodes (np.ndarray): Initial node positions (n_nodes, 3).
         wing_connectivity (np.ndarray): Wing connectivity matrix.
         kite_connectivity (np.ndarray): Full kite connectivity matrix.
@@ -340,23 +340,23 @@ def instantiate_psystem(
     for idx, _ in enumerate(kite_connectivity):
         if idx in tubular_frame_line_idx_list:
             # compression and tension
-            k = config_kite_dict["tubular_frame_stiffness"]
-            c = config_kite_dict["tubular_frame_damping"]
+            k = geometry_dict["tubular_frame_stiffness"]
+            c = geometry_dict["tubular_frame_damping"]
             linktype = "default"
         elif idx in te_line_idx_list:
             # only tension
-            k = config_kite_dict["trailing_edge_stiffness"]
-            c = config_kite_dict["trailing_edge_damping"]
+            k = geometry_dict["trailing_edge_stiffness"]
+            c = geometry_dict["trailing_edge_damping"]
             linktype = "noncompressive"
         elif idx in pulley_line_indices:
             # pulley
-            k = config_kite_dict["bridle_line_stiffness"]
-            c = config_kite_dict["bridle_line_damping"]
+            k = geometry_dict["bridle_line_stiffness"]
+            c = geometry_dict["bridle_line_damping"]
             linktype = "pulley"
         else:
             # only compression
-            k = config_kite_dict["bridle_line_stiffness"]
-            c = config_kite_dict["canopy_damping"]
+            k = geometry_dict["bridle_line_stiffness"]
+            c = geometry_dict["canopy_damping"]
             linktype = "noncompressive"
 
         pss_kite_connectivity.append(
@@ -375,7 +375,7 @@ def instantiate_psystem(
     else:
         vel_ini = np.zeros((len(struc_nodes), 3))
 
-    fixed_nodes = np.array(config_kite_dict["fixed_node_indices"])
+    fixed_nodes = np.array(geometry_dict["fixed_node_indices"])
     pss_initial_conditions = []
     n = len(struc_nodes)
     for i in range(n):

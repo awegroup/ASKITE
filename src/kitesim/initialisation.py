@@ -1,19 +1,19 @@
 import numpy as np
 
 
-def initialize_wing_structure(config_kite_dict):
+def initialize_wing_structure(geometry_dict):
     """
     Create the structural nodes and connectivity for the kite structure.
 
     Args:
-        config_kite_dict (dict): Kite configuration dictionary.
+        geometry_dict (dict): Kite configuration dictionary.
 
     Returns:
         tuple: (struc_nodes, wing_ci, wing_cj, bridle_ci, bridle_cj, struc_node_le_indices,
                 struc_node_te_indices, pulley_point_indices, tubular_frame_line_idx_list,
                 te_line_idx_list, n_struc_ribs)
     """
-    n_wing_nodes = len(config_kite_dict["wing_nodes"]["data"])
+    n_wing_nodes = len(geometry_dict["wing_nodes"]["data"])
     wing_ci = []
     wing_cj = []
     tubular_frame_line_idx_list = []
@@ -24,11 +24,11 @@ def initialize_wing_structure(config_kite_dict):
     pulley_point_indices = []
     node_masses_wing = np.zeros(n_wing_nodes + 1)
     for _, (node_id, x, y, z, node_type) in enumerate(
-        config_kite_dict["wing_nodes"]["data"]
+        geometry_dict["wing_nodes"]["data"]
     ):
         # TODO: Improve distribution to preserve inertia
         # Distributing wing mass uniformly
-        node_masses_wing[node_id] = config_kite_dict["wing_mass"] / n_wing_nodes
+        node_masses_wing[node_id] = geometry_dict["wing_mass"] / n_wing_nodes
 
         struc_nodes_list.append([x, y, z])
         if node_type == "pulley":
@@ -96,7 +96,7 @@ def initialize_bridle_line_system(
     node_masses_wing,
     n_wing_lines,
     pulley_point_indices,
-    config_kite_dict,
+    geometry_dict,
 ):
     """
     Initialize the bridle line system for the kite.
@@ -105,13 +105,13 @@ def initialize_bridle_line_system(
         tuple: (bridle_ci, bridle_cj, pulley_point_indices)
     """
 
-    bridle_nodes_data = config_kite_dict["bridle_nodes"]["data"]
+    bridle_nodes_data = geometry_dict["bridle_nodes"]["data"]
     for idx, (node_id, x, y, z, node_type) in enumerate(bridle_nodes_data):
         struc_nodes_list.append([x, y, z])
         if node_type == "pulley":
             pulley_point_indices.append(node_id)
 
-    bridle_lines = config_kite_dict["bridle_lines"]
+    bridle_lines = geometry_dict["bridle_lines"]
     headers = bridle_lines["headers"]  # e.g. ["LE_x", "LE_y", ...]
     data = bridle_lines["data"]  # list of lists
     bridle_lines_dict = {}
@@ -126,7 +126,7 @@ def initialize_bridle_line_system(
     pulley_line_to_other_node_pair_dict = {}
     bridle_rest_lengths_initial = []
     steering_tape_indices = []
-    for idx, bridle_data_i in enumerate(config_kite_dict["bridle_connections"]["data"]):
+    for idx, bridle_data_i in enumerate(geometry_dict["bridle_connections"]["data"]):
         line_name = bridle_data_i[0]
         ci = int(bridle_data_i[1])
         cj = int(bridle_data_i[2])
@@ -199,7 +199,7 @@ def initialize_bridle_line_system(
 
     for idx in pulley_point_indices:
         # Add pulley mass to the node mass
-        node_masses[idx] += config_kite_dict["pulley_mass"]
+        node_masses[idx] += geometry_dict["pulley_mass"]
 
     bridle_connectivity = np.column_stack(
         (
@@ -223,12 +223,12 @@ def initialize_bridle_line_system(
     )
 
 
-def main(config_kite_dict):
+def main(geometry_dict):
     """
     Main entry point for kite structural initialisation.
 
     Args:
-        config_kite_dict (dict): Kite configuration dictionary.
+        geometry_dict (dict): Kite configuration dictionary.
 
     Returns:
         tuple: All structural and connectivity arrays, mass arrays, rest lengths, and pulley data.
@@ -247,7 +247,7 @@ def main(config_kite_dict):
         n_struc_ribs,
         pulley_point_indices,
         node_masses_wing,
-    ) = initialize_wing_structure(config_kite_dict)
+    ) = initialize_wing_structure(geometry_dict)
 
     (
         struc_nodes,
@@ -266,7 +266,7 @@ def main(config_kite_dict):
         node_masses_wing,
         len(wing_connectivity),
         pulley_point_indices,
-        config_kite_dict,
+        geometry_dict,
     )
 
     kite_connectivity = np.vstack((wing_connectivity, bridle_connectivity))

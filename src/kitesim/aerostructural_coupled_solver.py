@@ -6,7 +6,6 @@ from pathlib import Path
 import copy
 from kitesim import (
     aerodynamic,
-    initialisation,
     struc2aero,
     aero2struc,
     structural,
@@ -51,13 +50,31 @@ def forcing_symmetry(struc_nodes):
     return struc_nodes
 
 
-def main(config_dict: dict, config_kite_dict: dict):
+def main(
+    m_array,
+    struc_nodes,
+    psystem,
+    struc_node_le_indices,
+    struc_node_te_indices,
+    body_aero,
+    vsm_solver,
+    vel_app,
+    initial_polar_data,
+    aero2struc_mapping,
+    pss_kite_connectivity,
+    params,
+    power_tape_index,
+    initial_length_power_tape,
+    n_power_tape_steps,
+    power_tape_final_extension,
+    power_tape_extension_step,
+    config: dict,
+):
     """
     Runs the aero-structural solver for the given input parameters.
 
     Args:
-        config_dict (dict): Main configuration dictionary.
-        config_kite_dict (dict): Kite-specific configuration dictionary.
+        config (dict): Main configuration dictionary.
         PROJECT_DIR (Path): Path to the project directory.
         results_dir (Path): Path to the results directory.
 
@@ -66,117 +83,20 @@ def main(config_dict: dict, config_kite_dict: dict):
         meta (dict): Dictionary with meta information about the simulation (timing, convergence, etc).
     """
 
-    ## INIT
-    (
-        struc_nodes,
-        wing_ci,
-        wing_cj,
-        bridle_ci,
-        bridle_cj,
-        struc_node_le_indices,  # was le_node_indices
-        struc_node_te_indices,  # was te_node_indices
-        pulley_point_indices,
-        tubular_frame_line_idx_list,
-        te_line_idx_list,
-        n_struc_ribs,
-        wing_connectivity,
-        bridle_connectivity,
-        kite_connectivity,
-        m_array,
-        bridle_rest_lengths_initial,
-        wing_rest_lengths_initial,
-        rest_lengths,
-        pulley_point_indices,
-        pulley_line_indices,
-        pulley_line_to_other_node_pair_dict,
-        power_tape_index,
-        steering_tape_indices,
-    ) = initialisation.main(config_kite_dict)
-
-    ## AERO
-    n_aero_panels = (n_struc_ribs - 1) * config_dict["aerodynamic"][
-        "n_aero_panels_per_struc_section"
-    ]
-    body_aero, vsm_solver = aerodynamic.initialize_vsm(
-        config_kite_dict=config_kite_dict,
-        config_dict=config_dict,
-        n_panels=n_aero_panels,
-    )
-    vel_app = np.array(config_dict["vel_wind"]) - np.array(config_dict["vel_kite"])
-    body_aero.va = (vel_app, 0)
-    wing = body_aero.wings[0]
-    new_sections = wing.refine_aerodynamic_mesh()
-    initial_polar_data = []
-    for new_section in new_sections:
-        initial_polar_data.append(new_section.aero_input)
-
-    ## AERO2STRUC
-    aero2struc_mapping = aero2struc.initialize_mapping(
-        body_aero.panels,
-        struc_nodes,
-        struc_node_le_indices,
-        struc_node_te_indices,
-    )
-
-    ## STRUC
-    psystem, params, pss_kite_connectivity = structural.instantiate_psystem(
-        config_dict,
-        config_kite_dict,
-        struc_nodes,
-        wing_connectivity,
-        kite_connectivity,
-        rest_lengths,
-        m_array,
-        tubular_frame_line_idx_list,
-        te_line_idx_list,
-        pulley_point_indices,
-        pulley_line_indices,
-        pulley_line_to_other_node_pair_dict,
-        power_tape_index,
-    )
-
-    ## ACTUATION
-    initial_length_power_tape = params["l0"][power_tape_index]
-    power_tape_extension_step = config_dict["power_tape_extension_step"]
-    power_tape_final_extension = config_dict["power_tape_final_extension"]
-    if power_tape_extension_step != 0:
-        n_power_tape_steps = int(power_tape_final_extension / power_tape_extension_step)
-    else:
-        n_power_tape_steps = 0
-    logging.info(
-        f"Initial depower tape length: {psystem.extract_rest_length[power_tape_index]:.3f}m"
-    )
-    logging.info(
-        f"Desired depower tape length: {initial_length_power_tape + power_tape_final_extension:.3f}m"
-    )
-    initial_length_steering_left = params["l0"][steering_tape_indices[0]]
-    initial_length_steering_right = params["l0"][steering_tape_indices[1]]
-    steering_tape_extension_step = config_dict["steering_tape_extension_step"]
-    steering_tape_final_extension = config_dict["steering_tape_final_extension"]
-    if steering_tape_extension_step != 0:
-        n_steering_tape_steps = int(
-            steering_tape_final_extension / steering_tape_extension_step
-        )
-    else:
-        n_steering_tape_steps = 0
-
-    psystem.update_rest_length(steering_tape_indices[0], -steering_tape_final_extension)
-    psystem.update_rest_length(steering_tape_indices[1], steering_tape_final_extension)
     ## PRELOOP
-    if config_dict["is_with_gravity"]:
+    if config["is_with_gravity"]:
         f_ext_gravity = np.array(
-            [np.array(config_dict["grav_constant"]) * m_pt for m_pt in m_array]
+            [np.array(config["grav_constant"]) * m_pt for m_pt in m_array]
         )
     else:
         f_ext_gravity = np.zeros(struc_nodes.shape)
     initial_particles = copy.deepcopy(psystem.particles)
     t_vector = np.linspace(
         1,
-        config_dict["aero_structural_solver"]["max_iter"],
-        config_dict["aero_structural_solver"]["max_iter"],
+        config["aero_structural_solver"]["max_iter"],
+        config["aero_structural_solver"]["max_iter"],
     )
     tracking_data = tracking.setup_tracking_arrays(len(struc_nodes), t_vector)
-    vel_app = np.array(config_dict["vel_wind"]) - np.array(config_dict["vel_kite"])
     is_convergence = False
     f_residual_list = []
     f_tether_drag = np.zeros(3)
@@ -202,7 +122,7 @@ def main(config_dict: dict, config_kite_dict: dict):
                 struc_nodes,
                 struc_node_le_indices,
                 struc_node_te_indices,
-                config_dict["aerodynamic"]["n_aero_panels_per_struc_section"],
+                config["aerodynamic"]["n_aero_panels_per_struc_section"],
             )
 
             ### AERO
@@ -215,7 +135,7 @@ def main(config_dict: dict, config_kite_dict: dict):
                     va_vector=vel_app,
                     aero_input_type="reuse_initial_polar_data",
                     initial_polar_data=initial_polar_data,
-                    is_with_plot=config_dict["is_with_aero_plot_per_iteration"],
+                    is_with_plot=config["is_with_aero_plot_per_iteration"],
                 )
             )
             logging.debug(
@@ -223,16 +143,14 @@ def main(config_dict: dict, config_kite_dict: dict):
             )
             ### AERO --> STRUC
             f_aero_wing = aero2struc.main(
-                config_dict["aero2struc"]["coupling_method"],
+                config["aero2struc"]["coupling_method"],
                 f_aero_wing_vsm_format,
                 struc_nodes,
                 np.array(results_aero["panel_cp_locations"]),
                 aero2struc_mapping,
                 p=2,
                 eps=1e-6,
-                is_with_coupling_plot=config_dict[
-                    "is_with_coupling_plot_per_iteration"
-                ],
+                is_with_coupling_plot=config["is_with_coupling_plot_per_iteration"],
             )
 
             # TODO: get bridle line forces back in to play
@@ -243,7 +161,7 @@ def main(config_dict: dict, config_kite_dict: dict):
             f_ext = f_aero + f_ext_gravity
             f_ext = np.round(f_ext, 5)
 
-            if config_dict["is_with_struc_plot_per_iteration"]:
+            if config["is_with_struc_plot_per_iteration"]:
                 plotting.main(
                     struc_nodes,
                     pss_kite_connectivity,
@@ -270,7 +188,7 @@ def main(config_dict: dict, config_kite_dict: dict):
             struc_nodes = np.array([particle.x for particle in psystem.particles])
 
             # Forcing symmetry
-            if config_dict["is_with_forcing_symmetry"]:
+            if config["is_with_forcing_symmetry"]:
                 logging.info("Forcing symmetry in y-direction")
                 struc_nodes = forcing_symmetry(struc_nodes)
 
@@ -310,7 +228,7 @@ def main(config_dict: dict, config_kite_dict: dict):
             if (
                 i > n_power_tape_steps
                 and np.linalg.norm(f_residual)
-                <= config_dict["aero_structural_solver"]["tol"]
+                <= config["aero_structural_solver"]["tol"]
             ):
                 is_residual_below_tol = True
                 is_convergence = True
@@ -333,14 +251,14 @@ def main(config_dict: dict, config_kite_dict: dict):
                 logging.info("Classic PS non-converging - residual no longer changes")
                 break
             # if to many iterations are needed
-            elif i > config_dict["aero_structural_solver"]["max_iter"]:
+            elif i > config["aero_structural_solver"]["max_iter"]:
                 is_convergence = False
                 logging.info(
-                    f"Classic PS non-converging - more than max ({config_dict['aero_structural_solver']['max_iter']}) iterations needed"
+                    f"Classic PS non-converging - more than max ({config['aero_structural_solver']['max_iter']}) iterations needed"
                 )
                 break
             # special case for running the simulation for only one timestep
-            elif config_dict["is_run_only_1_time_step"]:
+            elif config["is_run_only_1_time_step"]:
                 break
             # when aero does not converge
             elif np.sum([force[1] for force in f_aero_wing_vsm_format]) == np.nan:
@@ -371,7 +289,7 @@ def main(config_dict: dict, config_kite_dict: dict):
     ######################################################################
     ## END OF SIMULATION FOR LOOP
     ######################################################################
-    if config_dict["is_with_final_plot"]:
+    if config["is_with_final_plot"]:
         plotting.main(
             np.array([particle.x for particle in psystem.particles]),
             pss_kite_connectivity,

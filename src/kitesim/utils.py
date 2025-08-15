@@ -21,7 +21,7 @@ def load_yaml(path: Path) -> dict:
         return yaml.safe_load(f)
 
 
-def load_and_save_config_files(PROJECT_DIR):
+def load_and_save_config_files(kite_name, PROJECT_DIR):
     """
     Load configuration files and save copies to a timestamped results directory.
 
@@ -33,15 +33,12 @@ def load_and_save_config_files(PROJECT_DIR):
         config_kite (dict): The loaded kite configuration.
         results_dir (Path): Path to the results directory where configs are saved.
     """
-    config = load_yaml(Path(PROJECT_DIR) / "data" / "config.yaml")
+    config = load_yaml(Path(PROJECT_DIR) / "data" / f"{kite_name}" / "config.yaml")
     config_kite = load_yaml(
-        Path(PROJECT_DIR) / "data" / f"{config['kite_name']}" / "config_kite.yaml"
+        Path(PROJECT_DIR) / "data" / f"{kite_name}" / "config_kite.yaml"
     )
 
     # create a results folder on this date and time and save the config files
-    kite_name = config["kite_name"]
-    if kite_name is None:
-        raise ValueError("kite_name must be specified in the config.yaml file.")
     results_dir = (
         Path(PROJECT_DIR)
         / "results"
