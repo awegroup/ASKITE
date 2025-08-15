@@ -396,7 +396,7 @@ def instantiate_psystem(
 
     # TODO: deal with the rest length problem
     # updating all the rest lengths to the user input, instead of based on initial node-to-node distance
-    # set_rest_lengths = psystem.extract_rest_length
+    set_rest_lengths = psystem.extract_rest_length
 
     # update rest lengths to original wing rest lengths
     # wing_rest_lengths = np.array(
@@ -433,21 +433,21 @@ def instantiate_psystem(
     # )
     # rest_lengths[1:29] = wing_rest_lengths
 
-    # for idx, curr_set_rest_length in enumerate(psystem.extract_rest_length):
-    #     #     # delta = rest_lengths[idx] - set_res_len
-    #     #     # if np.abs(delta) > 0.25:
-    #     #     #     print(f"\nci,cj: {kite_connectivity[idx][0]}, {kite_connectivity[idx][1]}")
-    #     #     #     print(f"set res len: {set_res_len}")
-    #     #     #     print(f"rest length: {rest_lengths[idx]}")
-    #     #     #     print(f"Delta l0: {rest_lengths[idx] - set_res_len}")
-    #     #     psystem.update_rest_length(idx, rest_lengths[idx] - curr_set_rest_length)
-    #     # print(
-    #     #     f"ci,cj: {kite_connectivity[idx][0]}, {kite_connectivity[idx][1]},curr rest length: {set_res_len:.3f}, set rest length: {rest_lengths[idx]:.3f}"
-    #     # )
+    for idx, curr_set_rest_length in enumerate(psystem.extract_rest_length):
+        #     # delta = rest_lengths[idx] - set_res_len
+        #     # if np.abs(delta) > 0.25:
+        #     #     print(f"\nci,cj: {kite_connectivity[idx][0]}, {kite_connectivity[idx][1]}")
+        #     #     print(f"set res len: {set_res_len}")
+        #     #     print(f"rest length: {rest_lengths[idx]}")
+        #     #     print(f"Delta l0: {rest_lengths[idx] - set_res_len}")
+        psystem.update_rest_length(idx, rest_lengths[idx] - curr_set_rest_length)
+    # print(
+    #     f"ci,cj: {kite_connectivity[idx][0]}, {kite_connectivity[idx][1]},curr rest length: {set_res_len:.3f}, set rest length: {rest_lengths[idx]:.3f}"
+    # )
 
-    #     # 3% of TE canopy billowing induced extra rest length
-    #     if idx in te_line_idx_list:
-    #         psystem.update_rest_length(idx, 0.03 * curr_set_rest_length)
+    # # 3% of TE canopy billowing induced extra rest length
+    # if idx in te_line_idx_list:
+    #     psystem.update_rest_length(idx, 0.03 * curr_set_rest_length)
 
     if config_dict["is_with_initial_structure_plot"]:
         plot_3d_kite_structure(

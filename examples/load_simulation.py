@@ -43,8 +43,8 @@ def main():
         rest_lengths=np.array(meta_data_dict["rest_lengths"]),
         f_ext=tracking_data["f_ext"],
         title="PSM Interactive",
-        elev=0,
-        azim=0,
+        # elev=0,
+        # azim=0,
         t_per_step=0.1,
     )
 

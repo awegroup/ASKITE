@@ -14,8 +14,8 @@ is_with_initial_point_velocity: !!bool false
 is_with_forcing_symmetry: !!bool false
 
 ## actuation settings
-power_tape_extension_step: !!float 0.00 #0.01
-power_tape_final_extension: !!float 0.00 #0.05
+power_tape_extension_step: !!float 0.02 #0.01
+power_tape_final_extension: !!float 0.3 #0.05
 steering_tape_extension_step: !!float 0
 steering_tape_final_extension: !!float 0.0
 

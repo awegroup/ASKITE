@@ -5,16 +5,16 @@ surfplan_filename: !!str "V3_25"
 # va ~20 5e4 #2024/02/24
 # va ~30 6e5
 # va ~40 6.5e5
-tubular_frame_stiffness: !!float 5e4
-bridle_line_stiffness: !!float 5e4
-trailing_edge_stiffness: !!float 5e4
+tubular_frame_stiffness: !!float 2e3 #5e4
+bridle_line_stiffness: !!float 2e3 #5e4
+trailing_edge_stiffness: !!float 2e3 #5e4
 canopy_stiffness: !!float 1e3
 tubular_frame_damping: !!float 0.0
 bridle_line_damping: !!float 0.0
 trailing_edge_damping: !!float 0.0
 canopy_damping: !!float 0.0
 
-fixed_node_indices: !!seq [0] #,9,11]
+fixed_node_indices: !!seq [0, 9,10,11,12]
 
 # KCU
 # N.Gechiere     --> CD: 0.47, Diameter: 0.38
