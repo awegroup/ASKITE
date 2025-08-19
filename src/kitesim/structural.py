@@ -496,4 +496,4 @@ def run_pss(psystem, params, f_ext):
         if converged and step_internal > 1:
             # print("Kinetic damping PS converged", step_internal)
             break
-    return psystem
+    return psystem, converged

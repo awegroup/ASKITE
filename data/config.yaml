@@ -20,10 +20,10 @@ steering_tape_extension_step: !!float 0
 steering_tape_final_extension: !!float 0.0
 
 ## output settings
-is_with_initial_structure_plot: !!bool false
-is_with_coupling_plot_per_iteration: !!bool false
-is_with_struc_plot_per_iteration: !!bool false
-is_with_aero_plot_per_iteration: !!bool false
+is_with_initial_structure_plot: !!bool true
+is_with_coupling_plot_per_iteration: !!bool true
+is_with_struc_plot_per_iteration: !!bool true
+is_with_aero_plot_per_iteration: !!bool true
 is_with_final_plot: !!bool true
 
 ## physical_constants:

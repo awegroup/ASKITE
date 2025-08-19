@@ -177,7 +177,8 @@ def main(
             f_ext_flat = f_ext.flatten()
             end_time_f_ext = time.time()
             begin_time_f_int = time.time()
-            psystem = structural.run_pss(psystem, params, f_ext_flat)
+            psystem, converged = structural.run_pss(psystem, params, f_ext_flat)
+            logging.info(f"PS converged: {converged}")
             end_time_f_int = time.time()
 
             # logging.debug(f"position.loc[step].shape: {position.loc[step].shape}")

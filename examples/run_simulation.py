@@ -33,6 +33,18 @@ def main():
     config, geometry, results_dir = load_and_save_config_files(kite_name, PROJECT_DIR)
     logging.info(f"config files saved in {results_dir}\n")
 
+    ## AERO
+    n_struc_ribs = len(struc_geometry["wing_nodes"]["data"]) / 2
+    n_panels_aero = (n_struc_ribs - 1) * config["aerodynamic"][
+        "n_aero_panels_per_struc_section"
+    ]
+    body_aero, vsm_solver, vel_app, initial_polar_data = aerodynamic.initialize(
+        kite_name,
+        PROJECT_DIR,
+        config,
+        n_panels_aero,
+    )
+
     ## GENERAL
     (
         struc_nodes,
@@ -60,22 +72,18 @@ def main():
         steering_tape_indices,
     ) = initialisation.main(geometry)
 
-    ## AERO
-    body_aero, vsm_solver, vel_app, initial_polar_data = aerodynamic.initialize(
-        kite_name,
-        PROJECT_DIR,
-        config,
-        n_struc_ribs,
-    )
-    ## AERO2STRUC
-    aero2struc_mapping = aero2struc.initialize_mapping(
-        body_aero.panels,
-        struc_nodes,
-        struc_node_le_indices,
-        struc_node_te_indices,
-    )
-
     ## STRUC
+
+    pulley_line_to_other_node_pair_dict
+    rest_lengths
+    struc_nodes
+    kite_connectivity
+    m_array
+    power_tape_index --> defined in struc_geometry
+    steering_tape_index --> defined in struc_geometry
+    fixed_nodes_indices --> defined in struc_geometry
+
+
     psystem, params, pss_kite_connectivity = structural.instantiate_psystem(
         config,
         geometry,
@@ -90,6 +98,14 @@ def main():
         pulley_line_indices,
         pulley_line_to_other_node_pair_dict,
         power_tape_index,
+    )
+
+    ## AERO2STRUC
+    aero2struc_mapping = aero2struc.initialize_mapping(
+        body_aero.panels,
+        struc_nodes,
+        struc_node_le_indices,
+        struc_node_te_indices,
     )
 
     ## ACTUATION

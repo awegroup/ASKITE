@@ -9,7 +9,7 @@ from VSM.plot_geometry_matplotlib import plot_geometry
 
 # def initialize_vsm(
 #     geometry_dict,
-#     config_dict,
+#     config,
 #     n_panels: int,
 # ) -> BodyAerodynamics:
 #     """
@@ -36,7 +36,7 @@ from VSM.plot_geometry_matplotlib import plot_geometry
 #     # 3) Create Wing instance
 #     wing = Wing(
 #         n_panels=n_panels,
-#         spanwise_panel_distribution=config_dict["aerodynamic"][
+#         spanwise_panel_distribution=config["aerodynamic"][
 #             "spanwise_panel_distribution"
 #         ],
 #     )
@@ -49,12 +49,12 @@ from VSM.plot_geometry_matplotlib import plot_geometry
 #         wing.add_section(LE, TE, airfoil_data)
 
 #     vsm_solver = Solver(
-#         max_iterations=config_dict["aerodynamic"]["max_iterations"],
-#         allowed_error=config_dict["aerodynamic"]["allowed_error"],
-#         relaxation_factor=config_dict["aerodynamic"]["relaxation_factor"],
-#         reference_point=config_dict["aerodynamic"]["reference_point"],
-#         mu=config_dict["mu"],
-#         density=config_dict["rho"],
+#         max_iterations=config["aerodynamic"]["max_iterations"],
+#         allowed_error=config["aerodynamic"]["allowed_error"],
+#         relaxation_factor=config["aerodynamic"]["relaxation_factor"],
+#         reference_point=config["aerodynamic"]["reference_point"],
+#         mu=config["mu"],
+#         density=config["rho"],
 #     )
 
 #     return BodyAerodynamics([wing]), vsm_solver
@@ -63,8 +63,8 @@ from VSM.plot_geometry_matplotlib import plot_geometry
 def initialize(
     kite_name,
     PROJECT_DIR,
-    config_dict,
-    n_struc_ribs: int,
+    config,
+    n_panels_aero: int,
 ) -> BodyAerodynamics:
     """
     Load kite configuration and initialize the VSM BodyAerodynamics object with one Wing instance.
@@ -78,28 +78,25 @@ def initialize(
         BodyAerodynamics: Initialized body aerodynamic model.
         Solver: Initialized solver object.
     """
-    n_aero_panels = (n_struc_ribs - 1) * config_dict["aerodynamic"][
-        "n_aero_panels_per_struc_section"
-    ]
     body_aero = BodyAerodynamics.instantiate(
-        n_panels=n_aero_panels,
-        file_path=(Path(PROJECT_DIR) / "data" / f"{kite_name}" / "geometry.yaml"),
-        spanwise_panel_distribution=config_dict["aerodynamic"][
+        n_panels=n_panels_aero,
+        file_path=(Path(PROJECT_DIR) / "data" / f"{kite_name}" / "aero_geometry.yaml"),
+        spanwise_panel_distribution=config["aerodynamic"][
             "spanwise_panel_distribution"
         ],
         is_with_bridles=False,
     )
 
     vsm_solver = Solver(
-        max_iterations=config_dict["aerodynamic"]["max_iterations"],
-        allowed_error=config_dict["aerodynamic"]["allowed_error"],
-        relaxation_factor=config_dict["aerodynamic"]["relaxation_factor"],
-        reference_point=config_dict["aerodynamic"]["reference_point"],
-        mu=config_dict["mu"],
-        rho=config_dict["rho"],
+        max_iterations=config["aerodynamic"]["max_iterations"],
+        allowed_error=config["aerodynamic"]["allowed_error"],
+        relaxation_factor=config["aerodynamic"]["relaxation_factor"],
+        reference_point=config["aerodynamic"]["reference_point"],
+        mu=config["mu"],
+        rho=config["rho"],
     )
 
-    vel_app = np.array(config_dict["vel_wind"]) - np.array(config_dict["vel_kite"])
+    vel_app = np.array(config["vel_wind"]) - np.array(config["vel_kite"])
     body_aero.va = (vel_app, 0)
     wing = body_aero.wings[0]
     new_sections = wing.refine_aerodynamic_mesh()
