@@ -8,7 +8,7 @@ from kitesim import (
     aerodynamic,
     struc2aero,
     aero2struc,
-    structural,
+    structural_pss,
     tracking,
     plotting,
 )
@@ -51,7 +51,7 @@ def forcing_symmetry(struc_nodes):
 
 
 def main(
-    m_array,
+    m_arr,
     struc_nodes,
     psystem,
     struc_node_le_indices,
@@ -61,8 +61,8 @@ def main(
     vel_app,
     initial_polar_data,
     aero2struc_mapping,
-    pss_kite_connectivity,
-    params,
+    psm_connectivity,
+    psm_params,
     power_tape_index,
     initial_length_power_tape,
     n_power_tape_steps,
@@ -86,7 +86,7 @@ def main(
     ## PRELOOP
     if config["is_with_gravity"]:
         f_ext_gravity = np.array(
-            [np.array(config["grav_constant"]) * m_pt for m_pt in m_array]
+            [np.array(config["grav_constant"]) * m_pt for m_pt in m_arr]
         )
     else:
         f_ext_gravity = np.zeros(struc_nodes.shape)
@@ -164,7 +164,7 @@ def main(
             if config["is_with_struc_plot_per_iteration"]:
                 plotting.main(
                     struc_nodes,
-                    pss_kite_connectivity,
+                    psm_connectivity,
                     psystem.extract_rest_length,
                     f_ext=f_ext,
                     title=f"i: {i}",
@@ -177,7 +177,7 @@ def main(
             f_ext_flat = f_ext.flatten()
             end_time_f_ext = time.time()
             begin_time_f_int = time.time()
-            psystem, converged = structural.run_pss(psystem, params, f_ext_flat)
+            psystem, converged = structural_pss.run_pss(psystem, psm_params, f_ext_flat)
             logging.info(f"PS converged: {converged}")
             end_time_f_int = time.time()
 
@@ -233,7 +233,7 @@ def main(
             ):
                 is_residual_below_tol = True
                 is_convergence = True
-            # if np.linalg.norm(f_residual) <= params["aerostructural_tol"]l and i > 50:
+            # if np.linalg.norm(f_residual) <= psm_params["aerostructural_tol"]l and i > 50:
             #     is_residual_below_tol = True
             #     is_convergence = True
 
@@ -293,17 +293,17 @@ def main(
     if config["is_with_final_plot"]:
         plotting.main(
             np.array([particle.x for particle in psystem.particles]),
-            pss_kite_connectivity,
+            psm_connectivity,
             rest_lengths=psystem.extract_rest_length,
             struc_nodes_initial=np.array([p.x for p in initial_particles]),
             title="PSM: Initial (black) vs Final (red)",
         )
     # Convert kite_connectivity to a numeric array for HDF5 compatibility
-    kite_connectivity_numeric = np.array(pss_kite_connectivity)
+    kite_connectivity_numeric = np.array(psm_connectivity)
     # If it is not 2D and numeric, try to extract only the first two columns (node indices)
     if kite_connectivity_numeric.dtype == object or kite_connectivity_numeric.ndim != 2:
         kite_connectivity_numeric = np.array(
-            [[int(row[0]), int(row[1])] for row in pss_kite_connectivity],
+            [[int(row[0]), int(row[1])] for row in psm_connectivity],
             dtype=np.int32,
         )
     meta = {

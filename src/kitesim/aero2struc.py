@@ -596,14 +596,22 @@ def initialize_mapping(
     """
 
     # extract and sort LE candidates by their y
-    le_coords = struc_nodes[struc_node_le_indices]
+    le_coords = []
+    for struc_node_le_idx in struc_node_le_indices:
+        le_coords.append(struc_nodes[struc_node_le_idx])
+
+    le_coords = np.array(le_coords)
     le_y = le_coords[:, 1]
     le_order = np.argsort(le_y)
     le_sorted_idx = np.array(struc_node_le_indices)[le_order]
     le_sorted_y = le_y[le_order]
 
     # same for TE
-    te_coords = struc_nodes[struc_node_te_indices]
+    te_coords = []
+    for struc_node_te_idx in struc_node_te_indices:
+        te_coords.append(struc_nodes[struc_node_te_idx])
+
+    te_coords = np.array(te_coords)
     te_y = te_coords[:, 1]
     te_order = np.argsort(te_y)
     te_sorted_idx = np.array(struc_node_te_indices)[te_order]

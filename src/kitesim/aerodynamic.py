@@ -79,7 +79,7 @@ def initialize(
         Solver: Initialized solver object.
     """
     body_aero = BodyAerodynamics.instantiate(
-        n_panels=n_panels_aero,
+        n_panels=int(n_panels_aero),
         file_path=(Path(PROJECT_DIR) / "data" / f"{kite_name}" / "aero_geometry.yaml"),
         spanwise_panel_distribution=config["aerodynamic"][
             "spanwise_panel_distribution"

@@ -284,114 +284,62 @@ def plot_3d_kite_structure(
     plt.show()
 
 
-def instantiate_psystem(
-    config_dict,
-    geometry_dict,
+def instantiate(
+    config,
+    struc_geometry,
     struc_nodes,
-    wing_connectivity,
-    kite_connectivity,
-    rest_lengths,
-    m_array,
-    tubular_frame_line_idx_list,
-    te_line_idx_list,
-    pulley_point_indices,
-    pulley_line_indices,
+    m_arr,
+    conn_arr,
+    l0_arr,
+    k_arr,
+    c_arr,
+    linktype_arr,
     pulley_line_to_other_node_pair_dict,
-    power_tape_index,
 ):
-    """
-    Instantiate the particle system for the structural solver.
-
-    Args:
-        config_dict (dict): Main configuration dictionary.
-        geometry_dict (dict): Kite-specific configuration dictionary.
-        struc_nodes (np.ndarray): Initial node positions (n_nodes, 3).
-        wing_connectivity (np.ndarray): Wing connectivity matrix.
-        kite_connectivity (np.ndarray): Full kite connectivity matrix.
-        rest_lengths (np.ndarray): Rest lengths for all springs.
-        m_array (np.ndarray): Mass array for all nodes.
-        tubular_frame_line_idx_list (list): Indices for tubular frame lines.
-        te_line_idx_list (list): Indices for trailing edge lines.
-        pulley_point_indices (list): Indices for pulley points.
-        pulley_data (dict): Pulley connectivity and mapping data.
-
-    Returns:
-        psystem (ParticleSystem): Instantiated particle system.
-        pss_param_dict (dict): Parameters for the particle system.
-        pss_kite_connectivity (list): Connectivity matrix for the particle system.
-    """
-
-    pss_param_dict = {
-        "pulley_other_line_pair": pulley_line_to_other_node_pair_dict,
-        "l0": rest_lengths,
-        "c": config_dict["structural"]["damping_constant"],
-        "is_with_visc_damping": config_dict["structural"]["is_with_visc_damping"],
-        "dt": config_dict["structural"]["dt"],
-        "t_steps": config_dict["structural"]["n_internal_time_steps"],
-        "abs_tol": config_dict["structural"]["abs_tol"],
-        "rel_tol": config_dict["structural"]["rel_tol"],
-        "max_iter": config_dict["structural"]["max_iter"],
-        "n": len(struc_nodes),
-        "g": -config_dict["grav_constant"][2],
-    }
-
-    # creating PSS style connectivity matrix
-    pss_kite_connectivity = []
-    for idx, _ in enumerate(kite_connectivity):
-        if idx in tubular_frame_line_idx_list:
-            # compression and tension
-            k = geometry_dict["tubular_frame_stiffness"]
-            c = geometry_dict["tubular_frame_damping"]
-            linktype = "default"
-        elif idx in te_line_idx_list:
-            # only tension
-            k = geometry_dict["trailing_edge_stiffness"]
-            c = geometry_dict["trailing_edge_damping"]
-            linktype = "noncompressive"
-        elif idx in pulley_line_indices:
-            # pulley
-            k = geometry_dict["bridle_line_stiffness"]
-            c = geometry_dict["bridle_line_damping"]
-            linktype = "pulley"
-        else:
-            # only compression
-            k = geometry_dict["bridle_line_stiffness"]
-            c = geometry_dict["canopy_damping"]
-            linktype = "noncompressive"
-
-        pss_kite_connectivity.append(
+    # TODO: add l0 to the instantiate method and change ParticleSystem accordingly
+    pss_connectivity = []
+    for cicj, k, c, l0, linktype in zip(conn_arr, k_arr, c_arr, l0_arr, linktype_arr):
+        pss_connectivity.append(
             [
-                int(kite_connectivity[idx][0]),
-                int(kite_connectivity[idx][1]),
+                int(cicj[0]),
+                int(cicj[1]),
                 float(k),
                 float(c),
+                # float(l0),
                 SpringDamperType(linktype.lower()),
             ]
         )
 
-    ## INITIAL CONDITIONS
-    if config_dict["is_with_initial_point_velocity"]:
+    pss_initial_conditions = []
+    if config["is_with_initial_point_velocity"]:
         raise ValueError("Error: initial point velocity has never been defined")
     else:
         vel_ini = np.zeros((len(struc_nodes), 3))
 
-    fixed_nodes = np.array(geometry_dict["fixed_node_indices"])
-    pss_initial_conditions = []
-    n = len(struc_nodes)
-    for i in range(n):
-        if i in fixed_nodes:
-            pss_initial_conditions.append(
-                [struc_nodes[i], vel_ini[i], m_array[i], True]
-            )
+    for i in range(len(struc_nodes)):
+        if i in struc_geometry["fixed_point_indices"]:
+            pss_initial_conditions.append([struc_nodes[i], vel_ini[i], m_arr[i], True])
         else:
-            pss_initial_conditions.append(
-                [struc_nodes[i], vel_ini[i], m_array[i], False]
-            )
+            pss_initial_conditions.append([struc_nodes[i], vel_ini[i], m_arr[i], False])
+
+    pss_params = {
+        "pulley_other_line_pair": pulley_line_to_other_node_pair_dict,
+        # "l0": l0_arr,
+        # "c": config["structural"]["damping_constant"],
+        # "is_with_visc_damping": config["structural"]["is_with_visc_damping"],
+        "dt": config["structural_pss"]["dt"],
+        "t_steps": config["structural_pss"]["n_internal_time_steps"],
+        "abs_tol": config["structural_pss"]["abs_tol"],
+        "rel_tol": config["structural_pss"]["rel_tol"],
+        "max_iter": config["structural_pss"]["max_iter"],
+        # "n": len(struc_nodes),
+        # "g": -config["grav_constant"][2],
+    }
 
     psystem = ParticleSystem(
-        pss_kite_connectivity,
+        pss_connectivity,
         pss_initial_conditions,
-        pss_param_dict,
+        pss_params,
     )
 
     # TODO: deal with the rest length problem
@@ -440,7 +388,7 @@ def instantiate_psystem(
         #     #     print(f"set res len: {set_res_len}")
         #     #     print(f"rest length: {rest_lengths[idx]}")
         #     #     print(f"Delta l0: {rest_lengths[idx] - set_res_len}")
-        psystem.update_rest_length(idx, rest_lengths[idx] - curr_set_rest_length)
+        psystem.update_rest_length(idx, l0_arr[idx] - curr_set_rest_length)
     # print(
     #     f"ci,cj: {kite_connectivity[idx][0]}, {kite_connectivity[idx][1]},curr rest length: {set_res_len:.3f}, set rest length: {rest_lengths[idx]:.3f}"
     # )
@@ -449,16 +397,12 @@ def instantiate_psystem(
     # if idx in te_line_idx_list:
     #     psystem.update_rest_length(idx, 0.03 * curr_set_rest_length)
 
-    if config_dict["is_with_initial_structure_plot"]:
-        plot_3d_kite_structure(
-            struc_nodes,
-            pss_kite_connectivity,
-            power_tape_index,
-            fixed_nodes=fixed_nodes,
-            pulley_nodes=pulley_point_indices,
-        )
-
-    return psystem, pss_param_dict, pss_kite_connectivity
+    return (
+        psystem,
+        pss_connectivity,
+        pss_initial_conditions,
+        pss_params,
+    )
 
 
 def run_pss(psystem, params, f_ext):

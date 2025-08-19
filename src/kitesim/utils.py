@@ -34,8 +34,11 @@ def load_and_save_config_files(kite_name, PROJECT_DIR):
         results_dir (Path): Path to the results directory where configs are saved.
     """
     config = load_yaml(Path(PROJECT_DIR) / "data" / f"{kite_name}" / "config.yaml")
-    config_kite = load_yaml(
-        Path(PROJECT_DIR) / "data" / f"{kite_name}" / "config_kite.yaml"
+    struc_geometry = load_yaml(
+        Path(PROJECT_DIR) / "data" / f"{kite_name}" / "struc_geometry.yaml"
+    )
+    aero_geometry = load_yaml(
+        Path(PROJECT_DIR) / "data" / f"{kite_name}" / "aero_geometry.yaml"
     )
 
     # create a results folder on this date and time and save the config files
@@ -48,10 +51,12 @@ def load_and_save_config_files(kite_name, PROJECT_DIR):
     results_dir.mkdir(parents=True, exist_ok=True)
     with open(results_dir / "config.yaml", "w") as f:
         yaml.dump(config, f, sort_keys=False)
-    with open(results_dir / "config_kite.yaml", "w") as f:
-        yaml.dump(config_kite, f, sort_keys=False)
+    with open(results_dir / "struc_geometry.yaml", "w") as f:
+        yaml.dump(struc_geometry, f, sort_keys=False)
+    with open(results_dir / "aero_geometry.yaml", "w") as f:
+        yaml.dump(aero_geometry, f, sort_keys=False)
 
-    return config, config_kite, results_dir
+    return config, struc_geometry, aero_geometry, results_dir
 
 
 def save_results(tracking, meta, filename):
