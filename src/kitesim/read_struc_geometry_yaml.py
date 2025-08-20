@@ -1,4 +1,5 @@
 import numpy as np
+import logging
 
 
 def initialize_wing_structure(
@@ -27,8 +28,8 @@ def initialize_wing_structure(
     struc_node_le_indices = []
     struc_node_te_indices = []
 
-    # Then append rest of the defined wing_nodes
-    for node_idx, x, y, z in struc_geometry["wing_nodes"]["data"]:
+    # Then append rest of the defined wing_particles
+    for node_idx, x, y, z in struc_geometry["wing_particles"]["data"]:
         # node_indices.append(node_idx)
         struc_nodes.append(np.array([x, y, z]))
         m_arr.append(0)
@@ -42,10 +43,8 @@ def initialize_wing_structure(
     ### element level ###
     # Create an element dict of dicts: { name → {rest_length:..., diameter:..., ...} }
     wing_elements_dict = {
-        row[0]: dict(
-            zip(struc_geometry["wing_spring_damper_elements"]["headers"][1:], row[1:])
-        )
-        for row in struc_geometry["wing_spring_damper_elements"]["data"]
+        row[0]: dict(zip(struc_geometry["wing_elements"]["headers"][1:], row[1:]))
+        for row in struc_geometry["wing_elements"]["data"]
     }
     tubular_frame_line_idx_list = []
     te_line_idx_list = []
@@ -105,106 +104,153 @@ def initialize_bridle_line_system(
     ### node level ###
 
     # First append the bridle_point_node, as this node (KCU) should have index 0
-    # Then append rest of the defined bridle_nodes
+    # Then append rest of the defined bridle_particles
 
-    for node_idx, x, y, z in struc_geometry["bridle_nodes"]["data"]:
+    for node_idx, x, y, z in struc_geometry["bridle_particles"]["data"]:
         struc_nodes.append(np.array([x, y, z]))
         m_arr.append(0.0)
 
     ### element level ###
 
     # Create an element dict of dicts: { name → {l0:..., d:..., ...} }
-    bridle_lines_dict = {
-        row[0]: dict(zip(struc_geometry["bridle_lines"]["headers"][1:], row[1:]))
-        for row in struc_geometry["bridle_lines"]["data"]
+    bridle_elements_dict = {
+        row[0]: dict(zip(struc_geometry["bridle_elements"]["headers"][1:], row[1:]))
+        for row in struc_geometry["bridle_elements"]["data"]
     }
 
-    n_wing_conn = len(conn_arr)
+    # initialize a connectivity counter, that starts with the number of wing_connections
+    conn_idx_counter = len(conn_arr)
     pulley_node_indices = []
     pulley_line_indices = []
     pulley_line_to_other_node_pair_dict = {}
     steering_tape_indices = []
-    for conn_idx, conn_data in enumerate(struc_geometry["bridle_connections"]["data"]):
+    for _, conn_data in enumerate(struc_geometry["bridle_connections"]["data"]):
 
         conn_name = conn_data[0]
         ci = int(conn_data[1])
         cj = int(conn_data[2])
-        l0 = bridle_lines_dict[conn_name]["l0"]
-        material = bridle_lines_dict[conn_name]["material"]
-        cross_sectional_area = np.pi * (bridle_lines_dict[conn_name]["d"] / 2) ** 2
-        m_line = struc_geometry[material]["density"] * cross_sectional_area * l0
 
-        conn_arr.append([ci, cj])
+        # computing the mass of the bridle line, and adding it 0.5 to each particle using m_arr
+        l0 = bridle_elements_dict[conn_name]["l0"]
+        material = bridle_elements_dict[conn_name]["material"]
+        cross_sectional_area = np.pi * (bridle_elements_dict[conn_name]["d"] / 2) ** 2
+        m_line = struc_geometry[material]["density"] * cross_sectional_area * l0
         m_arr[ci] += m_line / 2
         m_arr[cj] += m_line / 2
 
-        if len(conn_data[1:]) == 2:
-            linktype_arr.append("noncompressive")
+        # If there is third connections, this line is a pulley!
+        # In here we will treat both ci-cj and cj-ck
+        if len(conn_data[1:]) == 3:
+            logging.debug(
+                f"-- linktype should be pulley, linktype: {bridle_elements_dict[conn_name]["linktype"]}"
+            )
+            # adding pulley_node_indices
+            pulley_node_indices.append(cj)
+
+            # making the third node an integer
+            ck = int(conn_data[3])
+
+            # add the pulley mass, to the pulley_index cj
+            m_arr[cj] += struc_geometry["pulley_mass"]
+
+            #######################################
+            # Computing k,c
+            # Compute the straight-line distances between the nodes involved in the pulley:
+            # - len_ci_cj: distance between ci and cj (the current segment)
+            # - len_cj_ck: distance between cj and ck (the other segment)
+            len_ci_cj = np.linalg.norm(
+                np.array(struc_nodes[ci]) - np.array(struc_nodes[cj])
+            )
+            len_cj_ck = np.linalg.norm(
+                np.array(struc_nodes[cj]) - np.array(struc_nodes[ck])
+            )
+
+            # The total straight-line length is the sum of both segments
+            len_ci_cj_ck = len_ci_cj + len_cj_ck
+
+            # Divide the rest length proportionally between the two segments,
+            # based on their straight-line distances ratios to the total length
+            l0_len_ci_cj = (len_ci_cj / len_ci_cj_ck) * l0
+            l0_len_cj_ck = (len_cj_ck / len_ci_cj_ck) * l0
+
+            k = (struc_geometry[material]["youngs_modulus"] * cross_sectional_area) / (
+                l0
+            )
+            c = struc_geometry[material]["damping_per_stiffness"] * k
+
+            #######################################
+            # Dealing with ci-cj
+            # add this new connection to the connectivity array, and also increase counter
+            conn_arr.append([ci, cj])
+            l0_arr.append(l0)
+            k_arr.append(k)
+            c_arr.append(c)
+            linktype_arr.append(bridle_elements_dict[conn_name]["linktype"])
+
+            # Create a special mapping for the Structural Particle System Solver
+            # key: pulley_line_index
+            # value: [cj, ck, line_len_other]
+            # This is used to connect the pulley line to the other node pair
+            pulley_line_to_other_node_pair_dict[str(conn_idx_counter)] = np.array(
+                [
+                    cj,
+                    ck,
+                    l0_len_cj_ck,
+                    ci,
+                    cj,
+                    ck,
+                ]
+            )
+
+            # Mark the indices of connectivity
+            pulley_line_index_ci_cj = conn_idx_counter
+            pulley_line_indices.append(pulley_line_index_ci_cj)
+            conn_idx_counter += 1
+
+            #######################################
+            # Dealing with cj-ck
+            # add this new connection to the connectivity array, and also increase counter
+            conn_arr.append([cj, ck])
+            l0_arr.append(l0)
+            k_arr.append(k)
+            c_arr.append(c)
+            linktype_arr.append(bridle_elements_dict[conn_name]["linktype"])
+
+            # Create a special mapping for the Structural Particle System Solver
+            # key: pulley_line_index
+            # value: [cj, ck, line_len_other]
+            # This is used to connect the pulley line to the other node pair
+            pulley_line_to_other_node_pair_dict[str(conn_idx_counter)] = np.array(
+                [
+                    cj,
+                    ci,
+                    l0_len_cj_ck,
+                    ci,
+                    cj,
+                    ck,
+                ]
+            )
+
+            # Mark the indices of connectivity
+            pulley_line_index_cj_ck = conn_idx_counter
+            pulley_line_indices.append(pulley_line_index_cj_ck)
+
+        # if there is no third connections this line represents a knot-to-knot line, a regular spring damper
+        elif len(conn_data[1:]) == 2:
+            logging.debug(
+                f"-- linktype should be noncompressive, linktype: {bridle_elements_dict[conn_name]["linktype"]}"
+            )
+            # add this new connection to the connectivity array, and also increase counter
 
             k = (struc_geometry[material]["youngs_modulus"] * cross_sectional_area) / l0
             c = (
                 struc_geometry[material]["damping_per_stiffness"] * k
             )  # Rayleigh damping
+            conn_arr.append([ci, cj])
             l0_arr.append(l0)
             k_arr.append(k)
             c_arr.append(c)
-
-        elif len(conn_data[1:]) == 3:
-            linktype_arr.append("pulley")
-
-            # if the connection ck exists, i.e. if there is a third connection, this line is a pulley
-            pulley_line_index = conn_idx + n_wing_conn
-            pulley_line_indices.append(pulley_line_index)
-
-            ck = int(conn_data[3])
-            pulley_index = cj
-            pulley_node_indices.append(pulley_index)
-            m_arr[pulley_index] += struc_geometry["pulley_mass"]
-
-            # Compute the straight-line distances between the nodes involved in the pulley:
-            # - point_to_point_line_len_current: distance between ci and cj (the current segment)
-            # - point_to_point_line_len_other: distance between cj and ck (the other segment)
-            point_to_point_line_len_current = np.linalg.norm(
-                np.array(struc_nodes[ci]) - np.array(struc_nodes[cj])
-            )
-            point_to_point_line_len_other = np.linalg.norm(
-                np.array(struc_nodes[cj]) - np.array(struc_nodes[ck])
-            )
-
-            # The total straight-line length is the sum of both segments
-            total_point_to_point_line_len = (
-                point_to_point_line_len_current + point_to_point_line_len_other
-            )
-
-            # Divide the rest length proportionally between the two segments,
-            # based on their straight-line distances ratios to the total length
-            line_len_current = (
-                point_to_point_line_len_current / total_point_to_point_line_len
-            ) * l0
-            line_len_other = (
-                point_to_point_line_len_other / total_point_to_point_line_len
-            ) * l0
-
-            # Create a special mapping for the Structural Particle System Solver
-            # key: pulley_line_index
-            # value: [pulley_index, ck, line_len_other]
-            # This is used to connect the pulley line to the other node pair
-            pulley_line_to_other_node_pair_dict[str(pulley_line_index)] = np.array(
-                [
-                    pulley_index,
-                    ck,
-                    line_len_other,
-                ]
-            )
-            k_eff = (
-                struc_geometry[material]["youngs_modulus"] * cross_sectional_area
-            ) / (line_len_current + line_len_other)
-            c_eff = (
-                struc_geometry[material]["damping_per_stiffness"] * k_eff
-            )  # Rayleigh damping
-            l0_arr.append(line_len_current)
-            k_arr.append(k_eff)
-            c_arr.append(c_eff)
+            linktype_arr.append(bridle_elements_dict[conn_name]["linktype"])
 
         else:
             raise ValueError(
@@ -212,10 +258,13 @@ def initialize_bridle_line_system(
             )
 
         if conn_name == "Power Tape":
-            power_tape_index = conn_idx + n_wing_conn
+            power_tape_index = conn_idx_counter
 
         if conn_name == "Steering Tape":
-            steering_tape_indices.append(conn_idx + n_wing_conn)
+            steering_tape_indices.append(conn_idx_counter)
+
+        ## increasing the counter
+        conn_idx_counter += 1
 
     return (
         # node level
@@ -230,6 +279,7 @@ def initialize_bridle_line_system(
         k_arr,
         c_arr,
         linktype_arr,
+        pulley_line_indices,
         pulley_line_to_other_node_pair_dict,
     )
 
@@ -289,6 +339,7 @@ def main(struc_geometry):
         k_arr,
         c_arr,
         linktype_arr,
+        pulley_line_indices,
         pulley_line_to_other_node_pair_dict,
     ) = initialize_bridle_line_system(
         struc_geometry, struc_nodes, m_arr, conn_arr, l0_arr, k_arr, c_arr, linktype_arr
@@ -320,5 +371,6 @@ def main(struc_geometry):
         k_arr,
         c_arr,
         linktype_arr,
+        pulley_line_indices,
         pulley_line_to_other_node_pair_dict,
     )

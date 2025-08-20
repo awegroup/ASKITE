@@ -1,6 +1,6 @@
+import logging
 import numpy as np
-import matplotlib.pyplot as plt
-
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from typing import Optional
 from cycler import cycler
@@ -95,6 +95,291 @@ def set_plot_style():
     )
 
 
+# def plot_normalized_elongation(
+#     ax,
+#     kite_connectivity,
+#     struc_nodes,
+#     rest_lengths,
+#     pulley_line_indices,  # kept for signature; used only to skip
+#     pulley_line_to_other_node_pair_dict,  # kept for signature; not used here
+# ):
+#     import numpy as np
+#     import matplotlib.pyplot as plt
+#     import matplotlib as mpl
+
+#     cmap = plt.get_cmap("viridis")
+
+#     num_conns = len(kite_connectivity)
+#     rest_lengths = np.asarray(rest_lengths, dtype=float)
+#     norm_values = np.full(num_conns, np.nan, dtype=float)
+
+#     print(f"pulley_line_indices: {pulley_line_indices}")
+#     print(f"pulley_line_to_other_node_pair_dict: {pulley_line_to_other_node_pair_dict}")
+
+#     # treat pulley indices as a set for O(1) membership
+#     pulley_set = set(int(i) for i in (pulley_line_indices or []))
+#     handled_pulleys_set = set()
+
+#     pulley_triples_set = set()
+#     # compute norm only for non-pulley lines
+#     for idx, (i, j, *_) in enumerate(kite_connectivity):
+#         if (
+#             idx in pulley_set
+#             and (i, j) not in handled_pulleys_set
+#             and str(idx) in pulley_line_to_other_node_pair_dict.keys()
+#         ):
+#             pulley_other_info = pulley_line_to_other_node_pair_dict[str(idx)]
+#             print(f"cj-loop: {j}, cj-other info: {int(pulley_other_info[0])}")
+#             cj = int(pulley_other_info[0])
+#             ck = int(pulley_other_info[1])
+#             # add to pulley set
+#             pulley_triples_set.add((i, cj, ck))
+#             print(f"pulley triplet: {(i, cj, ck)}")
+
+#             # add to handled_pulleys
+#             handled_pulleys_set.add((cj, ck))
+
+#             p1 = np.asarray(struc_nodes[i])
+#             p2 = np.asarray(struc_nodes[cj])
+#             p3 = np.asarray(struc_nodes[ck])
+#             ax.plot(
+#                 [p1[0], p2[0]],
+#                 [p1[1], p2[1]],
+#                 [p1[2], p2[2]],
+#                 color="green",
+#                 linewidth=3,
+#             )
+#             ax.plot(
+#                 [p2[0], p3[0]],
+#                 [p2[1], p3[1]],
+#                 [p2[2], p3[2]],
+#                 color="green",
+#                 linewidth=3,
+#             )
+
+#             # 35, 26
+#             # 33, 25
+#             continue  # skip pulley lines entirely
+
+#         ci, cj = int(i), int(j)
+#         p1, p2 = np.asarray(struc_nodes[ci]), np.asarray(struc_nodes[cj])
+#         curr_len = float(np.linalg.norm(p2 - p1))
+#         rl = rest_lengths[idx] if idx < len(rest_lengths) else np.nan
+
+#         norm_values[idx] = (
+#             0.0 if (not np.isfinite(rl) or rl == 0.0) else 100.0 * (curr_len - rl) / rl
+#         )
+
+#     # color scaling based only on finite (non-pulley) values
+#     finite_mask = np.isfinite(norm_values)
+#     if not np.any(finite_mask):
+#         # nothing to draw
+#         return
+
+#     vmin = float(np.nanmin(norm_values))
+#     vmax = float(np.nanmax(norm_values))
+
+#     # plot only non-pulley lines
+#     for idx, (i, j, *_) in enumerate(kite_connectivity):
+#         if idx in pulley_set:
+#             continue
+
+#         ci, cj = int(i), int(j)
+#         p1, p2 = struc_nodes[ci], struc_nodes[cj]
+#         val = norm_values[idx]
+#         t = (val - vmin) / (vmax - vmin) if np.isfinite(val) and vmax > vmin else 0.5
+#         ax.plot(
+#             [p1[0], p2[0]],
+#             [p1[1], p2[1]],
+#             [p1[2], p2[2]],
+#             color=cmap(t),
+#             linewidth=2,
+#         )
+
+#     # (optional) legend; will be empty unless you add labels elsewhere
+#     ax.legend(loc="center right", bbox_to_anchor=(1.05, 0.5))
+
+#     # colorbar for the current state
+#     sm = mpl.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
+#     sm.set_array([])
+#     cbar = plt.colorbar(sm, ax=ax, shrink=0.7, pad=0.1)
+#     cbar.set_label(r"Normalized rest length change (\%)")
+#     cbar.ax.text(
+#         1.5,
+#         -0.1,
+#         "contracted",
+#         va="center",
+#         ha="left",
+#         fontsize=11,
+#         color="black",
+#         transform=cbar.ax.transAxes,
+#     )
+#     cbar.ax.text(
+#         1.5,
+#         1.1,
+#         "elongated",
+#         va="center",
+#         ha="left",
+#         fontsize=11,
+#         color="black",
+#         transform=cbar.ax.transAxes,
+#     )
+
+
+def plot_normalized_elongation(
+    ax,
+    kite_connectivity,
+    struc_nodes,
+    rest_lengths,
+    pulley_line_indices,  # kept for signature; used only to skip
+    pulley_line_to_other_node_pair_dict,  # kept for signature; used to get (cj, ck)
+):
+
+    cmap = plt.get_cmap("viridis")
+
+    num_conns = len(kite_connectivity)
+    rest_lengths = np.asarray(rest_lengths, dtype=float)
+    norm_values = np.full(num_conns, np.nan, dtype=float)
+
+    # map undirected pair -> index (if duplicates exist, last one wins; that’s fine for plotting)
+    pair_to_idx = {}
+    for idx, (i, j, *_) in enumerate(kite_connectivity):
+        ci, cj = int(i), int(j)
+        pair_to_idx[frozenset((ci, cj))] = idx
+
+    # treat pulley indices as a set for O(1) membership
+    pulley_set = set(int(i) for i in (pulley_line_indices or []))
+
+    pulley_triples = []  # will store (ci, cj, ck) for later plotting with cmap
+
+    # compute norm only for non-pulley lines; collect pulley triples
+    for idx, (i, j, *_) in enumerate(kite_connectivity):
+        if (
+            idx in pulley_set
+            and str(idx) in (pulley_line_to_other_node_pair_dict or {}).keys()
+        ):
+            pulley_other_info = pulley_line_to_other_node_pair_dict[str(idx)]
+            logging.debug(f"cj-loop: {j}, cj-other info: {int(pulley_other_info[0])}")
+            ci = int(i)
+            cj = int(pulley_other_info[0])
+            ck = int(pulley_other_info[1])
+            pulley_triples.append((ci, cj, ck))
+            logging.debug(f"pulley triplet: {(ci, cj, ck)}")
+            continue  # skip pulley lines in this pass
+
+        ci, cj = int(i), int(j)
+        p1, p2 = np.asarray(struc_nodes[ci]), np.asarray(struc_nodes[cj])
+        curr_len = float(np.linalg.norm(p2 - p1))
+        rl = rest_lengths[idx] if idx < len(rest_lengths) else np.nan
+
+        norm_values[idx] = (
+            0.0 if (not np.isfinite(rl) or rl == 0.0) else 100.0 * (curr_len - rl) / rl
+        )
+
+    # color scaling based only on finite (non-pulley) values
+    finite_mask = np.isfinite(norm_values)
+    if not np.any(finite_mask):
+        return  # nothing to draw
+
+    vmin = float(np.nanmin(norm_values))
+    vmax = float(np.nanmax(norm_values))
+
+    # plot only non-pulley lines with cmap
+    for idx, (i, j, *_) in enumerate(kite_connectivity):
+        if idx in pulley_set:
+            continue
+        ci, cj = int(i), int(j)
+        p1, p2 = struc_nodes[ci], struc_nodes[cj]
+        val = norm_values[idx]
+        t = (val - vmin) / (vmax - vmin) if np.isfinite(val) and vmax > vmin else 0.5
+        ax.plot(
+            [p1[0], p2[0]],
+            [p1[1], p2[1]],
+            [p1[2], p2[2]],
+            color=cmap(t),
+            linewidth=2,
+        )
+
+    # --- NEW: plot pulley segments using the same cmap, with two-segment norm ---
+    for ci, cj, ck in pulley_triples:
+        # current lengths
+        p_ci, p_cj, p_ck = (
+            np.asarray(struc_nodes[ci]),
+            np.asarray(struc_nodes[cj]),
+            np.asarray(struc_nodes[ck]),
+        )
+        cl_ci_cj = float(np.linalg.norm(p_cj - p_ci))
+        cl_cj_ck = float(np.linalg.norm(p_ck - p_cj))
+        curr_total = cl_ci_cj + cl_cj_ck
+
+        # rest lengths from connectivity (driver is (ci,cj), mate is (cj,ck) if present)
+        driver_idx = pair_to_idx.get(frozenset((ci, cj)))
+        mate_idx = pair_to_idx.get(frozenset((cj, ck)))
+
+        if driver_idx is not None and mate_idx is not None:
+            rest_total = float(rest_lengths[driver_idx]) + float(rest_lengths[mate_idx])
+        elif driver_idx is not None:
+            # fallback if mate not in connectivity
+            rest_total = float(rest_lengths[driver_idx])
+        else:
+            # nothing we can do; skip
+            continue
+
+        norm_val = (
+            0.0 if rest_total == 0.0 else 100.0 * (curr_total - rest_total) / rest_total
+        )
+        # map to same colormap range (clamp into [0,1] if outside)
+        if vmax > vmin:
+            t = (norm_val - vmin) / (vmax - vmin)
+            t = 0.0 if t < 0.0 else 1.0 if t > 1.0 else t
+        else:
+            t = 0.5
+        color = cmap(t)
+
+        # draw both segments with identical color
+        ax.plot(
+            [p_ci[0], p_cj[0]],
+            [p_ci[1], p_cj[1]],
+            [p_ci[2], p_cj[2]],
+            color=color,
+            linewidth=2,
+        )
+        ax.plot(
+            [p_cj[0], p_ck[0]],
+            [p_cj[1], p_ck[1]],
+            [p_cj[2], p_ck[2]],
+            color=color,
+            linewidth=2,
+        )
+
+    # legend + colorbar
+    ax.legend(loc="center right", bbox_to_anchor=(1.05, 0.5))
+    sm = mpl.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
+    sm.set_array([])
+    cbar = plt.colorbar(sm, ax=ax, shrink=0.7, pad=0.1)
+    cbar.set_label(r"Normalized rest length change (\%)")
+    cbar.ax.text(
+        1.5,
+        -0.1,
+        "contracted",
+        va="center",
+        ha="left",
+        fontsize=11,
+        color="black",
+        transform=cbar.ax.transAxes,
+    )
+    cbar.ax.text(
+        1.5,
+        1.1,
+        "elongated",
+        va="center",
+        ha="left",
+        fontsize=11,
+        color="black",
+        transform=cbar.ax.transAxes,
+    )
+
+
 def main(
     struc_nodes,
     kite_connectivity,
@@ -106,6 +391,9 @@ def main(
     chord_length=2.6,  # new argument for scaling force vectors
     is_with_node_indices=False,
     lightred_color="#FF5F5F",
+    pulley_line_indices=None,
+    pulley_line_to_other_node_pair_dict=None,
+    label_current_particles="Current",
 ):
     """
     Plot the current (and optionally initial) structure state in 3D.
@@ -136,44 +424,36 @@ def main(
 
     # Plot initial state if provided (single color for reference)
     if struc_nodes_initial is not None:
+        label_current_particles = "Final"
         ax.scatter(
-            *(struc_nodes_initial.T), color="black", marker="o", s=10, label="Initial"
+            *(struc_nodes_initial.T), color="blue", marker="o", s=10, label="Initial"
         )
-        # Draw initial lines in gray
+        # Draw initial lines in pink
         for idx, (i, j, *rest) in enumerate(kite_connectivity):
             p1, p2 = struc_nodes_initial[i], struc_nodes_initial[j]
             ax.plot(
                 [p1[0], p2[0]],
                 [p1[1], p2[1]],
                 [p1[2], p2[2]],
-                color="gray",
+                color="blue",
                 linewidth=1,
                 alpha=0.5,
             )
 
     # Plot current state
-    ax.scatter(*(struc_nodes.T), color="black", marker="o", s=10, label="Particles")
-    # Compute normalized elongation for each connection
-    cmap = plt.get_cmap("viridis")  # Changed from "coolwarm" to "viridis"
-    norm_values = []
-    for idx, (i, j, *rest) in enumerate(kite_connectivity):
-        p1, p2 = struc_nodes[i], struc_nodes[j]
-        curr_length = np.linalg.norm(p2 - p1)
-        # Change: multiply by 100 for percent change
-        norm_val = 100 * (curr_length - rest_lengths[idx]) / rest_lengths[idx]
-        norm_values.append(norm_val)
-    # Normalize for color mapping
-    vmin, vmax = min(norm_values), max(norm_values)
-    for idx, (i, j, *rest) in enumerate(kite_connectivity):
-        p1, p2 = struc_nodes[i], struc_nodes[j]
-        color = cmap((norm_values[idx] - vmin) / (vmax - vmin) if vmax > vmin else 0.5)
-        ax.plot(
-            [p1[0], p2[0]],
-            [p1[1], p2[1]],
-            [p1[2], p2[2]],
-            color=color,
-            linewidth=2,  # thicker lines
-        )
+    ax.scatter(
+        *(struc_nodes.T), color="black", marker="o", s=10, label=label_current_particles
+    )
+
+    # Plot normalized elongation
+    plot_normalized_elongation(
+        ax,
+        kite_connectivity,
+        struc_nodes,
+        rest_lengths,
+        pulley_line_indices,
+        pulley_line_to_other_node_pair_dict,
+    )
 
     # Optionally plot external forces
     if f_ext is not None:
@@ -233,40 +513,7 @@ def main(
     ax.set_ylabel("Y")
     ax.set_zlabel("Z")
     ax.set_title(title)
-    # Move legend outside plot area to the right
-    ax.legend(loc="center right", bbox_to_anchor=(1.05, 0.5))
-    # Always add colorbar for current state
-    if len(norm_values) > 0:
-        import matplotlib as mpl
 
-        sm = mpl.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
-        sm.set_array([])
-        cbar = plt.colorbar(sm, ax=ax, shrink=0.7, pad=0.1)
-        # Change: update colorbar label to percent
-        cbar.set_label("Normalized rest length change (\%)")
-        # Add contracted (bottom) and elongated (top) labels
-        cbar.ax.text(
-            1.5,
-            -0.1,
-            "contracted",
-            va="center",
-            ha="left",
-            fontsize=11,
-            rotation=0,
-            color="black",
-            transform=cbar.ax.transAxes,
-        )
-        cbar.ax.text(
-            1.5,
-            1.1,
-            "elongated",
-            va="center",
-            ha="left",
-            fontsize=11,
-            rotation=0,
-            color="black",
-            transform=cbar.ax.transAxes,
-        )
     plt.show()
 
 

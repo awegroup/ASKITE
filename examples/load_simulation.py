@@ -22,7 +22,7 @@ def main():
     # load files
     results_dir = Path(PROJECT_DIR) / "results" / f"V3_25" / f"2025_06_03_1027h"
     results_dir = (
-        Path(PROJECT_DIR) / "results" / f"TUDELFT_V3_KITE" / f"2025_08_15_1122h"
+        Path(PROJECT_DIR) / "results" / f"TUDELFT_V3_KITE" / f"2025_08_20_1634h"
     )
     h5_path = Path(results_dir) / "sim_output.h5"
     meta_data_dict, tracking_data = load_sim_output(h5_path)

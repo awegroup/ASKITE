@@ -61,14 +61,16 @@ def main(
     vel_app,
     initial_polar_data,
     aero2struc_mapping,
-    psm_connectivity,
-    psm_params,
+    pss_connectivity,
+    pss_params,
     power_tape_index,
     initial_length_power_tape,
     n_power_tape_steps,
     power_tape_final_extension,
     power_tape_extension_step,
     config: dict,
+    pulley_line_indices,
+    pulley_line_to_other_node_pair_dict,
 ):
     """
     Runs the aero-structural solver for the given input parameters.
@@ -104,6 +106,18 @@ def main(
     struc_nodes_prev = None  # Initialize previous points for tracking
     start_time = time.time()
     plotting.set_plot_style()
+
+    ## track initial state
+    # Update unified tracking dataframe (replaces position update)
+    tracking.update_tracking_arrays(
+        tracking_data,
+        0,
+        psystem,
+        struc_nodes,
+        struc_nodes,
+        np.zeros(np.shape(struc_nodes)),
+        np.zeros(np.shape(struc_nodes)),
+    )
 
     ######################################################################
     # SIMULATION LOOP
@@ -164,36 +178,46 @@ def main(
             if config["is_with_struc_plot_per_iteration"]:
                 plotting.main(
                     struc_nodes,
-                    psm_connectivity,
+                    pss_connectivity,
                     psystem.extract_rest_length,
                     f_ext=f_ext,
                     title=f"i: {i}",
                     body_aero=body_aero,
                     chord_length=2.6,
                     is_with_node_indices=False,
+                    pulley_line_indices=pulley_line_indices,
+                    pulley_line_to_other_node_pair_dict=pulley_line_to_other_node_pair_dict,
                 )
 
             ### STRUC
             f_ext_flat = f_ext.flatten()
             end_time_f_ext = time.time()
             begin_time_f_int = time.time()
-            psystem, converged = structural_pss.run_pss(psystem, psm_params, f_ext_flat)
-            logging.info(f"PS converged: {converged}")
+            if config["structural_solver"] == "pss":
+                psystem, converged = structural_pss.run_pss(
+                    psystem, pss_params, f_ext_flat
+                )
+                logging.debug(f"PS converged: {converged}")
+                # logging.debug(f"position.loc[step].shape: {position.loc[step].shape}")
+                logging.debug(f"internal force: {psystem.f_int}")
+                logging.debug(f"external force: {f_ext}")
+                # Updating the points
+                struc_nodes = np.array([particle.x for particle in psystem.particles])
+                # Extracting internal force
+                f_int = psystem.f_int
+
+            elif config["structural_solver"] == "pyfe3d":
+                raise ValueError("pyfe3d solver is not implemented yet")
+
             end_time_f_int = time.time()
-
-            # logging.debug(f"position.loc[step].shape: {position.loc[step].shape}")
-            logging.debug(f"internal force: {psystem.f_int}")
-            logging.debug(f"external force: {f_ext}")
-
-            # Updating the points
-            struc_nodes = np.array([particle.x for particle in psystem.particles])
 
             # Forcing symmetry
             if config["is_with_forcing_symmetry"]:
                 logging.info("Forcing symmetry in y-direction")
                 struc_nodes = forcing_symmetry(struc_nodes)
 
-            f_residual = psystem.f_int + f_ext_flat
+            # Computing residual forces
+            f_residual = f_int + f_ext_flat
             f_residual_list.append(np.linalg.norm(np.abs(f_residual)))
             logging.debug(
                 f"residual force in y-direction: {np.sum([f_residual[1::3]]):.3f}N"
@@ -218,8 +242,8 @@ def main(
             pbar.set_postfix(
                 {
                     "res": f"{np.linalg.norm(f_residual):.3f}N",
-                    # "aero": f"{end_time_f_ext-begin_time_f_ext:.2f}s",
-                    # "struc": f"{end_time_f_int-begin_time_f_int:.2f}s",
+                    "aero": f"{end_time_f_ext-begin_time_f_ext:.2f}s",
+                    "struc": f"{end_time_f_int-begin_time_f_int:.2f}s",
                 }
             )
             pbar.update(1)
@@ -233,7 +257,7 @@ def main(
             ):
                 is_residual_below_tol = True
                 is_convergence = True
-            # if np.linalg.norm(f_residual) <= psm_params["aerostructural_tol"]l and i > 50:
+            # if np.linalg.norm(f_residual) <= pss_params["aerostructural_tol"]l and i > 50:
             #     is_residual_below_tol = True
             #     is_convergence = True
 
@@ -293,17 +317,20 @@ def main(
     if config["is_with_final_plot"]:
         plotting.main(
             np.array([particle.x for particle in psystem.particles]),
-            psm_connectivity,
+            pss_connectivity,
+            f_ext=f_ext,
             rest_lengths=psystem.extract_rest_length,
             struc_nodes_initial=np.array([p.x for p in initial_particles]),
-            title="PSM: Initial (black) vs Final (red)",
+            title="Initial  vs final",
+            pulley_line_indices=pulley_line_indices,
+            pulley_line_to_other_node_pair_dict=pulley_line_to_other_node_pair_dict,
         )
     # Convert kite_connectivity to a numeric array for HDF5 compatibility
-    kite_connectivity_numeric = np.array(psm_connectivity)
+    kite_connectivity_numeric = np.array(pss_connectivity)
     # If it is not 2D and numeric, try to extract only the first two columns (node indices)
     if kite_connectivity_numeric.dtype == object or kite_connectivity_numeric.ndim != 2:
         kite_connectivity_numeric = np.array(
-            [[int(row[0]), int(row[1])] for row in psm_connectivity],
+            [[int(row[0]), int(row[1])] for row in pss_connectivity],
             dtype=np.int32,
         )
     meta = {
@@ -313,4 +340,5 @@ def main(
         "rest_lengths": np.array(psystem.extract_rest_length),  # ensure numeric array
         "kite_connectivity": kite_connectivity_numeric,
     }
+
     return tracking_data, meta

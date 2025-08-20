@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 # def force2nodes(F, Fpoint, nodes, tangential):
@@ -421,7 +422,7 @@ import numpy as np
 
 # TODO: this should be placed in a more general plotting place/module
 def plot_aerodynamic_forces_chordwise_distributed(
-    points_aero_chordwise,
+    panel_cps,
     f_aero_chordwise,
     nodes_struc,
     force_struc=None,
@@ -430,7 +431,7 @@ def plot_aerodynamic_forces_chordwise_distributed(
     Plot aerodynamic forces distributed chordwise and mapped to structural nodes.
 
     Args:
-        points_aero_chordwise (np.ndarray): Chordwise aerodynamic points (n,3).
+        panel_cps (np.ndarray): panel cps (n,3).
         f_aero_chordwise (np.ndarray): Chordwise aerodynamic forces (n,3).
         nodes_struc (np.ndarray): Structural node positions (n_nodes,3).
         force_struc (np.ndarray, optional): Forces on structural nodes (n_nodes,3).
@@ -439,26 +440,24 @@ def plot_aerodynamic_forces_chordwise_distributed(
         None. Displays a 3D plot.
     """
 
-    import matplotlib.pyplot as plt
-
     # Create a new figure and set up 3D axes
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
 
     # Scatter plot of chordwise points (blue)
     ax.scatter(
-        points_aero_chordwise[:, 0],
-        points_aero_chordwise[:, 1],
-        points_aero_chordwise[:, 2],
+        panel_cps[:, 0],
+        panel_cps[:, 1],
+        panel_cps[:, 2],
         color="black",
-        label="Chordwise Points",
+        label="Panel center of pressure",
     )
 
     # Quiver plot for the forces (red arrows)
     ax.quiver(
-        points_aero_chordwise[:, 0],
-        points_aero_chordwise[:, 1],
-        points_aero_chordwise[:, 2],
+        panel_cps[:, 0],
+        panel_cps[:, 1],
+        panel_cps[:, 2],
         f_aero_chordwise[:, 0],
         f_aero_chordwise[:, 1],
         f_aero_chordwise[:, 2],
@@ -466,11 +465,11 @@ def plot_aerodynamic_forces_chordwise_distributed(
         # normalize=True,
         length=0.01,
         color="black",
-        label="Force Vectors",
+        label="Panel force vector",
     )
 
     if force_struc is None:
-        # Scatter plot of structural nodes (wing segment corners) (green)
+        # Scatter plot of structural nodes (wing segment corners)
         ax.scatter(
             nodes_struc[:, 0],
             nodes_struc[:, 1],
@@ -489,7 +488,7 @@ def plot_aerodynamic_forces_chordwise_distributed(
             nodes_struc[:, 1],
             nodes_struc[:, 2],
             color="blue",
-            label="Wing Segment Corners",
+            label="Structural nodes",
         )
 
         # Quiver plot for the forces on structural nodes (yellow arrows)
@@ -504,11 +503,11 @@ def plot_aerodynamic_forces_chordwise_distributed(
             length=0.01,
             # normalize=True,
             color="red",
-            label="Force Vectors on Structural Nodes",
+            label="Mapped aerodynamic force vector onto structural nodes",
         )
 
     # Set equal scale for all axes
-    points_all = np.concatenate((points_aero_chordwise, nodes_struc), axis=0)
+    points_all = np.concatenate((panel_cps, nodes_struc), axis=0)
     bb = points_all.max(axis=0) - points_all.min(axis=0)
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
@@ -565,7 +564,7 @@ def aero2struc_NN_vsm(
 
     if is_with_coupling_plot:
         plot_aerodynamic_forces_chordwise_distributed(
-            points_aero_chordwise=panel_cps,
+            panel_cps=panel_cps,
             f_aero_chordwise=f_aero_wing_vsm_format,
             nodes_struc=struc_nodes,
             force_struc=f_aero_wing,

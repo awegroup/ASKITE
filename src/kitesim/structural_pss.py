@@ -187,7 +187,7 @@ def plot_3d_kite_structure(
                 point[1],
                 point[2],
                 color="purple",
-                s=8,
+                s=25,
                 label="",  # We'll add to legend separately
             )
             if "Pulley Node" not in used_labels:
@@ -341,62 +341,6 @@ def instantiate(
         pss_initial_conditions,
         pss_params,
     )
-
-    # TODO: deal with the rest length problem
-    # updating all the rest lengths to the user input, instead of based on initial node-to-node distance
-    set_rest_lengths = psystem.extract_rest_length
-
-    # update rest lengths to original wing rest lengths
-    # wing_rest_lengths = np.array(
-    #     [
-    #         0.34867407,
-    #         1.51367733,
-    #         0.88927689,
-    #         1.72113939,
-    #         1.32426864,
-    #         1.32890591,
-    #         2.24038103,
-    #         1.32801374,
-    #         1.31377741,
-    #         2.49418968,
-    #         1.32335236,
-    #         1.31128284,
-    #         2.61551116,
-    #         1.328504,
-    #         1.321442,
-    #         2.61551116,
-    #         1.32335236,
-    #         1.31128284,
-    #         2.49418968,
-    #         1.32801374,
-    #         1.31377741,
-    #         2.24038103,
-    #         1.32426864,
-    #         1.32890591,
-    #         1.72113939,
-    #         1.51367733,
-    #         0.88927689,
-    #         0.34867407,
-    #     ]
-    # )
-    # rest_lengths[1:29] = wing_rest_lengths
-
-    for idx, curr_set_rest_length in enumerate(psystem.extract_rest_length):
-        #     # delta = rest_lengths[idx] - set_res_len
-        #     # if np.abs(delta) > 0.25:
-        #     #     print(f"\nci,cj: {kite_connectivity[idx][0]}, {kite_connectivity[idx][1]}")
-        #     #     print(f"set res len: {set_res_len}")
-        #     #     print(f"rest length: {rest_lengths[idx]}")
-        #     #     print(f"Delta l0: {rest_lengths[idx] - set_res_len}")
-        psystem.update_rest_length(idx, l0_arr[idx] - curr_set_rest_length)
-    # print(
-    #     f"ci,cj: {kite_connectivity[idx][0]}, {kite_connectivity[idx][1]},curr rest length: {set_res_len:.3f}, set rest length: {rest_lengths[idx]:.3f}"
-    # )
-
-    # # 3% of TE canopy billowing induced extra rest length
-    # if idx in te_line_idx_list:
-    #     psystem.update_rest_length(idx, 0.03 * curr_set_rest_length)
-
     return (
         psystem,
         pss_connectivity,

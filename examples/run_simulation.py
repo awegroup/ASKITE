@@ -7,6 +7,7 @@ License: ... \
 Github: ...
 """
 
+import numpy as np
 from pathlib import Path
 from kitesim.logging_config import *
 from kitesim.utils import load_and_save_config_files, load_sim_output, save_results
@@ -38,7 +39,7 @@ def main():
     ###################
     ### AERODYNAMIC ###
     ###################
-    n_wing_struc_nodes = len(struc_geometry["wing_nodes"]["data"])
+    n_wing_struc_nodes = len(struc_geometry["wing_particles"]["data"])
     n_struc_ribs = n_wing_struc_nodes / 2
     n_panels_aero = (n_struc_ribs - 1) * config["aerodynamic"][
         "n_aero_panels_per_struc_section"
@@ -68,8 +69,30 @@ def main():
         k_arr,
         c_arr,
         linktype_arr,
+        pulley_line_indices,
         pulley_line_to_other_node_pair_dict,
     ) = read_struc_geometry_yaml.main(struc_geometry)
+
+    # print(f"len(conn_arr): {len(conn_arr)}")
+    # print(f"len(l0_arr): {len(l0_arr)}")
+    # print(f"len(k_arr): {len(k_arr)}")
+    # print(f"len(c_arr): {len(c_arr)}")
+    # print(f"len(linktype_arr): {len(linktype_arr)}")
+    # print(f"len(pulley_line_indices): {len(pulley_line_indices)}")
+    # print(
+    #     f"len(pulley_line_to_other_node_pair_dict): {len(pulley_line_to_other_node_pair_dict)}"
+    # )
+
+    # for idx, conn in enumerate(conn_arr):
+    #     print(f"conn_arr[{idx}]: {conn}")
+    # print(f"pulley_line_indices: \n{pulley_line_indices}")
+    # print(
+    #     f"pulley_line_to_other_node_pair_dict: \n{pulley_line_to_other_node_pair_dict}"
+    # )
+
+    # print(f"\n power_tape_indices: {power_tape_index}")
+    # print(f"\n steering_tape_indices: {steering_tape_indices}")
+    # print(f"\n pulley_node_indices: {pulley_node_indices}")
 
     if config["structural_solver"] == "pss":
         ## pss -- https://github.com/awegroup/Particle_System_Simulator
@@ -97,6 +120,16 @@ def main():
             linktype_arr,
             pulley_line_to_other_node_pair_dict,
         )
+        ##TODO: dealing with rest-lengths, not read properly by ParticleSystemSimulator it seems
+        for idx, curr_set_rest_length in enumerate(psystem.extract_rest_length):
+            #     # delta = rest_lengths[idx] - set_res_len
+            #     # if np.abs(delta) > 0.25:
+            #     #     print(f"\nci,cj: {kite_connectivity[idx][0]}, {kite_connectivity[idx][1]}")
+            #     #     print(f"set res len: {set_res_len}")
+            #     #     print(f"rest length: {rest_lengths[idx]}")
+            #     #     print(f"Delta l0: {rest_lengths[idx] - set_res_len}")
+            delta = curr_set_rest_length - l0_arr[idx]
+            psystem.update_rest_length(idx, 0.01 * delta)
         if config["is_with_initial_structure_plot"]:
             structural_pss.plot_3d_kite_structure(
                 struc_nodes,
@@ -158,8 +191,15 @@ def main():
     else:
         n_steering_tape_steps = 0
 
-    psystem.update_rest_length(steering_tape_indices[0], -steering_tape_final_extension)
-    psystem.update_rest_length(steering_tape_indices[1], steering_tape_final_extension)
+    if config["structural_solver"] == "pss":
+        psystem.update_rest_length(
+            steering_tape_indices[0], -steering_tape_final_extension
+        )
+        psystem.update_rest_length(
+            steering_tape_indices[1], steering_tape_final_extension
+        )
+    elif config["structural_solver"] == "pyfe3d":
+        raise ValueError("pyfe3d solver is not implemented yet")
 
     ########################################
     ### AEROSTUCTURAL COUPLED SIMULATION ###
@@ -183,6 +223,8 @@ def main():
         power_tape_final_extension,
         power_tape_extension_step,
         config,
+        pulley_line_indices,
+        pulley_line_to_other_node_pair_dict,
     )
 
     # Save results
@@ -192,13 +234,108 @@ def main():
     # Load results
     meta_data_dict, tracking_data = load_sim_output(h5_path)
 
-    logging.info(f"meta_data: {meta_data_dict}")
+    # logging.info(f"meta_data: {meta_data_dict}")
 
     # TODO:
     # - here you could add functions to plot the tracking of f_int, f_ext and f_residual over the iterations
     # - functions that make an animation of the kite going through the iterations
     # - etc.
     f_residual = tracking_data["f_int"] - tracking_data["f_ext"]
+
+    def printing_rest_lengths(tracking_data, struc_geometry):
+        """
+        Print the current and initial rest lengths of all bridle lines defined in bridle_elements by
+        averaging the lengths of all their segments in bridle_connections.
+
+        For each connection:
+        - if 3 nodes, sum ci-cj and cj-ck
+        - if 2 nodes, sum ci-cj
+        """
+        positions = tracking_data["positions"]
+        struc_nodes = positions[-1]  # current positions
+        initial_struc_nodes = positions[0]  # initial positions
+
+        bridle_elements_data = struc_geometry["bridle_elements"]["data"]
+        bridle_line_names = [row[0] for row in bridle_elements_data]
+        bridle_connections_data = struc_geometry["bridle_connections"]["data"]
+
+        # YAML l0 lookup dictionary
+        bridle_elements_yaml = {row[0]: row[1] for row in bridle_elements_data}
+
+        print("\nCurrent bridle line lengths:")
+        results = []
+        for line_name in bridle_line_names:
+            total_length = 0.0
+            initial_total_length = 0.0
+            count = 0
+
+            for conn in bridle_connections_data:
+                if conn[0] == line_name:
+                    ci = int(conn[1])
+                    cj = int(conn[2])
+                    if len(conn) > 3 and conn[3] not in (None, "", 0):
+                        ck = int(conn[3])
+                        # current
+                        total_length += np.linalg.norm(
+                            struc_nodes[ci] - struc_nodes[cj]
+                        )
+                        total_length += np.linalg.norm(
+                            struc_nodes[cj] - struc_nodes[ck]
+                        )
+                        # initial
+                        initial_total_length += np.linalg.norm(
+                            initial_struc_nodes[ci] - initial_struc_nodes[cj]
+                        )
+                        initial_total_length += np.linalg.norm(
+                            initial_struc_nodes[cj] - initial_struc_nodes[ck]
+                        )
+                        count += 1
+                    else:
+                        # current
+                        total_length += np.linalg.norm(
+                            struc_nodes[ci] - struc_nodes[cj]
+                        )
+                        # initial
+                        initial_total_length += np.linalg.norm(
+                            initial_struc_nodes[ci] - initial_struc_nodes[cj]
+                        )
+                        count += 1
+
+            if count > 0:
+                avg_length = total_length / count
+                initial_avg_length = initial_total_length / count
+                delta_pct = (
+                    100.0 * (avg_length - initial_avg_length) / initial_avg_length
+                    if initial_avg_length != 0
+                    else 0.0
+                )
+
+                # yaml l0 value
+                yaml_l0 = bridle_elements_yaml.get(line_name, None)
+                try:
+                    yaml_l0_val = float(yaml_l0) if yaml_l0 is not None else None
+                except Exception:
+                    yaml_l0_val = yaml_l0
+
+                delta_yaml_pct = (
+                    100.0 * (avg_length - yaml_l0_val) / yaml_l0_val
+                    if yaml_l0_val not in (None, 0)
+                    else 0.0
+                )
+
+                results.append(
+                    f"{line_name}: curr: {avg_length:.3f} m, "
+                    f"initial: {initial_avg_length:.3f} m, "
+                    f"delta: {delta_pct:+.2f} %, "
+                    f"yaml: {yaml_l0_val} m, "
+                    f"delta_yaml: {delta_yaml_pct:+.2f} %"
+                )
+
+        # print once
+        for result in results:
+            print(result)
+
+    printing_rest_lengths(tracking_data, struc_geometry)
 
 
 if __name__ == "__main__":
