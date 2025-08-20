@@ -14,10 +14,7 @@ This code is a design-tool, to be used in the kite-design process for finding pe
 | -------------- | ------- |
 | data           | Input data and output/results of the code. |
 | doc            | Currently contains an attempt at making Sphinx documentation. |
-| Pipfile        | Dependencies. |
-| pycache        | Description of Python byte code cached for faster loading. |
 | README.md      | Description of the project/repository overview. |
-| pyvenv.cfg     | Virtual environment configuration. |
 | requirements.txt | Description of project dependencies. |
 | scripts       | Python scripts and Jupyter-notebooks. |
 | settings       | config.yaml file with all settings. |
@@ -27,18 +24,18 @@ This code is a design-tool, to be used in the kite-design process for finding pe
 
 
 ## More details per folder
-[data](data/doc/README.md)
+[data](doc/data/data.md)
 
 ## Detailed List for `src` Directory
 The `src` directory contains various Python packages involved in the project:
 <!-- - [coconut](doc/coconut.md) - Description or purpose of the `coconut` package. -->
-- [aerodynamic](src/aerodynamic/doc/aerodynamic.md) - Description or purpose of the `aerodynamic` package.
-- [coupling](src/coupling.doc/coupling.md) - Description or purpose of the `coupling` package.
-- [initialisation](src/initialisation/doc/initialisation.md) - Description or purpose of the `initialisation` package.
-- [particleSystem](src/particleSystem/doc/particleSystem.md) - Description or purpose of the `particleSystem` package.
-- [post_processing](src/post_processing/doc/post_processing.md) - Description or purpose of the `post_processing` package.
-- [solver](src/solver/doc/solver.md) - Description or purpose of the `solver` package.
-- [structural](src/structural/doc/structural.md) - Description or purpose of the `structural` package.
+- [aerodynamic](doc/src/aerodynamic/aerodynamic.md) - Description or purpose of the `aerodynamic` package.
+- [coupling](doc/src/coupling/coupling.md) - Description or purpose of the `coupling` package.
+- [initialisation](doc/src/initialisation/initialisation.md) - Description or purpose of the `initialisation` package.
+- [particleSystem](doc/src/particleSystem/particleSystem.md) - Description or purpose of the `particleSystem` package.
+- [post_processing](doc/src/post_processing/post_processing.md) - Description or purpose of the `post_processing` package.
+- [solver](doc/src/solver/solver.md) - Description or purpose of the `solver` package.
+- [structural](doc/src/structural/structural.md) - Description or purpose of the `structural` package.
 
 # Performing a simulation
 
@@ -66,7 +63,7 @@ The simulation process involves several steps:
 
 1. **Setting up simulation parameters**: Various parameters for the simulation are set, such as the simulation name, whether to perform VK optimization, whether it's a circular case, whether to run only one time step, whether to print intermediate results, and whether to include gravity.
 
-2. **Running the aerostructural [solver](doc/markdown_files/src/solver.md)**: The `run_aerostructural_solver` function from `solver_main` is called with the initial points, apparent velocity, particle system, parameters dictionary, configuration, input VSM, input bridle aero, and the previously set simulation parameters. This function returns the final points, print data, plot data, and animation data.
+2. **Running the aerostructural [solver](doc/src/solver/solver.md)**: The `run_aerostructural_solver` function from `solver_main` is called with the initial points, apparent velocity, particle system, parameters dictionary, configuration, input VSM, input bridle aero, and the previously set simulation parameters. This function returns the final points, print data, plot data, and animation data.
 
 </details>
 
@@ -83,6 +80,10 @@ The process involves several steps:
 
 </details>
 
+# Installation instructions
+
+...
+Should contain instructions about how to get this as a pip package and for the developers, how to run the pip package in developer mode.
 
 ## Authors
 J.A.W. Poland
@@ -104,7 +105,37 @@ Poland JAW, Schmehl R. Modelling Aero-Structural Deformation of Flexible Membran
 should show a sort of important message 
 
 ## Installation Instructions
-`﻿Here we could enter some cool looking-code` 
+
+### Developer
+Clone the repo
+```bash
+git clone https://github.com/jellepoland/kitesim
+```
+
+Go into the repo folder
+```bash
+cd kitesim
+```
+
+Create a new venv with the following command:
+```bash
+python -m venv venv
+```
+
+Activate the venv with the following command:
+```bash
+source venv/bin/activate
+```
+
+Execute the following command in the root directory of the repository:
+```bash
+pip install -e .[dev]
+```
+
+The venv can be deactivated with the following command:
+```bash
+deactivate
+```
 
 ### Depencies and their versions
 ## Questions

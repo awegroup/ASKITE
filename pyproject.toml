@@ -1,0 +1,61 @@
+
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kitesim"
+version = "0.1.0"
+dependencies = [
+    "numpy",
+    "matplotlib",
+    "scipy",
+    "pandas",
+    "scikit-learn",
+    "attrs",
+    "pytest",
+    "Imageio",
+    "opencv-python",
+    "dill",
+    "pyyaml",
+    "plotly",
+    "pillow",
+    "ipywidgets",
+    "pydantic",
+    "h5py",
+    "tables",
+    "tqdm",
+    "PSS @ git+https://github.com/awegroup/Particle_System_Simulator.git@main",
+    "VSM @ git+https://github.com/ocayon/Vortex-Step-Method.git@develop",
+    "pathlib"]
+requires-python = ">=3.8"
+authors = [
+  {name = "Jelle Poland"}
+]
+maintainers = [
+  {name = "Jelle Poland"}
+]
+description = "A package for simulating kites in the atmosphere"
+readme = "README.md"
+keywords = ["Airborne Wind Energy", "Kites", "Simulation", "Fluid-Structure Interaction", "Kite Design"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python",
+    "Intended Audience :: Kite Designers, Developers",
+]
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "--cov=kitesim"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "flake8",
+    "pytest-cov"
+    ]
+
+[project.urls]
+Repository = "https://github.com/jellepoland/kitesim.git"

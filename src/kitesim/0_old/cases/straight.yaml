@@ -1,0 +1,9 @@
+# Straight case 
+is_with_vk_optimization: false
+is_circular_case: false
+is_print_intermediate_results: true
+is_with_gravity: false
+### inflow conditions
+vel_wind: !!seq [12, 0, 2]
+vel_kite: !!seq [0, 0, 0]
+acc_kite: !!seq [0, 0, 0]

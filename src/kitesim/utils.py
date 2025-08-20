@@ -1,0 +1,137 @@
+import yaml
+from pathlib import Path
+import numpy as np
+import pandas as pd
+from datetime import datetime
+from scipy.spatial import ConvexHull
+import h5py
+
+
+def load_yaml(path: Path) -> dict:
+    """
+    Read a YAML file and return the parsed data as a Python dict.
+
+    Args:
+        path (Path): The path to the YAML file.
+
+    Returns:
+        dict: The parsed data from the YAML file.
+    """
+    with path.open("r", encoding="utf-8") as f:
+        return yaml.safe_load(f)
+
+
+def load_and_save_config_files(kite_name, PROJECT_DIR):
+    """
+    Load configuration files and save copies to a timestamped results directory.
+
+    Args:
+        PROJECT_DIR (Path): The project directory.
+
+    Returns:
+        config (dict): The loaded main configuration.
+        config_kite (dict): The loaded kite configuration.
+        results_dir (Path): Path to the results directory where configs are saved.
+    """
+    config = load_yaml(Path(PROJECT_DIR) / "data" / f"{kite_name}" / "config.yaml")
+    struc_geometry = load_yaml(
+        Path(PROJECT_DIR) / "data" / f"{kite_name}" / "struc_geometry.yaml"
+    )
+    aero_geometry = load_yaml(
+        Path(PROJECT_DIR) / "data" / f"{kite_name}" / "aero_geometry.yaml"
+    )
+
+    # create a results folder on this date and time and save the config files
+    results_dir = (
+        Path(PROJECT_DIR)
+        / "results"
+        / f"{kite_name}"
+        / f'{datetime.now().strftime("%Y_%m_%d_%H%M")}h'
+    )
+    results_dir.mkdir(parents=True, exist_ok=True)
+    with open(results_dir / "config.yaml", "w") as f:
+        yaml.dump(config, f, sort_keys=False)
+    with open(results_dir / "struc_geometry.yaml", "w") as f:
+        yaml.dump(struc_geometry, f, sort_keys=False)
+    with open(results_dir / "aero_geometry.yaml", "w") as f:
+        yaml.dump(aero_geometry, f, sort_keys=False)
+
+    return config, struc_geometry, aero_geometry, results_dir
+
+
+def save_results(tracking, meta, filename):
+    """
+    Save tracking arrays and metadata to an HDF5 file.
+
+    Args:
+        tracking (dict): Dictionary of arrays to save under the "tracking" group.
+        meta (dict): Metadata dictionary to save as attributes.
+        filename (str or Path): Output HDF5 file path.
+
+    Returns:
+        None
+    """
+    with h5py.File(filename, "w") as f:
+        grp = f.create_group("tracking")
+        for name, arr in tracking.items():
+            grp.create_dataset(name, data=arr[: meta["n_iter"]], compression="gzip")
+        for k, v in meta.items():
+            grp.attrs[k] = v
+
+
+def load_sim_output(h5_path):
+    """
+    Load simulation results and metadata from an HDF5 file written with h5py.
+
+    Args:
+        h5_path (str or Path): Path to the .h5 file (e.g. "sim_output.h5").
+
+    Returns:
+        tuple:
+            metadata (dict): Run-level metadata (attributes from the file).
+            track (dict): Dictionary of numpy arrays for each dataset under "tracking".
+    """
+    h5_path = Path(h5_path)
+    if not h5_path.exists():
+        raise FileNotFoundError(f"No such file: {h5_path}")
+
+    with h5py.File(h5_path, "r") as f:
+        if "tracking" not in f:
+            raise KeyError(f"No 'tracking' group in {h5_path}")
+        grp = f["tracking"]
+
+        # load metadata
+        metadata = {key: grp.attrs[key] for key in grp.attrs}
+
+        # load all datasets under /tracking into numpy arrays
+        track = {}
+        for name, item in grp.items():
+            if isinstance(item, h5py.Dataset):
+                track[name] = item[()]  # read the full array into memory
+
+    return metadata, track
+
+
+# TODO: at this moment unused
+def calculate_projected_area(points):
+    """
+    Calculate the projected area of a set of 3D points onto the XY plane using the convex hull.
+
+    Args:
+        points (np.ndarray): Array of 3D points (n_points, 3).
+
+    Returns:
+        float: Projected area on the XY plane.
+    """
+    # Project points onto the x,y plane
+    xy_points = points[:, :2]
+
+    # Find the convex hull
+    hull = ConvexHull(xy_points)
+    hull_points = xy_points[hull.vertices]
+
+    # Using the shoelace formula
+    x = hull_points[:, 0]
+    y = hull_points[:, 1]
+
+    return 0.5 * np.abs(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1)))
