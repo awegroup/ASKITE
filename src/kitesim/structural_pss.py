@@ -345,11 +345,11 @@ def instantiate(
             cj, ck, l0_len_cj_ck, l0_len_ci_cj, ci = (
                 pulley_line_to_other_node_pair_dict[str(idx)]
             )
-            print(f"--- pulley!: ci: {ci}, cj: {cj}, ck: {ck}")
+            logging.debug(f"--- pulley!: ci: {ci}, cj: {cj}, ck: {ck}")
 
             l0_this_piece = l0_len_ci_cj
             delta = curr_set_rest_length - l0_this_piece
-            print(
+            logging.debug(
                 f"curr_set_rest_length: {curr_set_rest_length}, l0_this_piece: {l0_this_piece}, delta: {delta}"
             )
         else:

@@ -73,28 +73,16 @@ def main():
         pulley_line_to_other_node_pair_dict,
     ) = read_struc_geometry_yaml.main(struc_geometry)
 
-    # print(f"len(conn_arr): {len(conn_arr)}")
-    # print(f"len(l0_arr): {len(l0_arr)}")
-    # print(f"len(k_arr): {len(k_arr)}")
-    # print(f"len(c_arr): {len(c_arr)}")
-    # print(f"len(linktype_arr): {len(linktype_arr)}")
-    # print(f"len(pulley_line_indices): {len(pulley_line_indices)}")
-    # print(
-    #     f"len(pulley_line_to_other_node_pair_dict): {len(pulley_line_to_other_node_pair_dict)}"
-    # )
+    # logging initial conditions
+    logging.info(f"\n\nINITIAL CONDITIONS, NODES \n")
+    for idx, (node_i, m_i) in enumerate(zip(struc_nodes, m_arr)):
+        logging.info(f"node_idx: {idx}: node: {node_i}, mass: {m_i}")
 
+    logging.info(f"\n\nINITIAL CONDITIONS, ELEMENTS \n")
     for idx, conn in enumerate(conn_arr):
-        print(
-            f"{idx}: conn: {conn}, l0: {l0_arr[idx]}, k: {k_arr[idx]}, c: {c_arr[idx]}, linktype: {linktype_arr[idx]}"
+        logging.info(
+            f"conn_idx: {idx}: conn: {conn}, l0: {l0_arr[idx]}, k: {k_arr[idx]}, c: {c_arr[idx]}, linktype: {linktype_arr[idx]}"
         )
-    # print(f"pulley_line_indices: \n{pulley_line_indices}")
-    # print(
-    #     f"pulley_line_to_other_node_pair_dict: \n{pulley_line_to_other_node_pair_dict}"
-    # )
-
-    # print(f"\n power_tape_indices: {power_tape_index}")
-    # print(f"\n steering_tape_indices: {steering_tape_indices}")
-    # print(f"\n pulley_node_indices: {pulley_node_indices}")
 
     if config["structural_solver"] == "pss":
         ## pss -- https://github.com/awegroup/Particle_System_Simulator
