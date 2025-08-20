@@ -2,36 +2,6 @@ import numpy as np
 import copy
 
 
-# def interpolate_edges(
-#     struc_nodes,
-#     struc_le_idx_list,
-#     struc_te_idx_list,
-#     n_aero_panels_per_struc_section,
-# ):
-#     """
-#     Interpolate leading and trailing edge points to create a denser array of points.
-
-#     Args:
-#         struc_nodes (np.ndarray): Structural node positions (n_nodes, 3).
-#         struc_le_idx_list (list): Indices of leading edge nodes.
-#         struc_te_idx_list (list): Indices of trailing edge nodes.
-#         n_aero_panels_per_struc_section (int): Number of aerodynamic panels per structural section.
-
-#     Returns:
-#         le_dense (np.ndarray): Densely sampled leading edge points.
-#         te_dense (np.ndarray): Densely sampled trailing edge points.
-#     """
-
-#     # Extract original LE and TE arrays
-#     le_arr = np.array([struc_nodes[i] for i in struc_le_idx_list])
-#     te_arr = np.array([struc_nodes[i] for i in struc_te_idx_list])
-
-#     le_dense = interpolate_points(le_arr)
-#     te_dense = interpolate_points(te_arr)
-
-#     return le_dense, te_dense
-
-
 def interpolate_points(arr, n_aero_panels_per_struc_section):
     new_arr = []
     for i in range(len(arr) - 1):

@@ -23,7 +23,11 @@ def setup_tracking_arrays(n_pts, t_vector):
 
 
 def update_tracking_arrays(
-    tracking_data, idx, psystem, struc_nodes, nodes_struc_prev, f_ext_flat, f_int_flat
+    tracking_data,
+    idx,
+    struc_nodes,
+    f_ext_flat,
+    f_int_flat,
 ):
     """
     Update tracking arrays with simulation results for a single time step.
@@ -31,9 +35,7 @@ def update_tracking_arrays(
     Args:
         tracking_data (dict): Tracking arrays to update.
         idx (int): Current time step index.
-        psystem (ParticleSystem): Particle system object.
-        struc_nodes (np.ndarray): Current node positions (n_nodes, 3).
-        nodes_struc_prev (np.ndarray or None): Previous node positions (n_nodes, 3).
+        pos3d (np.ndarray): Current 3D positions (n_nodes, 3).
         f_ext_flat (np.ndarray): Flattened external force vector (n_nodes*3,).
         f_int_flat (np.ndarray): Flattened internal force vector (n_nodes*3,).
 
@@ -48,8 +50,7 @@ def update_tracking_arrays(
     n_pts = pos3d.shape[1]
 
     # 1) Positions
-    pos_flat, _ = psystem.x_v_current  # shape (n_pts*3,)
-    pos3d[idx] = pos_flat.reshape(n_pts, 3)
+    pos3d[idx] = struc_nodes
 
     # 2) External & internal forces: reshape before storing
     ext3d[idx] = f_ext_flat.reshape(n_pts, 3)

@@ -324,16 +324,11 @@ def instantiate(
 
     pss_params = {
         "pulley_other_line_pair": pulley_line_to_other_node_pair_dict,
-        # "l0": l0_arr,
-        # "c": config["structural"]["damping_constant"],
-        # "is_with_visc_damping": config["structural"]["is_with_visc_damping"],
         "dt": config["structural_pss"]["dt"],
         "t_steps": config["structural_pss"]["n_internal_time_steps"],
         "abs_tol": config["structural_pss"]["abs_tol"],
         "rel_tol": config["structural_pss"]["rel_tol"],
         "max_iter": config["structural_pss"]["max_iter"],
-        # "n": len(struc_nodes),
-        # "g": -config["grav_constant"][2],
     }
 
     psystem = ParticleSystem(
@@ -341,6 +336,28 @@ def instantiate(
         pss_initial_conditions,
         pss_params,
     )
+
+    ##TODO: dealing with rest-lengths, not read properly by the internal ParticleSystemSimulator
+    # the below WORKS, but should be fixed properly internally instead
+    for idx, curr_set_rest_length in enumerate(psystem.extract_rest_length):
+        # when line is a pulley it needs special attention
+        if str(idx) in pulley_line_to_other_node_pair_dict.keys():
+            cj, ck, l0_len_cj_ck, l0_len_ci_cj, ci = (
+                pulley_line_to_other_node_pair_dict[str(idx)]
+            )
+            print(f"--- pulley!: ci: {ci}, cj: {cj}, ck: {ck}")
+
+            l0_this_piece = l0_len_ci_cj
+            delta = curr_set_rest_length - l0_this_piece
+            print(
+                f"curr_set_rest_length: {curr_set_rest_length}, l0_this_piece: {l0_this_piece}, delta: {delta}"
+            )
+        else:
+            l0_this_piece = l0_arr[idx]
+
+        delta = curr_set_rest_length - l0_this_piece
+        psystem.update_rest_length(idx, delta)
+
     return (
         psystem,
         pss_connectivity,

@@ -2,9 +2,9 @@ import logging
 import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-from typing import Optional
 from cycler import cycler
-from matplotlib.widgets import Slider
+from matplotlib.gridspec import GridSpec
+from matplotlib.widgets import Slider, Button
 
 PALETTE = {
     "Black": "#000000",
@@ -93,137 +93,6 @@ def set_plot_style():
             "legend.fontsize": 15,
         }
     )
-
-
-# def plot_normalized_elongation(
-#     ax,
-#     kite_connectivity,
-#     struc_nodes,
-#     rest_lengths,
-#     pulley_line_indices,  # kept for signature; used only to skip
-#     pulley_line_to_other_node_pair_dict,  # kept for signature; not used here
-# ):
-#     import numpy as np
-#     import matplotlib.pyplot as plt
-#     import matplotlib as mpl
-
-#     cmap = plt.get_cmap("viridis")
-
-#     num_conns = len(kite_connectivity)
-#     rest_lengths = np.asarray(rest_lengths, dtype=float)
-#     norm_values = np.full(num_conns, np.nan, dtype=float)
-
-#     print(f"pulley_line_indices: {pulley_line_indices}")
-#     print(f"pulley_line_to_other_node_pair_dict: {pulley_line_to_other_node_pair_dict}")
-
-#     # treat pulley indices as a set for O(1) membership
-#     pulley_set = set(int(i) for i in (pulley_line_indices or []))
-#     handled_pulleys_set = set()
-
-#     pulley_triples_set = set()
-#     # compute norm only for non-pulley lines
-#     for idx, (i, j, *_) in enumerate(kite_connectivity):
-#         if (
-#             idx in pulley_set
-#             and (i, j) not in handled_pulleys_set
-#             and str(idx) in pulley_line_to_other_node_pair_dict.keys()
-#         ):
-#             pulley_other_info = pulley_line_to_other_node_pair_dict[str(idx)]
-#             print(f"cj-loop: {j}, cj-other info: {int(pulley_other_info[0])}")
-#             cj = int(pulley_other_info[0])
-#             ck = int(pulley_other_info[1])
-#             # add to pulley set
-#             pulley_triples_set.add((i, cj, ck))
-#             print(f"pulley triplet: {(i, cj, ck)}")
-
-#             # add to handled_pulleys
-#             handled_pulleys_set.add((cj, ck))
-
-#             p1 = np.asarray(struc_nodes[i])
-#             p2 = np.asarray(struc_nodes[cj])
-#             p3 = np.asarray(struc_nodes[ck])
-#             ax.plot(
-#                 [p1[0], p2[0]],
-#                 [p1[1], p2[1]],
-#                 [p1[2], p2[2]],
-#                 color="green",
-#                 linewidth=3,
-#             )
-#             ax.plot(
-#                 [p2[0], p3[0]],
-#                 [p2[1], p3[1]],
-#                 [p2[2], p3[2]],
-#                 color="green",
-#                 linewidth=3,
-#             )
-
-#             # 35, 26
-#             # 33, 25
-#             continue  # skip pulley lines entirely
-
-#         ci, cj = int(i), int(j)
-#         p1, p2 = np.asarray(struc_nodes[ci]), np.asarray(struc_nodes[cj])
-#         curr_len = float(np.linalg.norm(p2 - p1))
-#         rl = rest_lengths[idx] if idx < len(rest_lengths) else np.nan
-
-#         norm_values[idx] = (
-#             0.0 if (not np.isfinite(rl) or rl == 0.0) else 100.0 * (curr_len - rl) / rl
-#         )
-
-#     # color scaling based only on finite (non-pulley) values
-#     finite_mask = np.isfinite(norm_values)
-#     if not np.any(finite_mask):
-#         # nothing to draw
-#         return
-
-#     vmin = float(np.nanmin(norm_values))
-#     vmax = float(np.nanmax(norm_values))
-
-#     # plot only non-pulley lines
-#     for idx, (i, j, *_) in enumerate(kite_connectivity):
-#         if idx in pulley_set:
-#             continue
-
-#         ci, cj = int(i), int(j)
-#         p1, p2 = struc_nodes[ci], struc_nodes[cj]
-#         val = norm_values[idx]
-#         t = (val - vmin) / (vmax - vmin) if np.isfinite(val) and vmax > vmin else 0.5
-#         ax.plot(
-#             [p1[0], p2[0]],
-#             [p1[1], p2[1]],
-#             [p1[2], p2[2]],
-#             color=cmap(t),
-#             linewidth=2,
-#         )
-
-#     # (optional) legend; will be empty unless you add labels elsewhere
-#     ax.legend(loc="center right", bbox_to_anchor=(1.05, 0.5))
-
-#     # colorbar for the current state
-#     sm = mpl.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax))
-#     sm.set_array([])
-#     cbar = plt.colorbar(sm, ax=ax, shrink=0.7, pad=0.1)
-#     cbar.set_label(r"Normalized rest length change (\%)")
-#     cbar.ax.text(
-#         1.5,
-#         -0.1,
-#         "contracted",
-#         va="center",
-#         ha="left",
-#         fontsize=11,
-#         color="black",
-#         transform=cbar.ax.transAxes,
-#     )
-#     cbar.ax.text(
-#         1.5,
-#         1.1,
-#         "elongated",
-#         va="center",
-#         ha="left",
-#         fontsize=11,
-#         color="black",
-#         transform=cbar.ax.transAxes,
-#     )
 
 
 def plot_normalized_elongation(
@@ -546,7 +415,6 @@ def interactive_plot(
     Returns:
         None. Displays an interactive plot.
     """
-    import matplotlib.pyplot as plt
 
     positions = tracking_data["positions"]  # shape (nt, n_nodes, 3)
     nt = positions.shape[0]
@@ -572,7 +440,6 @@ def interactive_plot(
     normalized_elongation_limit = max_abs_elong * 1.01  # add 1% margin
 
     fig = plt.figure(figsize=(12, 7))
-    from matplotlib.gridspec import GridSpec
 
     gs = GridSpec(
         2, 2, width_ratios=[20, 1], height_ratios=[20, 1], hspace=0.25, wspace=0.15
@@ -638,8 +505,6 @@ def interactive_plot(
 
     draw_state(idx0)
 
-    import matplotlib as mpl
-
     ax_cbar = fig.add_subplot(gs[0, 1])
     cbar = plt.colorbar(sm, cax=ax_cbar, orientation="vertical")
     cbar.set_label("Normalized rest length change (\%)")
@@ -666,8 +531,6 @@ def interactive_plot(
         transform=cbar.ax.transAxes,
     )
 
-    from matplotlib.widgets import Slider, Button
-
     ax_slider = fig.add_subplot(gs[1, 0])
     plt.subplots_adjust(bottom=0.15)
     slider = Slider(
@@ -688,8 +551,6 @@ def interactive_plot(
     button_bottom = ax_slider.get_position().y0 + 0.01
     ax_play = fig.add_axes([button_left, button_bottom, button_width, button_height])
     play_button = Button(ax_play, "Play")
-
-    import time
 
     play_state = {"playing": False}
 

@@ -196,9 +196,8 @@ def initialize_bridle_line_system(
                     cj,
                     ck,
                     l0_len_cj_ck,
+                    l0_len_ci_cj,
                     ci,
-                    cj,
-                    ck,
                 ]
             )
 
@@ -224,10 +223,9 @@ def initialize_bridle_line_system(
                 [
                     cj,
                     ci,
+                    l0_len_ci_cj,
                     l0_len_cj_ck,
                     ci,
-                    cj,
-                    ck,
                 ]
             )
 

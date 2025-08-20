@@ -13,18 +13,23 @@ def instantiate(
     linktype_arr,
     pulley_line_to_other_node_pair_dict,
 ):
-    initial_conditions = []
-    if config["is_with_initial_point_velocity"]:
-        raise ValueError("Error: initial point velocity has never been defined")
-    else:
-        vel_ini = np.zeros((len(struc_nodes), 3))
 
+    # --- initial conditions ---
+    initial_conditions = []
+    if config.get("is_with_initial_point_velocity"):
+        raise ValueError("Error: initial point velocity has never been defined")
+    vel_ini = np.zeros((len(struc_nodes), 3))
+
+    fixed_set = set(int(i) for i in struc_geometry.get("fixed_point_indices", []))
     for i in range(len(struc_nodes)):
-        fixed = i in struc_geometry["fixed_point_indices"]
+        fixed = i in fixed_set
         initial_conditions.append([struc_nodes[i], vel_ini[i], m_arr[i], fixed])
 
     pulley_matrix = []
     spring_matrix = []
+
+    # Deduplicate pulleys: remember which (ci,cj,ck) we’ve emitted already
+    seen_pulley_triplets = set()
 
     for idx, (cicj, k, c, l0, linktype) in enumerate(
         zip(conn_arr, k_arr, c_arr, l0_arr, linktype_arr)
@@ -33,28 +38,39 @@ def instantiate(
         lt = str(linktype).lower()
 
         if lt == "pulley":
-            # mapping stores: { str(idx) -> [pulley_node(=cj), ck, l0_other] }
-            pulley_node, ck, l0_other = pulley_line_to_other_node_pair_dict[str(idx)]
-            ck = int(ck)
+            # Expect mapping: { str(idx) : [cj, ck, l0_other, ci, cj, ck] }
+            map_val = pulley_line_to_other_node_pair_dict.get(str(idx))
+            if map_val is None:
+                # No mapping (indexing mismatch) → skip or raise
+                # Here we skip gracefully and treat as spring to avoid crashing:
+                spring_matrix.append([ci, cj, float(k), float(c), float(l0), lt])
+                continue
 
-            # This row already encodes a single pulley with two halves:
-            # current half: ci -- cj (rest length l0_1 = l0)
-            # other  half: cj -- ck (rest length l0_2 = l0_other)
-            l0_1 = float(l0)
-            l0_2 = float(l0_other)
-            k1 = float(k)
-            c1 = float(c)
+            # Extract the full triplet from the mapping to avoid ambiguity
+            # (the last three elements are [ci, cj, ck] in your initializer)
+            try:
+                ci_map, cj_map, ck = int(map_val[3]), int(map_val[4]), int(map_val[5])
+            except Exception:
+                # Fallback to using [cj, ck] plus current ci
+                cj_map, ck = int(map_val[0]), int(map_val[1])
+                ci_map = ci
 
-            # Effective series properties (assuming same EA on both halves):
-            # EA = k1 * l0_1  ->  k_eff = EA / (l0_1 + l0_2)
-            l0_tot = l0_1 + l0_2
-            k_eff = (k1 * l0_1) / l0_tot if l0_tot != 0.0 else 0.0
-            alpha = (c1 / k1) if k1 != 0.0 else 0.0  # damping per stiffness
+            triplet = (ci_map, cj_map, ck)
+            if triplet in seen_pulley_triplets:
+                continue
+            seen_pulley_triplets.add(triplet)
+
+            # Recover EA and consistent effective properties
+            l0_total = float(l0)  # total rest length of the *whole* line
+            k1 = float(k)  # equals EA / l0_total
+            EA = k1 * l0_total
+            k_eff = 0.0 if l0_total == 0.0 else EA / l0_total  # == k1
+            alpha = (float(c) / k1) if k1 != 0.0 else 0.0  # damping per stiffness
             c_eff = alpha * k_eff
 
-            # pyfe3d pulley format: [n1, pulley_node(=cj), n3, k_eff, c_eff, l0_total]
-            pulley_matrix.append([ci, cj, ck, k_eff, c_eff, l0_tot])
+            # pyfe3d pulley: [n1, pulley_node(=cj), n3, k_eff, c_eff, l0_total]
+            pulley_matrix.append([ci_map, cj_map, ck, k_eff, c_eff, l0_total])
 
         else:
-            # spring format: [n1, n2, k, c, l0, springtype]
+            # Regular spring: [n1, n2, k, c, l0, springtype]
             spring_matrix.append([ci, cj, float(k), float(c), float(l0), lt])

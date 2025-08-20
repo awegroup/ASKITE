@@ -112,11 +112,9 @@ def main(
     tracking.update_tracking_arrays(
         tracking_data,
         0,
-        psystem,
         struc_nodes,
-        struc_nodes,
-        np.zeros(np.shape(struc_nodes)),
-        np.zeros(np.shape(struc_nodes)),
+        np.zeros(np.shape(struc_nodes.flatten())),
+        np.zeros(np.shape(struc_nodes.flatten())),
     )
 
     ######################################################################
@@ -227,9 +225,7 @@ def main(
             tracking.update_tracking_arrays(
                 tracking_data,
                 i,
-                psystem,
                 struc_nodes,
-                struc_nodes_prev,
                 f_ext_flat,
                 f_residual,
             )

@@ -9,18 +9,72 @@ This code is a design-tool, to be used in the kite-design process for finding pe
 
 ![AI-generated-AWE_illustration](doc/images/AI_generated_AWE.png)
 
-# Files Structure
-| File/Directory | Content |
-| -------------- | ------- |
-| data           | Input data and output/results of the code. |
-| doc            | Currently contains an attempt at making Sphinx documentation. |
-| README.md      | Description of the project/repository overview. |
-| requirements.txt | Description of project dependencies. |
-| scripts       | Python scripts and Jupyter-notebooks. |
-| settings       | config.yaml file with all settings. |
-| src            | The Python Packages (see detailed list below). |
-| test           | Attempt at writing test functions. |
-| venv_phd       | Virtual environment files. |
+
+# Project Structure
+
+| File/Directory         | Content |
+|-----------------------|---------|
+| data/                 | Input data (YAML, geometry, etc.) and simulation results. |
+| docs/                 | Sphinx documentation and images. |
+| examples/             | Main entry points for running and analyzing simulations. See below. |
+| requirements.txt      | Project dependencies. |
+| settings/             | Configuration files (e.g., config.yaml). |
+| src/                  | Main Python package source code (see details below). |
+| tests/                | Test scripts and utilities. |
+| venv/                 | Python virtual environment (not tracked in git). |
+| README.md             | This file. |
+
+## Main Simulation Workflow
+
+The typical workflow consists of:
+
+1. **Running a simulation**: Use `examples/run_simulation.py` to set up, run, and save a new simulation. This script:
+	- Loads configuration and geometry from YAML files in `data/`.
+	- Initializes aerodynamic and structural models (using modules in `src/kitesim/`).
+	- Runs the coupled aero-structural solver.
+	- Saves results to an HDF5 file in the results directory.
+
+2. **Loading and analyzing results**: Use `examples/load_simulation.py` to load a previously saved simulation output and visualize or post-process the results. This script:
+	- Loads the HDF5 results file.
+	- Prints summary information about the run.
+	- Provides interactive 3D visualization of the kite structure and its evolution.
+
+## Details for `src/` Directory
+
+The `src/kitesim/` directory contains the main simulation modules:
+
+| Module                        | Purpose |
+|-------------------------------|---------|
+| aerodynamic.py                | Aerodynamic model setup and calculations |
+| aerostructural_coupled_solver.py | Main coupled solver for aero-structural simulation |
+| structural_pss.py             | Structural solver using the Particle System Simulator (PSS) |
+| structural_pyfe3d.py          | Structural solver using pyfe3d (alternative) |
+| aero2struc.py                 | Mapping between aerodynamic and structural meshes |
+| read_struc_geometry_yaml.py   | Utilities for reading geometry and configuration from YAML |
+| plotting.py                   | 3D and interactive plotting utilities |
+| tracking.py                   | Tracking and post-processing of simulation data |
+| utils.py                      | General utilities (file I/O, config, etc.) |
+| logging_config.py             | Logging setup for the package |
+| solver.py, struc2aero.py      | Additional solver and mapping utilities |
+| __init__.py                   | Package initialization |
+
+## Example Usage
+
+To run a new simulation:
+
+```bash
+python examples/run_simulation.py
+```
+
+To load and interactively analyze a previous simulation:
+
+```bash
+python examples/load_simulation.py
+```
+
+See the docstrings in those scripts for more details on their workflow and configuration.
+
+---
 
 
 ## More details per folder

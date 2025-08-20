@@ -83,8 +83,10 @@ def main():
     #     f"len(pulley_line_to_other_node_pair_dict): {len(pulley_line_to_other_node_pair_dict)}"
     # )
 
-    # for idx, conn in enumerate(conn_arr):
-    #     print(f"conn_arr[{idx}]: {conn}")
+    for idx, conn in enumerate(conn_arr):
+        print(
+            f"{idx}: conn: {conn}, l0: {l0_arr[idx]}, k: {k_arr[idx]}, c: {c_arr[idx]}, linktype: {linktype_arr[idx]}"
+        )
     # print(f"pulley_line_indices: \n{pulley_line_indices}")
     # print(
     #     f"pulley_line_to_other_node_pair_dict: \n{pulley_line_to_other_node_pair_dict}"
@@ -120,16 +122,6 @@ def main():
             linktype_arr,
             pulley_line_to_other_node_pair_dict,
         )
-        ##TODO: dealing with rest-lengths, not read properly by ParticleSystemSimulator it seems
-        for idx, curr_set_rest_length in enumerate(psystem.extract_rest_length):
-            #     # delta = rest_lengths[idx] - set_res_len
-            #     # if np.abs(delta) > 0.25:
-            #     #     print(f"\nci,cj: {kite_connectivity[idx][0]}, {kite_connectivity[idx][1]}")
-            #     #     print(f"set res len: {set_res_len}")
-            #     #     print(f"rest length: {rest_lengths[idx]}")
-            #     #     print(f"Delta l0: {rest_lengths[idx] - set_res_len}")
-            delta = curr_set_rest_length - l0_arr[idx]
-            psystem.update_rest_length(idx, 0.01 * delta)
         if config["is_with_initial_structure_plot"]:
             structural_pss.plot_3d_kite_structure(
                 struc_nodes,
