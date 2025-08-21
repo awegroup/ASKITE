@@ -286,7 +286,6 @@ def plot_3d_kite_structure(
 
 def instantiate(
     config,
-    struc_geometry,
     struc_nodes,
     m_arr,
     conn_arr,
@@ -317,7 +316,7 @@ def instantiate(
         vel_ini = np.zeros((len(struc_nodes), 3))
 
     for i in range(len(struc_nodes)):
-        if i in struc_geometry["fixed_point_indices"]:
+        if i in config["structural_pss"]["fixed_point_indices"]:
             pss_initial_conditions.append([struc_nodes[i], vel_ini[i], m_arr[i], True])
         else:
             pss_initial_conditions.append([struc_nodes[i], vel_ini[i], m_arr[i], False])

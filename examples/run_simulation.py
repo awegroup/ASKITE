@@ -98,7 +98,6 @@ def main():
         ) = structural_pss.instantiate(
             # yaml files
             config,
-            struc_geometry,
             # node level
             struc_nodes,
             m_arr,
@@ -115,7 +114,7 @@ def main():
                 struc_nodes,
                 pss_connectivity,
                 power_tape_index,
-                fixed_nodes=struc_geometry["fixed_point_indices"],
+                fixed_nodes=config["structural_pss"]["fixed_point_indices"],
                 pulley_nodes=pulley_node_indices,
             )
     elif config["structural_solver"] == "pyfe3d":
