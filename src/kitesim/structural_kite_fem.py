@@ -1,5 +1,6 @@
 import numpy as np
 from kite_fem.FEMStructure import FEM_structure
+from matplotlib import pyplot as plt
 
 
 def instantiate(
@@ -87,12 +88,21 @@ def instantiate(
         pulley_matrix=pulley_matrix,
     )
 
-    fem_structure.plot_3D(color="blue")
-    from matplotlib import pyplot as plt
+    # if is_plot is True:
+    #     fem_structure.plot_3D(color="blue")
+    #     plt.show()
+    #     plt.close()
 
-    plt.show()
-
-    print(f"FEM structure: {fem_structure}")
-
-    breakpoint()
     return fem_structure, initial_conditions, pulley_matrix, spring_matrix
+
+
+def extract_rest_length(fem_structure):
+    """
+    Extracts the rest lengths of the spring elements in the FEM structure.
+
+    Args:
+        fem_structure (FEM_structure): The FEM structure object containing spring elements.
+    Returns:
+
+    """
+    return np.array([link.l0 for link in fem_structure.spring_elements])

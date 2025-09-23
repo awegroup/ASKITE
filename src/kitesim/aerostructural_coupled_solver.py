@@ -11,6 +11,7 @@ from kitesim import (
     structural_pss,
     tracking,
     plotting,
+    structural_kite_fem,
 )
 
 
@@ -92,7 +93,13 @@ def main(
         )
     else:
         f_ext_gravity = np.zeros(struc_nodes.shape)
+
+    ##TODO: replace with initial_conditions
+    # seems the same as initial_conditions
+    # PSS src/code--> self.__particles.append(Particle(x, v, m, f))
+    # replace with initial_conditions from structural_kite_fem
     initial_particles = copy.deepcopy(psystem.particles)
+
     t_vector = np.linspace(
         1,
         config["aero_structural_solver"]["max_iter"],
@@ -174,6 +181,8 @@ def main(
             f_ext = np.round(f_ext, 5)
 
             if config["is_with_struc_plot_per_iteration"]:
+                ##TODO: replace extract_rest_length
+                # with structural_kite_fem.extract_rest_length()
                 plotting.main(
                     struc_nodes,
                     pss_connectivity,
@@ -205,6 +214,24 @@ def main(
                 f_int = psystem.f_int
 
             elif config["structural_solver"] == "kite_fem":
+                ##TODO: implement kite_fem solver
+                # need to change the fe to a 6d vector, with fx,fy,fz and mx, my, mz
+                # 2. fe_6d = [[fe[0],fe[1],fe[2],0,0,0] for fe in f_ext_flat]
+                # 3. fem_structure.solve(
+                #   fe=f_6d,
+                #   config['structural_kite_fem']['max_iterations'],
+                #   config['structural_kite_fem']['tolerance'],
+                #   config['structural_kite_fem']['step_limit'],
+                #   config['structural_kite_fem']['relax_init'],
+                #   config['structural_kite_fem']['relax_update'],
+                #   config['structural_kite_fem']['k_update'],
+                #   config['structural_kite_fem']['I_stiffness'],
+                # )
+                # --> when convergence
+                # coordinates_flat_array = fem_structure.coords_current
+                # 4. fem_structure.coords_init()
+                # 5. change current with re-initilasiatoinaoginoeng function
+
                 raise ValueError("kite_fem solver is not implemented yet")
 
             end_time_f_int = time.time()
@@ -311,6 +338,7 @@ def main(
     ## END OF SIMULATION FOR LOOP
     ######################################################################
     if config["is_with_final_plot"]:
+        ##TODO: replace psystem.particles with coords_current
         plotting.main(
             np.array([particle.x for particle in psystem.particles]),
             pss_connectivity,
