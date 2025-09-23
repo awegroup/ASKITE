@@ -68,9 +68,16 @@ def instantiate(
             alpha = (float(c) / k1) if k1 != 0.0 else 0.0  # damping per stiffness
             c_eff = alpha * k_eff
 
-            # pyfe3d pulley: [n1, pulley_node(=cj), n3, k_eff, c_eff, l0_total]
+            # pyfe3d pulley: [ci, cj, ck, k_eff, c_eff, l0_total]
             pulley_matrix.append([ci_map, cj_map, ck, k_eff, c_eff, l0_total])
 
         else:
-            # Regular spring: [n1, n2, k, c, l0, springtype]
+            # Regular spring: [ci, cj, k, c, l0, springtype]
             spring_matrix.append([ci, cj, float(k), float(c), float(l0), lt])
+
+    ##TODO: use the defined inputs to initialize the pyfe3d
+    initial_conditions = initial_conditions  # [[x,y,z,vel_x,vel_y,vel_z,m,fixed]]
+    pulley_matrix = pulley_matrix  # [[ci, cj, ck, k_eff, c_eff, l0_total], ...]
+    spring_matrix = spring_matrix  # [[ci, cj, k, c, l0, springtype], ...]
+
+    return initial_conditions, pulley_matrix, spring_matrix
