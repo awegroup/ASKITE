@@ -15,10 +15,8 @@ from kitesim import (
     aerodynamic,
     # struc2aero,
     aero2struc,
+    structural_kite_fem,
     structural_pss,
-    structural_pyfe3d,
-    # tracking,
-    # plotting,
     aerostructural_coupled_solver,
     read_struc_geometry_yaml,
 )
@@ -117,19 +115,21 @@ def main():
                 fixed_nodes=config["structural_pss"]["fixed_point_indices"],
                 pulley_nodes=pulley_node_indices,
             )
-    elif config["structural_solver"] == "pyfe3d":
-        ### py3fe -- https://github.com/saullocastro/pyfe3d
-        structural_pyfe3d.instantiate(
-            config,
-            struc_geometry,
-            struc_nodes,
-            conn_arr,
-            l0_arr,
-            k_arr,
-            c_arr,
-            m_arr,
-            linktype_arr,
-            pulley_line_to_other_node_pair_dict,
+    elif config["structural_solver"] == "kite_fem":
+        ### kite_fem -- https://github.com/awegroup/kite_fem
+        fem_structure, initial_conditions, pulley_matrix, spring_matrix = (
+            structural_kite_fem.instantiate(
+                config,
+                struc_geometry,
+                struc_nodes,
+                conn_arr,
+                l0_arr,
+                k_arr,
+                c_arr,
+                m_arr,
+                linktype_arr,
+                pulley_line_to_other_node_pair_dict,
+            )
         )
 
     else:

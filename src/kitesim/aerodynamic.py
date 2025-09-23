@@ -31,7 +31,7 @@ def initialize(
         spanwise_panel_distribution=config["aerodynamic"][
             "spanwise_panel_distribution"
         ],
-        is_with_bridles=False,
+        # is_with_bridles=False,
     )
 
     vsm_solver = Solver(

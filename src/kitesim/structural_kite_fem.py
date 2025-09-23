@@ -1,4 +1,5 @@
 import numpy as np
+from kite_fem.FEMStructure import FEM_structure
 
 
 def instantiate(
@@ -80,4 +81,18 @@ def instantiate(
     pulley_matrix = pulley_matrix  # [[ci, cj, ck, k_eff, c_eff, l0_total], ...]
     spring_matrix = spring_matrix  # [[ci, cj, k, c, l0, springtype], ...]
 
-    return initial_conditions, pulley_matrix, spring_matrix
+    fem_structure = FEM_structure(
+        initial_conditions=initial_conditions,
+        spring_matrix=spring_matrix,
+        pulley_matrix=pulley_matrix,
+    )
+
+    fem_structure.plot_3D(color="blue")
+    from matplotlib import pyplot as plt
+
+    plt.show()
+
+    print(f"FEM structure: {fem_structure}")
+
+    breakpoint()
+    return fem_structure, initial_conditions, pulley_matrix, spring_matrix

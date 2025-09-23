@@ -204,8 +204,8 @@ def main(
                 # Extracting internal force
                 f_int = psystem.f_int
 
-            elif config["structural_solver"] == "pyfe3d":
-                raise ValueError("pyfe3d solver is not implemented yet")
+            elif config["structural_solver"] == "kite_fem":
+                raise ValueError("kite_fem solver is not implemented yet")
 
             end_time_f_int = time.time()
 

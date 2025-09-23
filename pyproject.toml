@@ -27,7 +27,9 @@ dependencies = [
     "tqdm",
     "PSS @ git+https://github.com/awegroup/Particle_System_Simulator.git@main",
     "VSM @ git+https://github.com/ocayon/Vortex-Step-Method.git@develop",
-    "pathlib"]
+    "pathlib",
+    "kite_fem @ git+https://github.com/awegroup/kite_fem.git"
+]
 requires-python = ">=3.8"
 authors = [
   {name = "Jelle Poland"}
