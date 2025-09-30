@@ -71,7 +71,9 @@ def instantiate(
             c_eff = alpha * k_eff
 
             # pyfe3d pulley: [ci, cj, ck, k_eff, c_eff, l0_total]
-            pulley_matrix.append([ci_map, cj_map, ck, k_eff, c_eff, l0_total])
+            ##TODO: fix this beun oplossing
+            if ci_map != cj_map:
+                pulley_matrix.append([ci_map, cj_map, ck, k_eff, c_eff, l0_total])
 
         else:
             # Regular spring: [ci, cj, k, c, l0, springtype]
@@ -82,27 +84,37 @@ def instantiate(
     pulley_matrix = pulley_matrix  # [[ci, cj, ck, k_eff, c_eff, l0_total], ...]
     spring_matrix = spring_matrix  # [[ci, cj, k, c, l0, springtype], ...]
 
-    fem_structure = FEM_structure(
+    kite_fem_structure = FEM_structure(
         initial_conditions=initial_conditions,
         spring_matrix=spring_matrix,
         pulley_matrix=pulley_matrix,
     )
 
+    # print(f"initial_conditions: {initial_conditions[0:3]}")
+    # breakpoint()
+    # print(f"\n pulley_matrix: {pulley_matrix[0:3]}")
+    # for pulley in pulley_matrix:
+    # print(f"  pulley: {pulley}")
+
+    # print(f"\n spring_matrix: {spring_matrix[0:10]}")
+
+    # breakpoint()
+
     # if is_plot is True:
-    #     fem_structure.plot_3D(color="blue")
+    #     kite_fem_structure.plot_3D(color="blue")
     #     plt.show()
     #     plt.close()
 
-    return fem_structure, initial_conditions, pulley_matrix, spring_matrix
+    return kite_fem_structure, initial_conditions, pulley_matrix, spring_matrix
 
 
-def extract_rest_length(fem_structure):
+def extract_rest_length(kite_fem_structure):
     """
     Extracts the rest lengths of the spring elements in the FEM structure.
 
     Args:
-        fem_structure (FEM_structure): The FEM structure object containing spring elements.
+        kite_fem_structure (FEM_structure): The FEM structure object containing spring elements.
     Returns:
 
     """
-    return np.array([link.l0 for link in fem_structure.spring_elements])
+    return np.array([link.l0 for link in kite_fem_structure.spring_elements])

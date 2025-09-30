@@ -115,21 +115,36 @@ def main():
                 fixed_nodes=config["structural_pss"]["fixed_point_indices"],
                 pulley_nodes=pulley_node_indices,
             )
+
+        # setting kite_fem related output to None
+        kite_fem_structure = None
+        kite_fem_initial_conditions = None
+        kite_fem_pulley_matrix = None
+        kite_fem_spring_matrix = None
     elif config["structural_solver"] == "kite_fem":
+        # setting psm related output to None
+        psystem = None
+        pss_connectivity = None
+        pss_initial_conditions = None
+        pss_params = None
+
         ### kite_fem -- https://github.com/awegroup/kite_fem
-        fem_structure, initial_conditions, pulley_matrix, spring_matrix = (
-            structural_kite_fem.instantiate(
-                config,
-                struc_geometry,
-                struc_nodes,
-                conn_arr,
-                l0_arr,
-                k_arr,
-                c_arr,
-                m_arr,
-                linktype_arr,
-                pulley_line_to_other_node_pair_dict,
-            )
+        (
+            kite_fem_structure,
+            kite_fem_initial_conditions,
+            kite_fem_pulley_matrix,
+            kite_fem_spring_matrix,
+        ) = structural_kite_fem.instantiate(
+            config,
+            struc_geometry,
+            struc_nodes,
+            conn_arr,
+            l0_arr,
+            k_arr,
+            c_arr,
+            m_arr,
+            linktype_arr,
+            pulley_line_to_other_node_pair_dict,
         )
 
     else:
@@ -159,51 +174,64 @@ def main():
     logging.info(
         f"Desired depower tape length: {initial_length_power_tape + power_tape_final_extension:.3f}m"
     )
-    initial_length_steering_left = l0_arr[steering_tape_indices[0]]
-    initial_length_steering_right = l0_arr[steering_tape_indices[1]]
-    steering_tape_extension_step = config["steering_tape_extension_step"]
-    steering_tape_final_extension = config["steering_tape_final_extension"]
-    if steering_tape_extension_step != 0:
-        n_steering_tape_steps = int(
-            steering_tape_final_extension / steering_tape_extension_step
-        )
-    else:
-        n_steering_tape_steps = 0
 
-    if config["structural_solver"] == "pss":
-        psystem.update_rest_length(
-            steering_tape_indices[0], -steering_tape_final_extension
+    if config["steering_tape_extension_step"] != 0:
+        raise NotImplementedError(
+            "Steering tape actuation not implemented yet, set steering_tape_extension_step to 0."
         )
-        psystem.update_rest_length(
-            steering_tape_indices[1], steering_tape_final_extension
-        )
-    elif config["structural_solver"] == "pyfe3d":
-        raise ValueError("pyfe3d solver is not implemented yet")
+
+        ##TODO: get steering tape actuation back in
+        # initial_length_steering_left = l0_arr[steering_tape_indices[0]]
+        # initial_length_steering_right = l0_arr[steering_tape_indices[1]]
+        # steering_tape_extension_step = config["steering_tape_extension_step"]
+        # steering_tape_final_extension = config["steering_tape_final_extension"]
+        # if steering_tape_extension_step != 0:
+        #     n_steering_tape_steps = int(
+        #         steering_tape_final_extension / steering_tape_extension_step
+        #     )
+        # else:
+        #     n_steering_tape_steps = 0
+
+        # if config["structural_solver"] == "pss":
+        #     psystem.update_rest_length(
+        #         steering_tape_indices[0], -steering_tape_final_extension
+        #     )
+        #     psystem.update_rest_length(
+        #         steering_tape_indices[1], steering_tape_final_extension
+        #     )
+        # elif config["structural_solver"] == "kite_fem":
+        #     raise ValueError("kite_fem solver is not implemented yet")
 
     ########################################
     ### AEROSTUCTURAL COUPLED SIMULATION ###
     ########################################
     tracking_data, meta = aerostructural_coupled_solver.main(
-        m_arr,
-        struc_nodes,
-        psystem,
-        struc_node_le_indices,
-        struc_node_te_indices,
-        body_aero,
-        vsm_solver,
-        vel_app,
-        initial_polar_data,
-        aero2struc_mapping,
-        pss_connectivity,
-        pss_params,
-        power_tape_index,
-        initial_length_power_tape,
-        n_power_tape_steps,
-        power_tape_final_extension,
-        power_tape_extension_step,
-        config,
-        pulley_line_indices,
-        pulley_line_to_other_node_pair_dict,
+        m_arr=m_arr,
+        struc_nodes=struc_nodes,
+        psystem=psystem,
+        struc_node_le_indices=struc_node_le_indices,
+        struc_node_te_indices=struc_node_te_indices,
+        body_aero=body_aero,
+        vsm_solver=vsm_solver,
+        vel_app=vel_app,
+        initial_polar_data=initial_polar_data,
+        aero2struc_mapping=aero2struc_mapping,
+        pss_connectivity=pss_connectivity,
+        pss_params=pss_params,
+        power_tape_index=power_tape_index,
+        initial_length_power_tape=initial_length_power_tape,
+        n_power_tape_steps=n_power_tape_steps,
+        power_tape_final_extension=power_tape_final_extension,
+        power_tape_extension_step=power_tape_extension_step,
+        config=config,
+        pulley_line_indices=pulley_line_indices,
+        pulley_line_to_other_node_pair_dict=pulley_line_to_other_node_pair_dict,
+        ### kite fem specifics ###
+        kite_fem_structure=kite_fem_structure,
+        kite_fem_initial_conditions=kite_fem_initial_conditions,
+        kite_fem_pulley_matrix=kite_fem_pulley_matrix,
+        kite_fem_spring_matrix=kite_fem_spring_matrix,
+        l0_arr=l0_arr,
     )
 
     # Save results

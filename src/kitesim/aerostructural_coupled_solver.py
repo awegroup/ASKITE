@@ -52,26 +52,32 @@ def forcing_symmetry(struc_nodes):
 
 
 def main(
-    m_arr,
-    struc_nodes,
-    psystem,
-    struc_node_le_indices,
-    struc_node_te_indices,
-    body_aero,
-    vsm_solver,
-    vel_app,
-    initial_polar_data,
-    aero2struc_mapping,
-    pss_connectivity,
-    pss_params,
-    power_tape_index,
-    initial_length_power_tape,
-    n_power_tape_steps,
-    power_tape_final_extension,
-    power_tape_extension_step,
-    config: dict,
-    pulley_line_indices,
-    pulley_line_to_other_node_pair_dict,
+    m_arr=None,
+    struc_nodes=None,
+    psystem=None,
+    struc_node_le_indices=None,
+    struc_node_te_indices=None,
+    body_aero=None,
+    vsm_solver=None,
+    vel_app=None,
+    initial_polar_data=None,
+    aero2struc_mapping=None,
+    pss_connectivity=None,
+    pss_params=None,
+    power_tape_index=None,
+    initial_length_power_tape=None,
+    n_power_tape_steps=None,
+    power_tape_final_extension=None,
+    power_tape_extension_step=None,
+    config=None,
+    pulley_line_indices=None,
+    pulley_line_to_other_node_pair_dict=None,
+    ### kite_fem specifics ###
+    kite_fem_structure=None,
+    kite_fem_initial_conditions=None,
+    kite_fem_pulley_matrix=None,
+    kite_fem_spring_matrix=None,
+    l0_arr=None,
 ):
     """
     Runs the aero-structural solver for the given input parameters.
@@ -94,11 +100,13 @@ def main(
     else:
         f_ext_gravity = np.zeros(struc_nodes.shape)
 
-    ##TODO: replace with initial_conditions
-    # seems the same as initial_conditions
-    # PSS src/code--> self.__particles.append(Particle(x, v, m, f))
-    # replace with initial_conditions from structural_kite_fem
-    initial_particles = copy.deepcopy(psystem.particles)
+    if config["structural_solver"] == "pss":
+        initial_particles = copy.deepcopy(psystem.particles)
+    elif config["structural_solver"] == "kite_fem":
+        initial_particles = copy.deepcopy(kite_fem_initial_conditions)
+        rest_lengths = kite_fem_structure.modify_get_spring_rest_length()
+    else:
+        raise ValueError("Invalid structural solver specified in config.")
 
     t_vector = np.linspace(
         1,
@@ -172,7 +180,7 @@ def main(
                 is_with_coupling_plot=config["is_with_coupling_plot_per_iteration"],
             )
 
-            # TODO: get bridle line forces back in to play
+            ## TODO: get bridle line forces back in to play
             f_aero_bridle = np.zeros(struc_nodes.shape)
             f_aero = f_aero_wing + f_aero_bridle
 
@@ -181,12 +189,14 @@ def main(
             f_ext = np.round(f_ext, 5)
 
             if config["is_with_struc_plot_per_iteration"]:
-                ##TODO: replace extract_rest_length
-                # with structural_kite_fem.extract_rest_length()
+                if config["structural_solver"] == "pss":
+                    rest_lengths = psystem.extract_rest_length
+                elif config["structural_solver"] == "kite_fem":
+                    rest_lengths = kite_fem_structure.modify_get_spring_rest_length()
                 plotting.main(
                     struc_nodes,
                     pss_connectivity,
-                    psystem.extract_rest_length,
+                    rest_lengths,
                     f_ext=f_ext,
                     title=f"i: {i}",
                     body_aero=body_aero,
@@ -214,6 +224,38 @@ def main(
                 f_int = psystem.f_int
 
             elif config["structural_solver"] == "kite_fem":
+                # reset to this iteration (sets coords_current to initial coords)
+                kite_fem_structure.reset()
+
+                # [fx, fy, fz, mx, my, mz] for each node
+                f_ext_reshaped = f_ext_flat.reshape(-1, 3)
+                fe_6d = [[fe[0], fe[1], fe[2], 0, 0, 0] for fe in f_ext_reshaped]
+                fe_6d = np.array(fe_6d).flatten()
+
+                # plotting
+                # kite_fem_structure.plot_3D()
+                # print(f"fe_6d: {fe_6d}")
+                # breakpoint()
+
+                kite_fem_structure.solve(
+                    fe=fe_6d,
+                    max_iterations=config["structural_kite_fem"]["max_iterations"],
+                    tolerance=config["structural_kite_fem"]["tolerance"],
+                    step_limit=config["structural_kite_fem"]["step_limit"],
+                    relax_init=config["structural_kite_fem"]["relax_init"],
+                    relax_update=config["structural_kite_fem"]["relax_update"],
+                    k_update=config["structural_kite_fem"]["k_update"],
+                    I_stiffness=config["structural_kite_fem"]["I_stiffness"],
+                )
+                struc_nodes = kite_fem_structure.coords_current
+                # reshape from flat to (n_nodes, 3)
+                struc_nodes = struc_nodes.reshape(-1, 3)
+                f_int = kite_fem_structure.fi
+                # remove moments
+                f_int = f_int.reshape(-1, 6)[:, :3].flatten()
+                ##TODO: get convergence status from kite_fem_structure.solve
+                converged = True
+
                 ##TODO: implement kite_fem solver
                 # need to change the fe to a 6d vector, with fx,fy,fz and mx, my, mz
                 # 2. fe_6d = [[fe[0],fe[1],fe[2],0,0,0] for fe in f_ext_flat]
@@ -232,7 +274,9 @@ def main(
                 # 4. fem_structure.coords_init()
                 # 5. change current with re-initilasiatoinaoginoeng function
 
-                raise ValueError("kite_fem solver is not implemented yet")
+                # raise ValueError("kite_fem solver is not implemented yet")
+                # kite_fem_structure.plot_convergence()
+                # kite_fem_structure.plot_3D(fe=fe_6d)
 
             end_time_f_int = time.time()
 
@@ -257,10 +301,22 @@ def main(
                 f_residual,
             )
             ## calculating delta tape lengths
-            delta_power_tape = (
-                psystem.extract_rest_length[power_tape_index]
-                - initial_length_power_tape
-            )
+            if config["structural_solver"] == "pss":
+                delta_power_tape = (
+                    psystem.extract_rest_length[power_tape_index]
+                    - initial_length_power_tape
+                )
+            ##TODO: implement depower tape length change for kite_fem
+            ##TODO: fix this
+            elif config["structural_solver"] == "kite_fem":
+                delta_power_tape = (
+                    rest_lengths[power_tape_index] + power_tape_extension_step
+                )
+                rest_lengths = kite_fem_structure.modify_get_spring_rest_length(
+                    spring_ids=[power_tape_index], new_l0s=[new_l0_depower_tape]
+                )
+                delta_power_tape = 0
+                print(f"NOT IMPLEMENTED: delta_power_tape for kite_fem")
 
             pbar.set_postfix(
                 {
@@ -337,14 +393,34 @@ def main(
     ######################################################################
     ## END OF SIMULATION FOR LOOP
     ######################################################################
+    # TODO: move reshaping and so on to structural solver files
+    if config["structural_solver"] == "pss":
+        current_particles = np.array([particle.x for particle in psystem.particles])
+        print(f"psystem: {psystem}")
+        rest_lengths = psystem.extract_rest_length
+        particles_ini = np.array(initial_particles)
+        # reshape to current_particles shape
+        particles_ini = initial_particles.reshape(current_particles.shape)
+    elif config["structural_solver"] == "kite_fem":
+        current_particles = struc_nodes
+        rest_lengths = kite_fem_structure.modify_get_spring_rest_length()
+        # For kite_fem, initial_particles is already a flat array, reshape it properly
+        if isinstance(initial_particles, np.ndarray):
+            # If it's already a numpy array, reshape it to match current_particles
+            particles_ini = initial_particles.reshape(-1, 6)[:, :3]
+            particles_ini = particles_ini.reshape(current_particles.shape)
+        else:
+            # If it's still a list/other format, convert appropriately
+            particles_ini = np.array(initial_particles).reshape(-1, 6)[:, :3]
+            particles_ini = particles_ini.reshape(current_particles.shape)
     if config["is_with_final_plot"]:
-        ##TODO: replace psystem.particles with coords_current
+
         plotting.main(
-            np.array([particle.x for particle in psystem.particles]),
+            current_particles,
             pss_connectivity,
             f_ext=f_ext,
-            rest_lengths=psystem.extract_rest_length,
-            struc_nodes_initial=np.array([p.x for p in initial_particles]),
+            rest_lengths=rest_lengths,
+            struc_nodes_initial=particles_ini,
             title="Initial  vs final",
             pulley_line_indices=pulley_line_indices,
             pulley_line_to_other_node_pair_dict=pulley_line_to_other_node_pair_dict,
@@ -361,7 +437,7 @@ def main(
         "total_time_s": time.time() - start_time,
         "n_iter": i + 1,
         "converged": is_convergence,
-        "rest_lengths": np.array(psystem.extract_rest_length),  # ensure numeric array
+        "rest_lengths": rest_lengths,  # ensure numeric array
         "kite_connectivity": kite_connectivity_numeric,
     }
 
