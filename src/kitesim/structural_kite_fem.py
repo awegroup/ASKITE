@@ -89,7 +89,8 @@ def instantiate(
         pulley_matrix=pulley_matrix,
     )
     struc_nodes_initial = np.array([node_data[0] for node_data in initial_conditions])
-
+    kite_fem_structure.update_internal_forces()
+    
     return (
         kite_fem_structure,
         initial_conditions,
@@ -97,7 +98,6 @@ def instantiate(
         spring_matrix,
         struc_nodes_initial,
     )
-
 
 def run_kite_fem(
     kite_fem_structure,
@@ -127,10 +127,8 @@ def run_kite_fem(
     # reshape from flat to (n_nodes, 3)
     struc_nodes = struc_nodes.reshape(-1, 3)
     f_int = -kite_fem_structure.fi
-    
     #set fixed nodes to the values of -fe_6d 
     f_int = np.where(kite_fem_structure.bu==True,f_int,-fe_6d)
-
     # remove moments
     f_int = f_int.reshape(-1, 6)[:, :3].flatten()
     return kite_fem_structure, is_structural_converged, struc_nodes, f_int

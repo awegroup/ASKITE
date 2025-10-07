@@ -324,6 +324,7 @@ def main(
             ## EXTERNAL FORCE
             f_ext = f_aero + f_ext_gravity
             f_ext = np.round(f_ext, 5)
+            f_ext_flat = f_ext.flatten()
 
             if config["is_with_struc_plot_per_iteration"]:
                 if config["structural_solver"] == "pss":
@@ -343,9 +344,19 @@ def main(
                     pulley_line_indices=pulley_line_indices,
                     pulley_line_to_other_node_pair_dict=pulley_line_to_other_node_pair_dict,
                 )
-
+                
+            ### RESIDUAL FEM
+            if config["structural_solver"] == "kite_fem":
+                if i > 0:
+                    f_residual = f_int + f_ext_flat
+                if i ==0:
+                    f_residual = f_ext_flat
+                f_residual_list.append(np.linalg.norm(np.abs(f_residual)))
+                logging.debug(
+                    f"residual force in y-direction: {np.sum([f_residual[1::3]]):.3f}N"
+                )
+            
             ### STRUC
-            f_ext_flat = f_ext.flatten()
             end_time_f_ext = time.time()
             begin_time_f_int = time.time()
             if config["structural_solver"] == "pss":
@@ -369,12 +380,13 @@ def main(
                 logging.info("Forcing symmetry in y-direction")
                 struc_nodes = forcing_symmetry(struc_nodes)
 
-            ### RESIDUAL
-            f_residual = f_int + f_ext_flat
-            f_residual_list.append(np.linalg.norm(np.abs(f_residual)))
-            logging.debug(
-                f"residual force in y-direction: {np.sum([f_residual[1::3]]):.3f}N"
-            )
+            ### RESIDUAL PSM
+            if config["structural_solver"] == "pss":
+                f_residual = f_int + f_ext_flat
+                f_residual_list.append(np.linalg.norm(np.abs(f_residual)))
+                logging.debug(
+                    f"residual force in y-direction: {np.sum([f_residual[1::3]]):.3f}N"
+                )
 
             ### TRACKING
             # Update unified tracking dataframe (replaces position update)
