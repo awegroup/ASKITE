@@ -105,7 +105,7 @@ def aero2struc_NN_vsm(
     struc_nodes: np.ndarray,
     panel_cps: np.ndarray,
     panel_corner_map: np.ndarray,
-    p: float = 2,
+    power_for_inverse_weighting: float = 2,
     eps: float = 1e-6,
     is_with_coupling_plot: bool = False,
 ):
@@ -135,7 +135,7 @@ def aero2struc_NN_vsm(
 
         # true inverse-distance weighting across the 4 nodes
         d = np.linalg.norm(sel_coords - cp[None, :], axis=1)
-        w = 1.0 / (d**p + eps)
+        w = 1.0 / (d**power_for_inverse_weighting + eps)
         w /= np.sum(w)
 
         f_vals = w[:, None] * frc[None, :]  # (4,3)
@@ -230,8 +230,7 @@ def main(
     panel_cp_locations: np.ndarray,
     aero2struc_mapping: np.ndarray,
     is_with_coupling_plot: bool,
-    p=2,
-    eps=1e-6,
+    config_aer2struc: dict,
 ):
     """
     Main interface for mapping aerodynamic panel forces to structural nodes.
@@ -250,16 +249,15 @@ def main(
         np.ndarray: Forces on structural nodes (n_struc,3).
     """
 
-    if coupling_method == "NN":
-        f_aero_wing = aero2struc_NN_vsm(
+    if coupling_method == config_aer2struc["coupling_method"]:
+        return aero2struc_NN_vsm(
             f_aero_wing_vsm_format,  # (n_panels,3)
             struc_nodes,  # (n_struc,3)
             panel_cp_locations,  # (n_panels,3)
             aero2struc_mapping,  # (n_panels,4)
-            p=p,
-            eps=eps,
+            power_for_inverse_weighting=config_aer2struc["power_for_inverse_weighting"],
+            eps=config_aer2struc["eps"],
             is_with_coupling_plot=is_with_coupling_plot,
         )
     else:
         raise ValueError("Coupling method not recognized; wrong name or typo")
-    return f_aero_wing

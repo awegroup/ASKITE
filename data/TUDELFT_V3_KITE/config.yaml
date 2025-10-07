@@ -61,6 +61,8 @@ structural_kite_fem:
 ## aero2struc
 aero2struc:
   coupling_method: !!str "NN"
+  eps: !!float 1e-6
+  power_for_inverse_weighting: !!float 2.0
 
 ## coupled
 aero_structural_solver:

@@ -52,21 +52,77 @@ def forcing_symmetry(struc_nodes):
     return struc_nodes
 
 
+def update_power_tape_actuation(
+    config,
+    psystem,
+    kite_fem_structure,
+    power_tape_index,
+    power_tape_extension_step,
+    initial_length_power_tape,
+    power_tape_final_extension,
+    is_residual_below_tol,
+    n_power_tape_steps,
+    rest_lengths=None,
+):
+    """
+    Calculate current power tape extension and update if needed for actuation.
+
+    Args:
+        config: Configuration dictionary
+        psystem: Particle system (for PSS solver)
+        kite_fem_structure: FEM structure (for kite_fem solver)
+        power_tape_index: Index of power tape in connectivity array
+        power_tape_extension_step: Increment for power tape extension
+        initial_length_power_tape: Initial length of power tape
+        power_tape_final_extension: Final desired power tape extension
+        is_residual_below_tol: Flag indicating if residual is below tolerance
+        n_power_tape_steps: Number of power tape extension steps
+        rest_lengths: Current rest lengths array (for kite_fem solver)
+
+    Returns:
+        tuple: (delta_power_tape, is_actuation_finalized)
+            - delta_power_tape: Current change in power tape length
+            - is_actuation_finalized: True if actuation is complete, False otherwise
+    """
+    is_actuation_finalized = True
+
+    ## Calculate delta tape lengths based on structural solver
+    if config["structural_solver"] == "pss":
+        delta_power_tape = (
+            psystem.extract_rest_length[power_tape_index] - initial_length_power_tape
+        )
+
+        # Check if we need to extend the power tape
+        if is_residual_below_tol and delta_power_tape <= power_tape_final_extension:
+            psystem.update_rest_length(power_tape_index, power_tape_extension_step)
+            delta_power_tape = (
+                psystem.extract_rest_length[power_tape_index]
+                - initial_length_power_tape
+            )
+            logging.info(
+                f"||--- delta l_d: {delta_power_tape:.3f}m | new l_d: {psystem.extract_rest_length[power_tape_index]:.3f}m | Steps required: {n_power_tape_steps}"
+            )
+            is_actuation_finalized = False
+
+    elif config["structural_solver"] == "kite_fem":
+        # TODO: get power tape actuation working again for kite_fem
+        delta_power_tape = rest_lengths[power_tape_index] + power_tape_extension_step
+        rest_lengths = kite_fem_structure.modify_get_spring_rest_length(
+            spring_ids=[power_tape_index], new_l0s=[delta_power_tape]
+        )
+        delta_power_tape = 0
+        logging.warning("NOT IMPLEMENTED: delta_power_tape for kite_fem")
+
+    return delta_power_tape, is_actuation_finalized
+
+
 # TODO: this should also use structural is not converging
 def check_convergence(
     i,
     f_residual,
     f_residual_list,
     f_aero_wing_vsm_format,
-    is_residual_below_tol,
-    delta_power_tape,
-    n_power_tape_steps,
-    power_tape_final_extension,
-    power_tape_extension_step,
-    initial_length_power_tape,
     config,
-    psystem=None,
-    power_tape_index=None,
 ):
     """
     Check convergence conditions for the aero-structural solver.
@@ -76,33 +132,19 @@ def check_convergence(
         f_residual: Current residual force vector
         f_residual_list: List of residual force norms from all iterations
         f_aero_wing_vsm_format: Aerodynamic forces in VSM format
-        is_residual_below_tol: Flag indicating if residual is below tolerance
-        delta_power_tape: Current change in power tape length
-        n_power_tape_steps: Number of power tape extension steps
-        power_tape_final_extension: Final desired power tape extension
-        power_tape_extension_step: Increment for power tape extension
-        initial_length_power_tape: Initial length of power tape
         config: Configuration dictionary
-        psystem: Particle system (for PSS solver)
-        power_tape_index: Index of power tape in connectivity array
 
     Returns:
-        tuple: (is_convergence, should_break, is_residual_below_tol, delta_power_tape)
+        tuple: (is_convergence, should_break)
             - is_convergence: True if converged, False otherwise
             - should_break: True if loop should break, False to continue
-            - is_residual_below_tol: Updated flag for residual tolerance
-            - delta_power_tape: Updated power tape extension
     """
     is_convergence = False
     should_break = False
 
     ### All the convergence checks, are be done in if-elif because only 1 should hold at once
     # if convergence (residual below set tolerance)
-    if (
-        i > n_power_tape_steps
-        and np.linalg.norm(f_residual) <= config["aero_structural_solver"]["tol"]
-    ):
-        is_residual_below_tol = True
+    if np.linalg.norm(f_residual) <= config["aero_structural_solver"]["tol"]:
         is_convergence = True
 
     # if residual forces are NaN
@@ -138,24 +180,7 @@ def check_convergence(
         logging.info("Classic PS non-converging - aero forces are NaN")
         should_break = True
 
-    ## if convergenced and not yet at desired depower-tape length
-    elif is_residual_below_tol and delta_power_tape <= power_tape_final_extension:
-        if psystem is not None and power_tape_index is not None:
-            psystem.update_rest_length(power_tape_index, power_tape_extension_step)
-            delta_power_tape = (
-                psystem.extract_rest_length[power_tape_index]
-                - initial_length_power_tape
-            )
-            logging.info(
-                f"||--- delta l_d: {delta_power_tape:.3f}m | new l_d: {psystem.extract_rest_length[power_tape_index]:.3f}m | Steps required: {n_power_tape_steps}"
-            )
-        is_residual_below_tol = False
-
-    ## if convergenced and all changes are made
-    elif is_residual_below_tol:
-        is_convergence = True
-
-    return is_convergence, should_break, is_residual_below_tol, delta_power_tape
+    return is_convergence, should_break
 
 
 def main(
@@ -280,11 +305,11 @@ def main(
                 struc_nodes,
                 np.array(results_aero["panel_cp_locations"]),
                 aero2struc_mapping,
-                p=2,
-                eps=1e-6,
-                is_with_coupling_plot=config["is_with_coupling_plot_per_iteration"],
+                config["is_with_coupling_plot_per_iteration"],
+                config["aero2struc"],
             )
 
+            ### BRIDLE AERO
             f_aero_bridle = aerodynamic_bridle_line_drag.main(
                 struc_nodes,
                 bridle_connectivity_arr,
@@ -296,7 +321,7 @@ def main(
             )
             f_aero = f_aero_wing + f_aero_bridle
 
-            ## summing up
+            ## EXTERNAL FORCE
             f_ext = f_aero + f_ext_gravity
             f_ext = np.round(f_ext, 5)
 
@@ -324,31 +349,34 @@ def main(
             end_time_f_ext = time.time()
             begin_time_f_int = time.time()
             if config["structural_solver"] == "pss":
-                psystem, is_converged, struc_nodes, f_int = structural_pss.run_pss(
-                    psystem,
-                    f_ext_flat,
-                    config["structural_pss"],
+                psystem, is_structural_converged, struc_nodes, f_int = (
+                    structural_pss.run_pss(
+                        psystem,
+                        f_ext_flat,
+                        config["structural_pss"],
+                    )
                 )
             elif config["structural_solver"] == "kite_fem":
-                kite_fem_structure, is_converged, struc_nodes, f_int = (
+                kite_fem_structure, is_structural_converged, struc_nodes, f_int = (
                     structural_kite_fem.run_kite_fem(
                         kite_fem_structure, f_ext_flat, config["structural_kite_fem"]
                     )
                 )
             end_time_f_int = time.time()
 
-            # Forcing symmetry
+            ### FORCING SYMMETRY
             if config["is_with_forcing_symmetry"]:
                 logging.info("Forcing symmetry in y-direction")
                 struc_nodes = forcing_symmetry(struc_nodes)
 
-            # Computing residual forces
+            ### RESIDUAL
             f_residual = f_int + f_ext_flat
             f_residual_list.append(np.linalg.norm(np.abs(f_residual)))
             logging.debug(
                 f"residual force in y-direction: {np.sum([f_residual[1::3]]):.3f}N"
             )
 
+            ### TRACKING
             # Update unified tracking dataframe (replaces position update)
             tracking.update_tracking_arrays(
                 tracking_data,
@@ -357,24 +385,8 @@ def main(
                 f_ext_flat,
                 f_residual,
             )
-            ## calculating delta tape lengths
-            if config["structural_solver"] == "pss":
-                delta_power_tape = (
-                    psystem.extract_rest_length[power_tape_index]
-                    - initial_length_power_tape
-                )
-            ##TODO: get power tape actuation working again
-            elif config["structural_solver"] == "kite_fem":
-                delta_power_tape = (
-                    rest_lengths[power_tape_index] + power_tape_extension_step
-                )
-                rest_lengths = kite_fem_structure.modify_get_spring_rest_length(
-                    spring_ids=[power_tape_index], new_l0s=[delta_power_tape]
-                )
-                delta_power_tape = 0
-                print(f"NOT IMPLEMENTED: delta_power_tape for kite_fem")
 
-            # Update progress bar for esthetics
+            ### PROGRESS BAR
             pbar.set_postfix(
                 {
                     "res": f"{np.linalg.norm(f_residual):.3f}N",
@@ -384,26 +396,44 @@ def main(
             )
             pbar.update(1)
 
-            # Check convergence conditions
-            is_convergence, should_break, is_residual_below_tol, delta_power_tape = (
-                check_convergence(
-                    i=i,
-                    f_residual=f_residual,
-                    f_residual_list=f_residual_list,
-                    f_aero_wing_vsm_format=f_aero_wing_vsm_format,
-                    is_residual_below_tol=is_residual_below_tol,
-                    delta_power_tape=delta_power_tape,
-                    n_power_tape_steps=n_power_tape_steps,
-                    power_tape_final_extension=power_tape_final_extension,
-                    power_tape_extension_step=power_tape_extension_step,
-                    initial_length_power_tape=initial_length_power_tape,
-                    config=config,
-                    psystem=psystem,
-                    power_tape_index=power_tape_index,
-                )
+            ### CHECK CONVERGENCE
+            is_convergence, should_break = check_convergence(
+                i=i,
+                f_residual=f_residual,
+                f_residual_list=f_residual_list,
+                f_aero_wing_vsm_format=f_aero_wing_vsm_format,
+                config=config,
             )
 
-            if should_break or is_convergence:
+            ### ACTUATION (only when converged)
+            if is_convergence:
+                # Update residual flag for actuation function
+                is_residual_below_tol = is_convergence
+
+                delta_power_tape, is_actuation_finalized = update_power_tape_actuation(
+                    config=config,
+                    psystem=psystem,
+                    kite_fem_structure=kite_fem_structure,
+                    power_tape_index=power_tape_index,
+                    power_tape_extension_step=power_tape_extension_step,
+                    initial_length_power_tape=initial_length_power_tape,
+                    power_tape_final_extension=power_tape_final_extension,
+                    is_residual_below_tol=is_residual_below_tol,
+                    n_power_tape_steps=n_power_tape_steps,
+                    rest_lengths=(
+                        rest_lengths
+                        if config["structural_solver"] == "kite_fem"
+                        else None
+                    ),
+                )
+
+                # If actuation not finalized, continue to next iteration
+                if not is_actuation_finalized:
+                    # ACTUATION PHASE: Continue until power tape reaches final extension
+                    continue
+
+            # Check if we should exit the loop
+            if should_break or (is_convergence and is_actuation_finalized):
                 break
     ######################################################################
     ## END OF SIMULATION FOR LOOP

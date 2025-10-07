@@ -123,15 +123,15 @@ def run_pss(psystem, f_ext, config_structural_pss):
         E_kin.append(np.linalg.norm(psystem.x_v_current[1] ** 2))
         f_int.append(np.linalg.norm(psystem.f_int))
 
-        is_converged = False
+        is_structural_converged = False
         if step_internal > 10:
             if np.max(E_kin[-10:-1]) <= E_kin_tol:
-                is_converged = True
-        if is_converged and step_internal > 1:
+                is_structural_converged = True
+        if is_structural_converged and step_internal > 1:
             # print("Kinetic damping PS is_converged", step_internal)
             break
 
-    logging.debug(f"PS is_converged: {is_converged}")
+    logging.debug(f"PS is_structural_converged: {is_structural_converged}")
     # logging.debug(f"position.loc[step].shape: {position.loc[step].shape}")
     logging.debug(f"internal force: {psystem.f_int}")
     logging.debug(f"external force: {f_ext}")
@@ -140,7 +140,7 @@ def run_pss(psystem, f_ext, config_structural_pss):
     # Extracting internal force
     f_int = psystem.f_int
 
-    return psystem, is_converged, struc_nodes, f_int
+    return psystem, is_structural_converged, struc_nodes, f_int
 
 
 def plot_3d_kite_structure(
