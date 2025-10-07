@@ -1,15 +1,14 @@
 <p><a target="_blank" href="https://app.eraser.io/workspace/TpUXeyQRIqink6xG9qgk" id="edit-in-eraser-github-link"><img alt="Edit in Eraser" src="https://firebasestorage.googleapis.com/v0/b/second-petal-295822.appspot.com/o/images%2Fgithub%2FOpen%20in%20Eraser.svg?alt=media&amp;token=968381c8-a7e7-472a-8ed6-4a6626da5501"></a></p>
 
-# ASKITE: Aero-ctructural coupled kite simulator
+# ASKITE: Aero-structural coupled kite simulator
 
 [![Python package testing](https://github.com/jellepoland/kitesim/actions/workflows/testing.yml/badge.svg?branch=main)](https://github.com/jellepoland/kitesim/actions/workflows/testing.yml)
 
-Github should automatically render a TOC?
 
 ## Purpose
-This code is a design-tool, to be used in the kite-design process for finding performance characteristics of soft-wing kites without the need for flying them.
-
-![AI-generated-AWE_illustration](doc/images/AI_generated_AWE.png)
+This code is designed for aero-structural coupled simulations, which can be utilized in the kite design process to determine the performance characteristics of soft-wing kites without the need for actual flight testing.
+It includes the [TU Delft V3 Kite](https://awegroup.github.io/TUDELFT_V3_KITE/) as an example, and relies primarly on:
+- 
 
 
 # Project Structure
@@ -78,7 +77,6 @@ See the docstrings in those scripts for more details on their workflow and confi
 
 ---
 
-
 ## More details per folder
 [data](doc/data/data.md)
 
@@ -136,80 +134,116 @@ The process involves several steps:
 
 </details>
 
-# Installation instructions
-
-...
-Should contain instructions about how to get this as a pip package and for the developers, how to run the pip package in developer mode.
-
-## Authors
-J.A.W. Poland
-
->  [!WARNING]
-should show a warning 
-
-## License is not yet clear
-Apache? CC-BY-2?
-
->  [!NOTE]
-should show a note 
-
-## How to Cite
-Poland JAW, Schmehl R. Modelling Aero-Structural Deformation of Flexible Membrane Kites. Energies. 2023; 16(14):5264. [﻿https://doi.org/10.3390/en16145264](https://doi.org/10.3390/en16145264) 
-
-## Example usage
->  [!IMPORTANT]
-should show a sort of important message 
 
 ## Installation Instructions
+1. Clone the repository:
+    ```bash
+    git clone https://github.com/ocayon/Vortex-Step-Method
+    ```
 
-### Developer
-Clone the repo
-```bash
-git clone https://github.com/jellepoland/kitesim
+2. Navigate to the repository folder:
+    ```bash
+    cd Vortex-Step-Method
+    ```
+    
+3. Create a virtual environment:
+   
+   Linux or Mac:
+    ```bash
+    python3 -m venv venv
+    ```
+    
+    Windows:
+    ```bash
+    python -m venv venv
+    ```
+    
+5. Activate the virtual environment:
+
+   Linux or Mac:
+    ```bash
+    source venv/bin/activate
+    ```
+
+    Windows
+    ```bash
+    .\venv\Scripts\activate
+    ```
+
+6. Install the required dependencies:
+
+   For users:
+    ```bash
+    pip install .
+    ```
+        
+   For developers:
+    ```bash
+    pip install -e .[dev]
+    ```
+    
+    For ubuntu add:
+    ```
+    pip install pyqt5
+    sudo apt install cm-super
+    sudo apt install dvipng
+   ```
+
+7. To deactivate the virtual environment:
+    ```bash
+    deactivate
+    ```
+
+## Dependencies
+See [pyproject.toml](pyproject.toml)
+
+**Machine Learning**
+
+The code base is adapted to work with a machine learning model trained on more than a hundred thousands Reynolds-average Navier Stokes (RANS) Computational Fluid Dynamics (CFD) simulations made for leading-edge inflatable airfoils, documented in the MSc. thesis of [K.R.G. Masure](https://resolver.tudelft.nl/uuid:865d59fc-ccff-462e-9bac-e81725f1c0c9), the [code base is also open-source accessible](https://github.com/awegroup/Pointwise-Openfoam-toolchain).
+
+As the three trained models, for Reynolds number = 1e6, 5e6 and 1e7 are too large (~2.3GB) for GitHub, they have to be downloaded separately, and added to the `data/ml_models` folder. They are accessible trough [Zenodo](https://doi.org/10.5281/zenodo.16925758), and so is the [CFD data](https://doi.org/10.5281/zenodo.16925833) on which the models are trained. More description on its usages is found in [Airfoil Aerodynamics](docs/AirfoilAerodynamics.md).
+
+## Contributing Guide
+Please report issues and create pull requests using the URL:
+```
+https://github.com/ocayon/Vortex-Step-Method/
 ```
 
-Go into the repo folder
-```bash
-cd kitesim
+This is required because you cannot/should not do it using the URL
+```
+https://github.com/awegroup/Vortex-Step-Method
 ```
 
-Create a new venv with the following command:
-```bash
-python -m venv venv
+We welcome contributions to this project! Whether you're reporting a bug, suggesting a feature, or writing code, here’s how you can contribute:
+
+1. **Create an issue** on GitHub
+2. **Create a branch** from this issue
+   ```bash
+   git checkout -b issue_number-new-feature
+   ```
+3. --- Implement your new feature---
+4. Verify nothing broke using **pytest**
 ```
-
-Activate the venv with the following command:
-```bash
-source venv/bin/activate
+  pytest
 ```
-
-Execute the following command in the root directory of the repository:
-```bash
-pip install -e .[dev]
+5. **Commit your changes** with a descriptive message
 ```
-
-The venv can be deactivated with the following command:
-```bash
-deactivate
+  git commit -m "#<number> <message>"
 ```
+6. **Push your changes** to the github repo:
+   git push origin branch-name
+   
+7. **Create a pull-request**, with `base:develop`, to merge this feature branch
+8. Once the pull request has been accepted, **close the issue**
 
-### Depencies and their versions
-## Questions
-First check out the FAQs section: -link to FAQs-
-For now questions open an issue: -link to issues page-
+## Citation
+If you use this project in your research, please consider citing it. 
+Citation details can be found in the [CITATION.cff](CITATION.cff) file included in this repository.
 
-## Contribution Guide
-### Trying some stuff
-Short summary 
+## License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod
-tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam,
-quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo
-consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse
-cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non
-proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+### Copyright
 
-
-
-
-<!--- Eraser file: https://app.eraser.io/workspace/TpUXeyQRIqink6xG9qgk --->
+Copyright (c) 2023 Jelle Poland, TU Delft
+Copyright (c) 2023 Jelle Poland, Patrick Roeleveld, TU Delft
