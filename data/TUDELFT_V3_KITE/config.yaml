@@ -57,7 +57,8 @@ structural_kite_fem:
   relax_update: !!float 0.95
   k_update: !!int 1
   I_stiffness: !!int 25 #V3 kite: 25
-
+  print_info: !!bool false
+  
 ## aero2struc
 aero2struc:
   coupling_method: !!str "NN"
