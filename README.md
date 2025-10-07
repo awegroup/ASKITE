@@ -4,9 +4,9 @@
 
 
 ## Purpose
+
 This code is designed for aero-structural coupled simulations, which can be utilized in the kite design process to determine the performance characteristics of soft-wing kites without the need for actual flight testing.
 It includes the [TU Delft V3 Kite](https://awegroup.github.io/TUDELFT_V3_KITE/) as an example, and relies primarly on:
-- 
 
 
 # Project Structure
