@@ -16,7 +16,7 @@ from kitesim import (
 )
 
 
-# TODO: remove hardcoded values, when changing away from V3
+# Remove hardcoded values, when changing away from V3
 def forcing_symmetry(struc_nodes):
     """
     Forcing symmetry in the y-direction for the kite structure nodes.
@@ -52,6 +52,7 @@ def forcing_symmetry(struc_nodes):
     return struc_nodes
 
 
+# TODO: this should also use structural is not converging
 def check_convergence(
     i,
     f_residual,
@@ -329,7 +330,6 @@ def main(
                     config["structural_pss"],
                 )
             elif config["structural_solver"] == "kite_fem":
-                # TODO: get is_converged from kite_fem, inside structural_kite_fem.py
                 kite_fem_structure, is_converged, struc_nodes, f_int = (
                     structural_kite_fem.run_kite_fem(
                         kite_fem_structure, f_ext_flat, config["structural_kite_fem"]

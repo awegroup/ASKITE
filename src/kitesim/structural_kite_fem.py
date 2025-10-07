@@ -112,9 +112,7 @@ def run_kite_fem(
     fe_6d = [[fe[0], fe[1], fe[2], 0, 0, 0] for fe in f_ext_reshaped]
     fe_6d = np.array(fe_6d).flatten()
 
-    ##TODO: add is_converged = to FEM_structure.solve
-    is_converged = True
-    kite_fem_structure.solve(
+    is_converged = kite_fem_structure.solve(
         fe=fe_6d,
         max_iterations=config_structural_kite_fem["max_iterations"],
         tolerance=config_structural_kite_fem["tolerance"],
