@@ -20,9 +20,8 @@ def main():
     PROJECT_DIR = Path(__file__).resolve().parents[1]
 
     # load files
-    results_dir = Path(PROJECT_DIR) / "results" / f"V3_25" / f"2025_06_03_1027h"
     results_dir = (
-        Path(PROJECT_DIR) / "results" / f"TUDELFT_V3_KITE" / f"2025_08_20_1634h"
+        Path(PROJECT_DIR) / "results" / f"TUDELFT_V3_KITE" / f"2025_10_07_0941h"
     )
     h5_path = Path(results_dir) / "sim_output.h5"
     meta_data_dict, tracking_data = load_sim_output(h5_path)
@@ -42,7 +41,7 @@ def main():
     # --- Interactive plot ---
     plotting.interactive_plot(
         tracking_data=tracking_data,
-        kite_connectivity=np.array(meta_data_dict["kite_connectivity"]),
+        kite_connectivity_arr=np.array(meta_data_dict["kite_connectivity"]),
         rest_lengths=np.array(meta_data_dict["rest_lengths"]),
         f_ext=tracking_data["f_ext"],
         title="PSM Interactive",

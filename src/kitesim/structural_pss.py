@@ -1,19 +1,161 @@
 import logging
 import numpy as np
 import matplotlib.pyplot as plt
+import copy
 from PSS.particleSystem.SpringDamper import SpringDamperType
 from PSS.particleSystem import ParticleSystem
 
 
+def instantiate(
+    config,
+    struc_nodes,
+    m_arr,
+    kite_connectivity_arr,
+    l0_arr,
+    k_arr,
+    c_arr,
+    linktype_arr,
+    pulley_line_to_other_node_pair_dict,
+):
+    # TODO: add l0 to the instantiate method and change ParticleSystem accordingly
+    pss_connectivity = []
+    for cicj, k, c, l0, linktype in zip(
+        kite_connectivity_arr, k_arr, c_arr, l0_arr, linktype_arr
+    ):
+        pss_connectivity.append(
+            [
+                int(cicj[0]),
+                int(cicj[1]),
+                float(k),
+                float(c),
+                # float(l0),
+                SpringDamperType(linktype.lower()),
+            ]
+        )
+
+    pss_initial_conditions = []
+    if config["is_with_initial_point_velocity"]:
+        raise ValueError("Error: initial point velocity has never been defined")
+    else:
+        vel_ini = np.zeros((len(struc_nodes), 3))
+
+    for i in range(len(struc_nodes)):
+        if i in config["structural_pss"]["fixed_point_indices"]:
+            pss_initial_conditions.append([struc_nodes[i], vel_ini[i], m_arr[i], True])
+        else:
+            pss_initial_conditions.append([struc_nodes[i], vel_ini[i], m_arr[i], False])
+
+    pss_params = {
+        "pulley_other_line_pair": pulley_line_to_other_node_pair_dict,
+        "dt": config["structural_pss"]["dt"],
+        "t_steps": config["structural_pss"]["n_internal_time_steps"],
+        "abs_tol": config["structural_pss"]["abs_tol"],
+        "rel_tol": config["structural_pss"]["rel_tol"],
+        "max_iter": config["structural_pss"]["max_iter"],
+    }
+
+    psystem = ParticleSystem(
+        pss_connectivity,
+        pss_initial_conditions,
+        pss_params,
+    )
+
+    ##TODO: dealing with rest-lengths, not read properly by the internal ParticleSystemSimulator
+    # the below WORKS, but should be fixed properly internally instead
+    for idx, curr_set_rest_length in enumerate(psystem.extract_rest_length):
+        # when line is a pulley it needs special attention
+        if str(idx) in pulley_line_to_other_node_pair_dict.keys():
+            cj, ck, l0_len_cj_ck, l0_len_ci_cj, ci = (
+                pulley_line_to_other_node_pair_dict[str(idx)]
+            )
+            logging.debug(f"--- pulley!: ci: {ci}, cj: {cj}, ck: {ck}")
+
+            l0_this_piece = l0_len_ci_cj
+            delta = curr_set_rest_length - l0_this_piece
+            logging.debug(
+                f"curr_set_rest_length: {curr_set_rest_length}, l0_this_piece: {l0_this_piece}, delta: {delta}"
+            )
+        else:
+            l0_this_piece = l0_arr[idx]
+
+        delta = curr_set_rest_length - l0_this_piece
+        psystem.update_rest_length(idx, delta)
+
+    # struc_nodes_initial
+    struc_nodes_initial = np.array([particle.x for particle in psystem.particles])
+
+    return (
+        psystem,
+        pss_initial_conditions,
+        pss_params,
+        struc_nodes_initial,
+    )
+
+
+def run_pss(psystem, f_ext, config_structural_pss):
+    """
+    Run the particle system simulation with kinetic damping until convergence.
+
+    Args:
+        psystem (ParticleSystem): The particle system to simulate.
+        params (dict): Simulation parameters.
+        f_ext (np.ndarray): Flattened external force vector (n_nodes*3,).
+
+    Returns:
+        psystem (ParticleSystem): The updated particle system after simulation.
+    """
+
+    t_vector_internal = np.linspace(
+        config_structural_pss["dt"],
+        config_structural_pss["internal_time_steps"] * config_structural_pss["dt"],
+        config_structural_pss["internal_time_steps"],
+    )
+    E_kin = []
+    f_int = []
+    E_kin_tol = 1e-3  # 1e-29
+
+    logging.debug(f"Running PS simulation, f_int: {psystem.f_int}")
+
+    # And run the simulation
+    for step_internal in t_vector_internal:
+        psystem.kin_damp_sim(f_ext)
+
+        E_kin.append(np.linalg.norm(psystem.x_v_current[1] ** 2))
+        f_int.append(np.linalg.norm(psystem.f_int))
+
+        is_converged = False
+        if step_internal > 10:
+            if np.max(E_kin[-10:-1]) <= E_kin_tol:
+                is_converged = True
+        if is_converged and step_internal > 1:
+            # print("Kinetic damping PS is_converged", step_internal)
+            break
+
+    logging.debug(f"PS is_converged: {is_converged}")
+    # logging.debug(f"position.loc[step].shape: {position.loc[step].shape}")
+    logging.debug(f"internal force: {psystem.f_int}")
+    logging.debug(f"external force: {f_ext}")
+    # Updating the points
+    struc_nodes = np.array([particle.x for particle in psystem.particles])
+    # Extracting internal force
+    f_int = psystem.f_int
+
+    return psystem, is_converged, struc_nodes, f_int
+
+
 def plot_3d_kite_structure(
-    struc_nodes, connectivity, power_tape_index, fixed_nodes=None, pulley_nodes=None
+    struc_nodes,
+    kite_connectivity_arr,
+    power_tape_index,
+    fixed_nodes=None,
+    pulley_nodes=None,
 ):
     """
     Plot the 3D structure of a kite with enhanced visualization features.
 
     Args:
         struc_nodes (np.ndarray): Array of 3D coordinates for each node (n_nodes, 3).
-        connectivity (list): List of [i, j, k, c, type] for each connection.
+        kite_connectivity_arr (list): List of [i, j, k, c, type] for each connection.
         fixed_nodes (iterable, optional): Indices of fixed nodes.
         pulley_nodes (iterable, optional): Indices of pulley nodes.
 
@@ -34,9 +176,9 @@ def plot_3d_kite_structure(
     else:
         pulley_nodes = set(np.atleast_1d(pulley_nodes))
 
-    # Extract node masses from connectivity (using the m_array would be better if available)
+    # Extract node masses from kite_connectivity_arr (using the m_array would be better if available)
     node_masses = {}
-    for conn in connectivity:
+    for conn in kite_connectivity_arr:
         i, j = int(conn[0]), int(conn[1])
         if hasattr(conn[4], "value"):
             link_type = conn[4].value
@@ -76,7 +218,7 @@ def plot_3d_kite_structure(
 
     # First pass to identify TE lines and bridle lines
     # This is necessary because we need to know which noncompressive lines are TE lines before plotting
-    for conn in connectivity:
+    for conn in kite_connectivity_arr:
         i, j = int(conn[0]), int(conn[1])
 
         if hasattr(conn[4], "value"):
@@ -93,7 +235,7 @@ def plot_3d_kite_structure(
                 te_line_nodes.add(j)
 
     # Plot connections with appropriate styling
-    for conn in connectivity:
+    for conn in kite_connectivity_arr:
         i, j = int(conn[0]), int(conn[1])
         k, c = float(conn[2]), float(conn[3])
 
@@ -208,7 +350,7 @@ def plot_3d_kite_structure(
                 node_labels.append("Free Node")
                 used_labels.add("Free Node")
 
-    for idx, (i, j, k, _, line_type) in enumerate(connectivity):
+    for idx, (i, j, k, _, line_type) in enumerate(kite_connectivity_arr):
         # Get coordinates
         p1 = np.array(struc_nodes[i])
         p2 = np.array(struc_nodes[j])
@@ -282,122 +424,3 @@ def plot_3d_kite_structure(
     plt.tight_layout(rect=[0, 0, 0.85, 1])  # Leave space on the right for the legend
 
     plt.show()
-
-
-def instantiate(
-    config,
-    struc_nodes,
-    m_arr,
-    conn_arr,
-    l0_arr,
-    k_arr,
-    c_arr,
-    linktype_arr,
-    pulley_line_to_other_node_pair_dict,
-):
-    # TODO: add l0 to the instantiate method and change ParticleSystem accordingly
-    pss_connectivity = []
-    for cicj, k, c, l0, linktype in zip(conn_arr, k_arr, c_arr, l0_arr, linktype_arr):
-        pss_connectivity.append(
-            [
-                int(cicj[0]),
-                int(cicj[1]),
-                float(k),
-                float(c),
-                # float(l0),
-                SpringDamperType(linktype.lower()),
-            ]
-        )
-
-    pss_initial_conditions = []
-    if config["is_with_initial_point_velocity"]:
-        raise ValueError("Error: initial point velocity has never been defined")
-    else:
-        vel_ini = np.zeros((len(struc_nodes), 3))
-
-    for i in range(len(struc_nodes)):
-        if i in config["structural_pss"]["fixed_point_indices"]:
-            pss_initial_conditions.append([struc_nodes[i], vel_ini[i], m_arr[i], True])
-        else:
-            pss_initial_conditions.append([struc_nodes[i], vel_ini[i], m_arr[i], False])
-
-    pss_params = {
-        "pulley_other_line_pair": pulley_line_to_other_node_pair_dict,
-        "dt": config["structural_pss"]["dt"],
-        "t_steps": config["structural_pss"]["n_internal_time_steps"],
-        "abs_tol": config["structural_pss"]["abs_tol"],
-        "rel_tol": config["structural_pss"]["rel_tol"],
-        "max_iter": config["structural_pss"]["max_iter"],
-    }
-
-    psystem = ParticleSystem(
-        pss_connectivity,
-        pss_initial_conditions,
-        pss_params,
-    )
-
-    ##TODO: dealing with rest-lengths, not read properly by the internal ParticleSystemSimulator
-    # the below WORKS, but should be fixed properly internally instead
-    for idx, curr_set_rest_length in enumerate(psystem.extract_rest_length):
-        # when line is a pulley it needs special attention
-        if str(idx) in pulley_line_to_other_node_pair_dict.keys():
-            cj, ck, l0_len_cj_ck, l0_len_ci_cj, ci = (
-                pulley_line_to_other_node_pair_dict[str(idx)]
-            )
-            logging.debug(f"--- pulley!: ci: {ci}, cj: {cj}, ck: {ck}")
-
-            l0_this_piece = l0_len_ci_cj
-            delta = curr_set_rest_length - l0_this_piece
-            logging.debug(
-                f"curr_set_rest_length: {curr_set_rest_length}, l0_this_piece: {l0_this_piece}, delta: {delta}"
-            )
-        else:
-            l0_this_piece = l0_arr[idx]
-
-        delta = curr_set_rest_length - l0_this_piece
-        psystem.update_rest_length(idx, delta)
-
-    return (
-        psystem,
-        pss_connectivity,
-        pss_initial_conditions,
-        pss_params,
-    )
-
-
-def run_pss(psystem, params, f_ext):
-    """
-    Run the particle system simulation with kinetic damping until convergence.
-
-    Args:
-        psystem (ParticleSystem): The particle system to simulate.
-        params (dict): Simulation parameters.
-        f_ext (np.ndarray): Flattened external force vector (n_nodes*3,).
-
-    Returns:
-        psystem (ParticleSystem): The updated particle system after simulation.
-    """
-    t_vector_internal = np.linspace(
-        params["dt"], params["t_steps"] * params["dt"], params["t_steps"]
-    )
-    E_kin = []
-    f_int = []
-    E_kin_tol = 1e-3  # 1e-29
-
-    logging.debug(f"Running PS simulation, f_int: {psystem.f_int}")
-
-    # And run the simulation
-    for step_internal in t_vector_internal:
-        psystem.kin_damp_sim(f_ext)
-
-        E_kin.append(np.linalg.norm(psystem.x_v_current[1] ** 2))
-        f_int.append(np.linalg.norm(psystem.f_int))
-
-        converged = False
-        if step_internal > 10:
-            if np.max(E_kin[-10:-1]) <= E_kin_tol:
-                converged = True
-        if converged and step_internal > 1:
-            # print("Kinetic damping PS converged", step_internal)
-            break
-    return psystem, converged

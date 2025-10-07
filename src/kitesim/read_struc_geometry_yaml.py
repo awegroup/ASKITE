@@ -6,7 +6,7 @@ def initialize_wing_structure(
     struc_geometry,
     struc_nodes,
     m_arr,
-    conn_arr,
+    kite_connectivity_arr,
     l0_arr,
     k_arr,
     c_arr,
@@ -56,7 +56,7 @@ def initialize_wing_structure(
         m_arr[ci] += m_element / 2
         m_arr[cj] += m_element / 2
 
-        conn_arr.append([ci, cj])
+        kite_connectivity_arr.append([ci, cj])
         l0_arr.append(wing_elements_dict[conn_name]["l0"])
         k_arr.append(wing_elements_dict[conn_name]["k"])
         c_arr.append(wing_elements_dict[conn_name]["c"])
@@ -74,7 +74,7 @@ def initialize_wing_structure(
         struc_node_le_indices,
         struc_node_te_indices,
         # element level
-        conn_arr,
+        kite_connectivity_arr,
         l0_arr,
         k_arr,
         c_arr,
@@ -88,7 +88,7 @@ def initialize_bridle_line_system(
     struc_geometry,
     struc_nodes,
     m_arr,
-    conn_arr,
+    kite_connectivity_arr,
     l0_arr,
     k_arr,
     c_arr,
@@ -119,7 +119,9 @@ def initialize_bridle_line_system(
     }
 
     # initialize a connectivity counter, that starts with the number of wing_connections
-    conn_idx_counter = len(conn_arr)
+    conn_idx_counter = len(kite_connectivity_arr)
+    bridle_connectivity_arr = []
+    bridle_diameter_arr = []
     pulley_node_indices = []
     pulley_line_indices = []
     pulley_line_to_other_node_pair_dict = {}
@@ -181,7 +183,9 @@ def initialize_bridle_line_system(
             #######################################
             # Dealing with ci-cj
             # add this new connection to the connectivity array, and also increase counter
-            conn_arr.append([ci, cj])
+            kite_connectivity_arr.append([ci, cj])
+            bridle_connectivity_arr.append([ci, cj])
+            bridle_diameter_arr.append(bridle_elements_dict[conn_name]["d"])
             l0_arr.append(l0)
             k_arr.append(k)
             c_arr.append(c)
@@ -209,7 +213,9 @@ def initialize_bridle_line_system(
             #######################################
             # Dealing with cj-ck
             # add this new connection to the connectivity array, and also increase counter
-            conn_arr.append([cj, ck])
+            kite_connectivity_arr.append([cj, ck])
+            bridle_connectivity_arr.append([cj, ck])
+            bridle_diameter_arr.append(bridle_elements_dict[conn_name]["d"])
             l0_arr.append(l0)
             k_arr.append(k)
             c_arr.append(c)
@@ -244,7 +250,9 @@ def initialize_bridle_line_system(
             c = (
                 struc_geometry[material]["damping_per_stiffness"] * k
             )  # Rayleigh damping
-            conn_arr.append([ci, cj])
+            kite_connectivity_arr.append([ci, cj])
+            bridle_connectivity_arr.append([ci, cj])
+            bridle_diameter_arr.append(bridle_elements_dict[conn_name]["d"])
             l0_arr.append(l0)
             k_arr.append(k)
             c_arr.append(c)
@@ -272,7 +280,9 @@ def initialize_bridle_line_system(
         steering_tape_indices,
         pulley_node_indices,
         # element level
-        conn_arr,
+        kite_connectivity_arr,
+        bridle_connectivity_arr,
+        bridle_diameter_arr,
         l0_arr,
         k_arr,
         c_arr,
@@ -291,7 +301,7 @@ def main(struc_geometry):
     m_arr.append(struc_geometry["kcu_mass"])
 
     # initialize element level lists
-    conn_arr = []
+    kite_connectivity_arr = []
     l0_arr = []
     k_arr = []
     c_arr = []
@@ -305,7 +315,7 @@ def main(struc_geometry):
         struc_node_le_indices,
         struc_node_te_indices,
         # element level
-        conn_arr,
+        kite_connectivity_arr,
         l0_arr,
         k_arr,
         c_arr,
@@ -316,7 +326,7 @@ def main(struc_geometry):
         struc_geometry,
         struc_nodes,
         m_arr,
-        conn_arr,
+        kite_connectivity_arr,
         l0_arr,
         k_arr,
         c_arr,
@@ -332,7 +342,9 @@ def main(struc_geometry):
         steering_tape_indices,
         pulley_node_indices,
         # element level
-        conn_arr,
+        kite_connectivity_arr,
+        bridle_connectivity_arr,
+        bridle_diameter_arr,
         l0_arr,
         k_arr,
         c_arr,
@@ -340,12 +352,21 @@ def main(struc_geometry):
         pulley_line_indices,
         pulley_line_to_other_node_pair_dict,
     ) = initialize_bridle_line_system(
-        struc_geometry, struc_nodes, m_arr, conn_arr, l0_arr, k_arr, c_arr, linktype_arr
+        struc_geometry,
+        struc_nodes,
+        m_arr,
+        kite_connectivity_arr,
+        l0_arr,
+        k_arr,
+        c_arr,
+        linktype_arr,
     )
 
     # explicit numpy arrays
     struc_nodes = np.array(struc_nodes)
-    conn_arr = np.array(conn_arr)
+    kite_connectivity_arr = np.array(kite_connectivity_arr)
+    bridle_connectivity_arr = np.array(bridle_connectivity_arr)
+    bridle_diameter_arr = np.array(bridle_diameter_arr)
     l0_arr = np.array(l0_arr)
     k_arr = np.array(k_arr)
     c_arr = np.array(c_arr)
@@ -364,7 +385,9 @@ def main(struc_geometry):
         steering_tape_indices,
         pulley_node_indices,
         # element level
-        conn_arr,
+        kite_connectivity_arr,
+        bridle_connectivity_arr,
+        bridle_diameter_arr,
         l0_arr,
         k_arr,
         c_arr,

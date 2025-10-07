@@ -135,3 +135,91 @@ def calculate_projected_area(points):
     y = hull_points[:, 1]
 
     return 0.5 * np.abs(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1)))
+
+
+def printing_rest_lengths(tracking_data, struc_geometry):
+    """
+    Print the current and initial rest lengths of all bridle lines defined in bridle_elements by
+    averaging the lengths of all their segments in bridle_connections.
+
+    For each connection:
+    - if 3 nodes, sum ci-cj and cj-ck
+    - if 2 nodes, sum ci-cj
+    """
+    positions = tracking_data["positions"]
+    struc_nodes = positions[-1]  # current positions
+    initial_struc_nodes = positions[0]  # initial positions
+
+    bridle_elements_data = struc_geometry["bridle_elements"]["data"]
+    bridle_line_names = [row[0] for row in bridle_elements_data]
+    bridle_connections_data = struc_geometry["bridle_connections"]["data"]
+
+    # YAML l0 lookup dictionary
+    bridle_elements_yaml = {row[0]: row[1] for row in bridle_elements_data}
+
+    print("\nCurrent bridle line lengths:")
+    results = []
+    for line_name in bridle_line_names:
+        total_length = 0.0
+        initial_total_length = 0.0
+        count = 0
+
+        for conn in bridle_connections_data:
+            if conn[0] == line_name:
+                ci = int(conn[1])
+                cj = int(conn[2])
+                if len(conn) > 3 and conn[3] not in (None, "", 0):
+                    ck = int(conn[3])
+                    # current
+                    total_length += np.linalg.norm(struc_nodes[ci] - struc_nodes[cj])
+                    total_length += np.linalg.norm(struc_nodes[cj] - struc_nodes[ck])
+                    # initial
+                    initial_total_length += np.linalg.norm(
+                        initial_struc_nodes[ci] - initial_struc_nodes[cj]
+                    )
+                    initial_total_length += np.linalg.norm(
+                        initial_struc_nodes[cj] - initial_struc_nodes[ck]
+                    )
+                    count += 1
+                else:
+                    # current
+                    total_length += np.linalg.norm(struc_nodes[ci] - struc_nodes[cj])
+                    # initial
+                    initial_total_length += np.linalg.norm(
+                        initial_struc_nodes[ci] - initial_struc_nodes[cj]
+                    )
+                    count += 1
+
+        if count > 0:
+            avg_length = total_length / count
+            initial_avg_length = initial_total_length / count
+            delta_pct = (
+                100.0 * (avg_length - initial_avg_length) / initial_avg_length
+                if initial_avg_length != 0
+                else 0.0
+            )
+
+            # yaml l0 value
+            yaml_l0 = bridle_elements_yaml.get(line_name, None)
+            try:
+                yaml_l0_val = float(yaml_l0) if yaml_l0 is not None else None
+            except Exception:
+                yaml_l0_val = yaml_l0
+
+            delta_yaml_pct = (
+                100.0 * (avg_length - yaml_l0_val) / yaml_l0_val
+                if yaml_l0_val not in (None, 0)
+                else 0.0
+            )
+
+            results.append(
+                f"{line_name}: curr: {avg_length:.3f} m, "
+                f"initial: {initial_avg_length:.3f} m, "
+                f"delta: {delta_pct:+.2f} %, "
+                f"yaml: {yaml_l0_val} m, "
+                f"delta_yaml: {delta_yaml_pct:+.2f} %"
+            )
+
+    # print once
+    for result in results:
+        print(result)

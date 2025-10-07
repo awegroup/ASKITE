@@ -7,7 +7,7 @@ def instantiate(
     config,
     struc_geometry,
     struc_nodes,
-    conn_arr,
+    kite_connectivity_arr,
     l0_arr,
     k_arr,
     c_arr,
@@ -34,7 +34,7 @@ def instantiate(
     seen_pulley_triplets = set()
 
     for idx, (cicj, k, c, l0, linktype) in enumerate(
-        zip(conn_arr, k_arr, c_arr, l0_arr, linktype_arr)
+        zip(kite_connectivity_arr, k_arr, c_arr, l0_arr, linktype_arr)
     ):
         ci, cj = int(cicj[0]), int(cicj[1])
         lt = str(linktype).lower()
@@ -71,7 +71,7 @@ def instantiate(
             c_eff = alpha * k_eff
 
             # pyfe3d pulley: [ci, cj, ck, k_eff, c_eff, l0_total]
-            ##TODO: fix this beun oplossing
+            ##TODO: fix not so clean solution
             if ci_map != cj_map:
                 pulley_matrix.append([ci_map, cj_map, ck, k_eff, c_eff, l0_total])
 
@@ -79,42 +79,56 @@ def instantiate(
             # Regular spring: [ci, cj, k, c, l0, springtype]
             spring_matrix.append([ci, cj, float(k), float(c), float(l0), lt])
 
-    ##TODO: use the defined inputs to initialize the pyfe3d
-    initial_conditions = initial_conditions  # [[x,y,z,vel_x,vel_y,vel_z,m,fixed]]
-    pulley_matrix = pulley_matrix  # [[ci, cj, ck, k_eff, c_eff, l0_total], ...]
-    spring_matrix = spring_matrix  # [[ci, cj, k, c, l0, springtype], ...]
+    # initial_conditions = initial_conditions  # [[x,y,z,vel_x,vel_y,vel_z,m,fixed]]
+    # pulley_matrix = pulley_matrix  # [[ci, cj, ck, k_eff, c_eff, l0_total], ...]
+    # spring_matrix = spring_matrix  # [[ci, cj, k, c, l0, springtype], ...]
 
     kite_fem_structure = FEM_structure(
         initial_conditions=initial_conditions,
         spring_matrix=spring_matrix,
         pulley_matrix=pulley_matrix,
     )
+    struc_nodes_initial = np.array([node_data[0] for node_data in initial_conditions])
 
-    # print(f"initial_conditions: {initial_conditions[0:3]}")
-    # breakpoint()
-    # print(f"\n pulley_matrix: {pulley_matrix[0:3]}")
-    # for pulley in pulley_matrix:
-    # print(f"  pulley: {pulley}")
-
-    # print(f"\n spring_matrix: {spring_matrix[0:10]}")
-
-    # breakpoint()
-
-    # if is_plot is True:
-    #     kite_fem_structure.plot_3D(color="blue")
-    #     plt.show()
-    #     plt.close()
-
-    return kite_fem_structure, initial_conditions, pulley_matrix, spring_matrix
+    return (
+        kite_fem_structure,
+        initial_conditions,
+        pulley_matrix,
+        spring_matrix,
+        struc_nodes_initial,
+    )
 
 
-def extract_rest_length(kite_fem_structure):
-    """
-    Extracts the rest lengths of the spring elements in the FEM structure.
+def run_kite_fem(
+    kite_fem_structure,
+    f_ext_flat,
+    config_structural_kite_fem,
+):
+    # reset to this iteration (sets coords_current to initial coords)
+    kite_fem_structure.reset()
 
-    Args:
-        kite_fem_structure (FEM_structure): The FEM structure object containing spring elements.
-    Returns:
+    # [fx, fy, fz, mx, my, mz] for each node
+    f_ext_reshaped = f_ext_flat.reshape(-1, 3)
+    fe_6d = [[fe[0], fe[1], fe[2], 0, 0, 0] for fe in f_ext_reshaped]
+    fe_6d = np.array(fe_6d).flatten()
 
-    """
-    return np.array([link.l0 for link in kite_fem_structure.spring_elements])
+    ##TODO: add is_converged = to FEM_structure.solve
+    is_converged = True
+    kite_fem_structure.solve(
+        fe=fe_6d,
+        max_iterations=config_structural_kite_fem["max_iterations"],
+        tolerance=config_structural_kite_fem["tolerance"],
+        step_limit=config_structural_kite_fem["step_limit"],
+        relax_init=config_structural_kite_fem["relax_init"],
+        relax_update=config_structural_kite_fem["relax_update"],
+        k_update=config_structural_kite_fem["k_update"],
+        I_stiffness=config_structural_kite_fem["I_stiffness"],
+    )
+    struc_nodes = kite_fem_structure.coords_current
+    # reshape from flat to (n_nodes, 3)
+    struc_nodes = struc_nodes.reshape(-1, 3)
+    f_int = kite_fem_structure.fi
+    # remove moments
+    f_int = f_int.reshape(-1, 6)[:, :3].flatten()
+
+    return kite_fem_structure, is_converged, struc_nodes, f_int

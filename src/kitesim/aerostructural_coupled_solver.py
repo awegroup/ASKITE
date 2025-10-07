@@ -5,13 +5,14 @@ import logging
 from pathlib import Path
 import copy
 from kitesim import (
-    aerodynamic,
+    aerodynamic_vsm,
     struc2aero,
     aero2struc,
     structural_pss,
     tracking,
     plotting,
     structural_kite_fem,
+    aerodynamic_bridle_line_drag,
 )
 
 
@@ -51,33 +52,141 @@ def forcing_symmetry(struc_nodes):
     return struc_nodes
 
 
+def check_convergence(
+    i,
+    f_residual,
+    f_residual_list,
+    f_aero_wing_vsm_format,
+    is_residual_below_tol,
+    delta_power_tape,
+    n_power_tape_steps,
+    power_tape_final_extension,
+    power_tape_extension_step,
+    initial_length_power_tape,
+    config,
+    psystem=None,
+    power_tape_index=None,
+):
+    """
+    Check convergence conditions for the aero-structural solver.
+
+    Args:
+        i: Current iteration number
+        f_residual: Current residual force vector
+        f_residual_list: List of residual force norms from all iterations
+        f_aero_wing_vsm_format: Aerodynamic forces in VSM format
+        is_residual_below_tol: Flag indicating if residual is below tolerance
+        delta_power_tape: Current change in power tape length
+        n_power_tape_steps: Number of power tape extension steps
+        power_tape_final_extension: Final desired power tape extension
+        power_tape_extension_step: Increment for power tape extension
+        initial_length_power_tape: Initial length of power tape
+        config: Configuration dictionary
+        psystem: Particle system (for PSS solver)
+        power_tape_index: Index of power tape in connectivity array
+
+    Returns:
+        tuple: (is_convergence, should_break, is_residual_below_tol, delta_power_tape)
+            - is_convergence: True if converged, False otherwise
+            - should_break: True if loop should break, False to continue
+            - is_residual_below_tol: Updated flag for residual tolerance
+            - delta_power_tape: Updated power tape extension
+    """
+    is_convergence = False
+    should_break = False
+
+    ### All the convergence checks, are be done in if-elif because only 1 should hold at once
+    # if convergence (residual below set tolerance)
+    if (
+        i > n_power_tape_steps
+        and np.linalg.norm(f_residual) <= config["aero_structural_solver"]["tol"]
+    ):
+        is_residual_below_tol = True
+        is_convergence = True
+
+    # if residual forces are NaN
+    elif np.isnan(np.linalg.norm(f_residual)):
+        is_convergence = False
+        logging.info("Classic PS diverged - residual force is NaN")
+        should_break = True
+
+    # if residual forces are not changing anymore
+    elif (
+        i > 15
+        and np.abs(np.mean(f_residual_list[i - 15]) - f_residual_list[i - 10]) < 1
+    ):
+        is_convergence = False
+        logging.info("Classic PS non-converging - residual no longer changes")
+        should_break = True
+
+    # if too many iterations are needed
+    elif i > config["aero_structural_solver"]["max_iter"]:
+        is_convergence = False
+        logging.info(
+            f"Classic PS non-converging - more than max ({config['aero_structural_solver']['max_iter']}) iterations needed"
+        )
+        should_break = True
+
+    # special case for running the simulation for only one timestep
+    elif config["is_run_only_1_time_step"]:
+        should_break = True
+
+    # when aero does not converge
+    elif np.sum([force[1] for force in f_aero_wing_vsm_format]) == np.nan:
+        is_convergence = False
+        logging.info("Classic PS non-converging - aero forces are NaN")
+        should_break = True
+
+    ## if convergenced and not yet at desired depower-tape length
+    elif is_residual_below_tol and delta_power_tape <= power_tape_final_extension:
+        if psystem is not None and power_tape_index is not None:
+            psystem.update_rest_length(power_tape_index, power_tape_extension_step)
+            delta_power_tape = (
+                psystem.extract_rest_length[power_tape_index]
+                - initial_length_power_tape
+            )
+            logging.info(
+                f"||--- delta l_d: {delta_power_tape:.3f}m | new l_d: {psystem.extract_rest_length[power_tape_index]:.3f}m | Steps required: {n_power_tape_steps}"
+            )
+        is_residual_below_tol = False
+
+    ## if convergenced and all changes are made
+    elif is_residual_below_tol:
+        is_convergence = True
+
+    return is_convergence, should_break, is_residual_below_tol, delta_power_tape
+
+
 def main(
     m_arr=None,
     struc_nodes=None,
-    psystem=None,
-    struc_node_le_indices=None,
-    struc_node_te_indices=None,
-    body_aero=None,
-    vsm_solver=None,
-    vel_app=None,
-    initial_polar_data=None,
-    aero2struc_mapping=None,
-    pss_connectivity=None,
-    pss_params=None,
-    power_tape_index=None,
+    struc_nodes_initial=None,
+    config=None,
+    ### ACTUATION
     initial_length_power_tape=None,
     n_power_tape_steps=None,
     power_tape_final_extension=None,
     power_tape_extension_step=None,
-    config=None,
+    ### CONNECTIVITY
+    kite_connectivity_arr=None,
+    bridle_connectivity_arr=None,
     pulley_line_indices=None,
     pulley_line_to_other_node_pair_dict=None,
-    ### kite_fem specifics ###
+    ### STRUC --> AERO
+    struc_node_le_indices=None,
+    struc_node_te_indices=None,
+    ### AERO
+    body_aero=None,
+    vsm_solver=None,
+    vel_app=None,
+    initial_polar_data=None,
+    bridle_diameter_arr=None,
+    ### AERO --> STRUC
+    aero2struc_mapping=None,
+    power_tape_index=None,
+    ### STRUC
+    psystem=None,
     kite_fem_structure=None,
-    kite_fem_initial_conditions=None,
-    kite_fem_pulley_matrix=None,
-    kite_fem_spring_matrix=None,
-    l0_arr=None,
 ):
     """
     Runs the aero-structural solver for the given input parameters.
@@ -100,13 +209,8 @@ def main(
     else:
         f_ext_gravity = np.zeros(struc_nodes.shape)
 
-    if config["structural_solver"] == "pss":
-        initial_particles = copy.deepcopy(psystem.particles)
-    elif config["structural_solver"] == "kite_fem":
-        initial_particles = copy.deepcopy(kite_fem_initial_conditions)
+    if config["structural_solver"] == "kite_fem":
         rest_lengths = kite_fem_structure.modify_get_spring_rest_length()
-    else:
-        raise ValueError("Invalid structural solver specified in config.")
 
     t_vector = np.linspace(
         1,
@@ -154,7 +258,7 @@ def main(
 
             ### AERO
             f_aero_wing_vsm_format, body_aero, results_aero = (
-                aerodynamic.run_vsm_package(
+                aerodynamic_vsm.run_vsm_package(
                     body_aero=body_aero,
                     solver=vsm_solver,
                     le_arr=le_arr,
@@ -180,8 +284,15 @@ def main(
                 is_with_coupling_plot=config["is_with_coupling_plot_per_iteration"],
             )
 
-            ## TODO: get bridle line forces back in to play
-            f_aero_bridle = np.zeros(struc_nodes.shape)
+            f_aero_bridle = aerodynamic_bridle_line_drag.main(
+                struc_nodes,
+                bridle_connectivity_arr,
+                bridle_diameter_arr,
+                vel_app,
+                config["rho"],
+                config["aerodynamic_bridle"]["cd_cable"],
+                config["aerodynamic_bridle"]["cf_cable"],
+            )
             f_aero = f_aero_wing + f_aero_bridle
 
             ## summing up
@@ -193,14 +304,15 @@ def main(
                     rest_lengths = psystem.extract_rest_length
                 elif config["structural_solver"] == "kite_fem":
                     rest_lengths = kite_fem_structure.modify_get_spring_rest_length()
+                    kite_fem_structure.plot_convergence()
+
                 plotting.main(
                     struc_nodes,
-                    pss_connectivity,
+                    kite_connectivity_arr,
                     rest_lengths,
                     f_ext=f_ext,
                     title=f"i: {i}",
                     body_aero=body_aero,
-                    chord_length=2.6,
                     is_with_node_indices=False,
                     pulley_line_indices=pulley_line_indices,
                     pulley_line_to_other_node_pair_dict=pulley_line_to_other_node_pair_dict,
@@ -211,73 +323,18 @@ def main(
             end_time_f_ext = time.time()
             begin_time_f_int = time.time()
             if config["structural_solver"] == "pss":
-                psystem, converged = structural_pss.run_pss(
-                    psystem, pss_params, f_ext_flat
+                psystem, is_converged, struc_nodes, f_int = structural_pss.run_pss(
+                    psystem,
+                    f_ext_flat,
+                    config["structural_pss"],
                 )
-                logging.debug(f"PS converged: {converged}")
-                # logging.debug(f"position.loc[step].shape: {position.loc[step].shape}")
-                logging.debug(f"internal force: {psystem.f_int}")
-                logging.debug(f"external force: {f_ext}")
-                # Updating the points
-                struc_nodes = np.array([particle.x for particle in psystem.particles])
-                # Extracting internal force
-                f_int = psystem.f_int
-
             elif config["structural_solver"] == "kite_fem":
-                # reset to this iteration (sets coords_current to initial coords)
-                kite_fem_structure.reset()
-
-                # [fx, fy, fz, mx, my, mz] for each node
-                f_ext_reshaped = f_ext_flat.reshape(-1, 3)
-                fe_6d = [[fe[0], fe[1], fe[2], 0, 0, 0] for fe in f_ext_reshaped]
-                fe_6d = np.array(fe_6d).flatten()
-
-                # plotting
-                # kite_fem_structure.plot_3D()
-                # print(f"fe_6d: {fe_6d}")
-                # breakpoint()
-
-                kite_fem_structure.solve(
-                    fe=fe_6d,
-                    max_iterations=config["structural_kite_fem"]["max_iterations"],
-                    tolerance=config["structural_kite_fem"]["tolerance"],
-                    step_limit=config["structural_kite_fem"]["step_limit"],
-                    relax_init=config["structural_kite_fem"]["relax_init"],
-                    relax_update=config["structural_kite_fem"]["relax_update"],
-                    k_update=config["structural_kite_fem"]["k_update"],
-                    I_stiffness=config["structural_kite_fem"]["I_stiffness"],
+                # TODO: get is_converged from kite_fem, inside structural_kite_fem.py
+                kite_fem_structure, is_converged, struc_nodes, f_int = (
+                    structural_kite_fem.run_kite_fem(
+                        kite_fem_structure, f_ext_flat, config["structural_kite_fem"]
+                    )
                 )
-                struc_nodes = kite_fem_structure.coords_current
-                # reshape from flat to (n_nodes, 3)
-                struc_nodes = struc_nodes.reshape(-1, 3)
-                f_int = kite_fem_structure.fi
-                # remove moments
-                f_int = f_int.reshape(-1, 6)[:, :3].flatten()
-                ##TODO: get convergence status from kite_fem_structure.solve
-                converged = True
-
-                ##TODO: implement kite_fem solver
-                # need to change the fe to a 6d vector, with fx,fy,fz and mx, my, mz
-                # 2. fe_6d = [[fe[0],fe[1],fe[2],0,0,0] for fe in f_ext_flat]
-                # 3. fem_structure.solve(
-                #   fe=f_6d,
-                #   config['structural_kite_fem']['max_iterations'],
-                #   config['structural_kite_fem']['tolerance'],
-                #   config['structural_kite_fem']['step_limit'],
-                #   config['structural_kite_fem']['relax_init'],
-                #   config['structural_kite_fem']['relax_update'],
-                #   config['structural_kite_fem']['k_update'],
-                #   config['structural_kite_fem']['I_stiffness'],
-                # )
-                # --> when convergence
-                # coordinates_flat_array = fem_structure.coords_current
-                # 4. fem_structure.coords_init()
-                # 5. change current with re-initilasiatoinaoginoeng function
-
-                # raise ValueError("kite_fem solver is not implemented yet")
-                # kite_fem_structure.plot_convergence()
-                # kite_fem_structure.plot_3D(fe=fe_6d)
-
             end_time_f_int = time.time()
 
             # Forcing symmetry
@@ -306,18 +363,18 @@ def main(
                     psystem.extract_rest_length[power_tape_index]
                     - initial_length_power_tape
                 )
-            ##TODO: implement depower tape length change for kite_fem
-            ##TODO: fix this
+            ##TODO: get power tape actuation working again
             elif config["structural_solver"] == "kite_fem":
                 delta_power_tape = (
                     rest_lengths[power_tape_index] + power_tape_extension_step
                 )
                 rest_lengths = kite_fem_structure.modify_get_spring_rest_length(
-                    spring_ids=[power_tape_index], new_l0s=[new_l0_depower_tape]
+                    spring_ids=[power_tape_index], new_l0s=[delta_power_tape]
                 )
                 delta_power_tape = 0
                 print(f"NOT IMPLEMENTED: delta_power_tape for kite_fem")
 
+            # Update progress bar for esthetics
             pbar.set_postfix(
                 {
                     "res": f"{np.linalg.norm(f_residual):.3f}N",
@@ -327,118 +384,56 @@ def main(
             )
             pbar.update(1)
 
-            ### All the convergence checks, are be done in if-elif because only 1 should hold at once
-            # if convergence (residual below set tolerance)
-            if (
-                i > n_power_tape_steps
-                and np.linalg.norm(f_residual)
-                <= config["aero_structural_solver"]["tol"]
-            ):
-                is_residual_below_tol = True
-                is_convergence = True
-            # if np.linalg.norm(f_residual) <= pss_params["aerostructural_tol"]l and i > 50:
-            #     is_residual_below_tol = True
-            #     is_convergence = True
-
-            # if residual forces are NaN
-            elif np.isnan(np.linalg.norm(f_residual)):
-                is_convergence = False
-                logging.info("Classic PS diverged - residual force is NaN")
-                break
-            # if residual forces are not changing anymore
-            elif (
-                i > 15
-                and np.abs(np.mean(f_residual_list[i - 15]) - f_residual_list[i - 10])
-                < 1
-            ):
-                is_convergence = False
-                logging.info("Classic PS non-converging - residual no longer changes")
-                break
-            # if to many iterations are needed
-            elif i > config["aero_structural_solver"]["max_iter"]:
-                is_convergence = False
-                logging.info(
-                    f"Classic PS non-converging - more than max ({config['aero_structural_solver']['max_iter']}) iterations needed"
+            # Check convergence conditions
+            is_convergence, should_break, is_residual_below_tol, delta_power_tape = (
+                check_convergence(
+                    i=i,
+                    f_residual=f_residual,
+                    f_residual_list=f_residual_list,
+                    f_aero_wing_vsm_format=f_aero_wing_vsm_format,
+                    is_residual_below_tol=is_residual_below_tol,
+                    delta_power_tape=delta_power_tape,
+                    n_power_tape_steps=n_power_tape_steps,
+                    power_tape_final_extension=power_tape_final_extension,
+                    power_tape_extension_step=power_tape_extension_step,
+                    initial_length_power_tape=initial_length_power_tape,
+                    config=config,
+                    psystem=psystem,
+                    power_tape_index=power_tape_index,
                 )
-                break
-            # special case for running the simulation for only one timestep
-            elif config["is_run_only_1_time_step"]:
-                break
-            # when aero does not converge
-            elif np.sum([force[1] for force in f_aero_wing_vsm_format]) == np.nan:
-                is_convergence = False
-                logging.info("Classic PS non-converging - aero forces are NaN")
-                break
+            )
 
-            ## if convergenced and not yet at desired depower-tape length
-            elif (
-                is_residual_below_tol and delta_power_tape <= power_tape_final_extension
-            ):
-                psystem.update_rest_length(power_tape_index, power_tape_extension_step)
-                delta_power_tape = (
-                    psystem.extract_rest_length[power_tape_index]
-                    - initial_length_power_tape
-                )
-                logging.info(
-                    f"||--- delta l_d: {delta_power_tape:.3f}m | new l_d: {psystem.extract_rest_length[power_tape_index]:.3f}m | Steps required: {n_power_tape_steps}"
-                )
-                is_residual_below_tol = False
-
-            ## if convergenced and all changes are made
-            elif is_residual_below_tol:
-                is_convergence = True
-
-            if is_convergence:
+            if should_break or is_convergence:
                 break
     ######################################################################
     ## END OF SIMULATION FOR LOOP
     ######################################################################
-    # TODO: move reshaping and so on to structural solver files
     if config["structural_solver"] == "pss":
-        current_particles = np.array([particle.x for particle in psystem.particles])
-        print(f"psystem: {psystem}")
         rest_lengths = psystem.extract_rest_length
-        particles_ini = np.array(initial_particles)
-        # reshape to current_particles shape
-        particles_ini = initial_particles.reshape(current_particles.shape)
     elif config["structural_solver"] == "kite_fem":
-        current_particles = struc_nodes
         rest_lengths = kite_fem_structure.modify_get_spring_rest_length()
-        # For kite_fem, initial_particles is already a flat array, reshape it properly
-        if isinstance(initial_particles, np.ndarray):
-            # If it's already a numpy array, reshape it to match current_particles
-            particles_ini = initial_particles.reshape(-1, 6)[:, :3]
-            particles_ini = particles_ini.reshape(current_particles.shape)
-        else:
-            # If it's still a list/other format, convert appropriately
-            particles_ini = np.array(initial_particles).reshape(-1, 6)[:, :3]
-            particles_ini = particles_ini.reshape(current_particles.shape)
-    if config["is_with_final_plot"]:
 
+    if config["is_with_final_plot"]:
         plotting.main(
-            current_particles,
-            pss_connectivity,
+            struc_nodes,
+            kite_connectivity_arr,
             f_ext=f_ext,
             rest_lengths=rest_lengths,
-            struc_nodes_initial=particles_ini,
-            title="Initial  vs final",
+            struc_nodes_initial=struc_nodes_initial,
+            title="Initial vs final",
             pulley_line_indices=pulley_line_indices,
             pulley_line_to_other_node_pair_dict=pulley_line_to_other_node_pair_dict,
-        )
-    # Convert kite_connectivity to a numeric array for HDF5 compatibility
-    kite_connectivity_numeric = np.array(pss_connectivity)
-    # If it is not 2D and numeric, try to extract only the first two columns (node indices)
-    if kite_connectivity_numeric.dtype == object or kite_connectivity_numeric.ndim != 2:
-        kite_connectivity_numeric = np.array(
-            [[int(row[0]), int(row[1])] for row in pss_connectivity],
-            dtype=np.int32,
         )
     meta = {
         "total_time_s": time.time() - start_time,
         "n_iter": i + 1,
         "converged": is_convergence,
         "rest_lengths": rest_lengths,  # ensure numeric array
-        "kite_connectivity": kite_connectivity_numeric,
+        # Convert kite_connectivity to a numeric array for HDF5 compatibility
+        "kite_connectivity": np.array(
+            [[int(row[0]), int(row[1])] for row in np.array(kite_connectivity_arr)],
+            dtype=np.int32,
+        ),
     }
 
     return tracking_data, meta

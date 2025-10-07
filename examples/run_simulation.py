@@ -10,11 +10,15 @@ Github: ...
 import numpy as np
 from pathlib import Path
 from kitesim.logging_config import *
-from kitesim.utils import load_and_save_config_files, load_sim_output, save_results
+from kitesim.utils import (
+    load_and_save_config_files,
+    load_sim_output,
+    save_results,
+    printing_rest_lengths,
+)
 from kitesim import (
-    aerodynamic,
-    # struc2aero,
     aero2struc,
+    aerodynamic_vsm,
     structural_kite_fem,
     structural_pss,
     aerostructural_coupled_solver,
@@ -42,7 +46,7 @@ def main():
     n_panels_aero = (n_struc_ribs - 1) * config["aerodynamic"][
         "n_aero_panels_per_struc_section"
     ]
-    body_aero, vsm_solver, vel_app, initial_polar_data = aerodynamic.initialize(
+    body_aero, vsm_solver, vel_app, initial_polar_data = aerodynamic_vsm.initialize(
         kite_name,
         PROJECT_DIR,
         config,
@@ -62,7 +66,9 @@ def main():
         steering_tape_indices,
         pulley_node_indices,
         # element level
-        conn_arr,
+        kite_connectivity_arr,
+        bridle_connectivity_arr,
+        bridle_diameter_arr,
         l0_arr,
         k_arr,
         c_arr,
@@ -77,7 +83,7 @@ def main():
         logging.info(f"node_idx: {idx}: node: {node_i}, mass: {m_i}")
 
     logging.info(f"\n\nINITIAL CONDITIONS, ELEMENTS \n")
-    for idx, conn in enumerate(conn_arr):
+    for idx, conn in enumerate(kite_connectivity_arr):
         logging.info(
             f"conn_idx: {idx}: conn: {conn}, l0: {l0_arr[idx]}, k: {k_arr[idx]}, c: {c_arr[idx]}, linktype: {linktype_arr[idx]}"
         )
@@ -88,29 +94,26 @@ def main():
         # Note: ParticleSystem doesn’t read l0_arr. SpringDamper sets l0
         # from the initial particle positions.
         # So l0_arr is a bookkeeping array for you, not used at instantiation.
-        (
-            psystem,
-            pss_connectivity,
-            pss_initial_conditions,
-            pss_params,
-        ) = structural_pss.instantiate(
-            # yaml files
-            config,
-            # node level
-            struc_nodes,
-            m_arr,
-            # element_level
-            conn_arr,
-            l0_arr,
-            k_arr,
-            c_arr,
-            linktype_arr,
-            pulley_line_to_other_node_pair_dict,
+        (psystem, pss_initial_conditions, pss_params, struc_nodes_initial) = (
+            structural_pss.instantiate(
+                # yaml files
+                config,
+                # node level
+                struc_nodes,
+                m_arr,
+                # element_level
+                kite_connectivity_arr,
+                l0_arr,
+                k_arr,
+                c_arr,
+                linktype_arr,
+                pulley_line_to_other_node_pair_dict,
+            )
         )
         if config["is_with_initial_structure_plot"]:
             structural_pss.plot_3d_kite_structure(
                 struc_nodes,
-                pss_connectivity,
+                kite_connectivity_arr,
                 power_tape_index,
                 fixed_nodes=config["structural_pss"]["fixed_point_indices"],
                 pulley_nodes=pulley_node_indices,
@@ -118,27 +121,20 @@ def main():
 
         # setting kite_fem related output to None
         kite_fem_structure = None
-        kite_fem_initial_conditions = None
-        kite_fem_pulley_matrix = None
-        kite_fem_spring_matrix = None
-    elif config["structural_solver"] == "kite_fem":
-        # setting psm related output to None
-        psystem = None
-        pss_connectivity = None
-        pss_initial_conditions = None
-        pss_params = None
 
+    elif config["structural_solver"] == "kite_fem":
         ### kite_fem -- https://github.com/awegroup/kite_fem
         (
             kite_fem_structure,
             kite_fem_initial_conditions,
             kite_fem_pulley_matrix,
             kite_fem_spring_matrix,
+            struc_nodes_initial,
         ) = structural_kite_fem.instantiate(
             config,
             struc_geometry,
             struc_nodes,
-            conn_arr,
+            kite_connectivity_arr,
             l0_arr,
             k_arr,
             c_arr,
@@ -146,6 +142,8 @@ def main():
             linktype_arr,
             pulley_line_to_other_node_pair_dict,
         )
+        # setting psm related output to None
+        psystem = None
 
     else:
         raise ValueError("Invalid structural solver specified, either pss or pyfe3d")
@@ -208,30 +206,33 @@ def main():
     tracking_data, meta = aerostructural_coupled_solver.main(
         m_arr=m_arr,
         struc_nodes=struc_nodes,
-        psystem=psystem,
-        struc_node_le_indices=struc_node_le_indices,
-        struc_node_te_indices=struc_node_te_indices,
-        body_aero=body_aero,
-        vsm_solver=vsm_solver,
-        vel_app=vel_app,
-        initial_polar_data=initial_polar_data,
-        aero2struc_mapping=aero2struc_mapping,
-        pss_connectivity=pss_connectivity,
-        pss_params=pss_params,
-        power_tape_index=power_tape_index,
+        struc_nodes_initial=struc_nodes_initial,
+        config=config,
+        ### ACTUATION
         initial_length_power_tape=initial_length_power_tape,
         n_power_tape_steps=n_power_tape_steps,
         power_tape_final_extension=power_tape_final_extension,
         power_tape_extension_step=power_tape_extension_step,
-        config=config,
+        ### CONNECTIVITY
+        kite_connectivity_arr=kite_connectivity_arr,
+        bridle_connectivity_arr=bridle_connectivity_arr,
         pulley_line_indices=pulley_line_indices,
         pulley_line_to_other_node_pair_dict=pulley_line_to_other_node_pair_dict,
-        ### kite fem specifics ###
+        ### STRUC --> AERO
+        struc_node_le_indices=struc_node_le_indices,
+        struc_node_te_indices=struc_node_te_indices,
+        ### AERO
+        body_aero=body_aero,
+        vsm_solver=vsm_solver,
+        vel_app=vel_app,
+        initial_polar_data=initial_polar_data,
+        bridle_diameter_arr=bridle_diameter_arr,
+        ### AERO --> STRUC
+        aero2struc_mapping=aero2struc_mapping,
+        power_tape_index=power_tape_index,
+        ### STRUC
+        psystem=psystem,
         kite_fem_structure=kite_fem_structure,
-        kite_fem_initial_conditions=kite_fem_initial_conditions,
-        kite_fem_pulley_matrix=kite_fem_pulley_matrix,
-        kite_fem_spring_matrix=kite_fem_spring_matrix,
-        l0_arr=l0_arr,
     )
 
     # Save results
@@ -242,105 +243,10 @@ def main():
     meta_data_dict, tracking_data = load_sim_output(h5_path)
 
     # logging.info(f"meta_data: {meta_data_dict}")
-
-    # TODO:
     # - here you could add functions to plot the tracking of f_int, f_ext and f_residual over the iterations
     # - functions that make an animation of the kite going through the iterations
     # - etc.
     f_residual = tracking_data["f_int"] - tracking_data["f_ext"]
-
-    def printing_rest_lengths(tracking_data, struc_geometry):
-        """
-        Print the current and initial rest lengths of all bridle lines defined in bridle_elements by
-        averaging the lengths of all their segments in bridle_connections.
-
-        For each connection:
-        - if 3 nodes, sum ci-cj and cj-ck
-        - if 2 nodes, sum ci-cj
-        """
-        positions = tracking_data["positions"]
-        struc_nodes = positions[-1]  # current positions
-        initial_struc_nodes = positions[0]  # initial positions
-
-        bridle_elements_data = struc_geometry["bridle_elements"]["data"]
-        bridle_line_names = [row[0] for row in bridle_elements_data]
-        bridle_connections_data = struc_geometry["bridle_connections"]["data"]
-
-        # YAML l0 lookup dictionary
-        bridle_elements_yaml = {row[0]: row[1] for row in bridle_elements_data}
-
-        print("\nCurrent bridle line lengths:")
-        results = []
-        for line_name in bridle_line_names:
-            total_length = 0.0
-            initial_total_length = 0.0
-            count = 0
-
-            for conn in bridle_connections_data:
-                if conn[0] == line_name:
-                    ci = int(conn[1])
-                    cj = int(conn[2])
-                    if len(conn) > 3 and conn[3] not in (None, "", 0):
-                        ck = int(conn[3])
-                        # current
-                        total_length += np.linalg.norm(
-                            struc_nodes[ci] - struc_nodes[cj]
-                        )
-                        total_length += np.linalg.norm(
-                            struc_nodes[cj] - struc_nodes[ck]
-                        )
-                        # initial
-                        initial_total_length += np.linalg.norm(
-                            initial_struc_nodes[ci] - initial_struc_nodes[cj]
-                        )
-                        initial_total_length += np.linalg.norm(
-                            initial_struc_nodes[cj] - initial_struc_nodes[ck]
-                        )
-                        count += 1
-                    else:
-                        # current
-                        total_length += np.linalg.norm(
-                            struc_nodes[ci] - struc_nodes[cj]
-                        )
-                        # initial
-                        initial_total_length += np.linalg.norm(
-                            initial_struc_nodes[ci] - initial_struc_nodes[cj]
-                        )
-                        count += 1
-
-            if count > 0:
-                avg_length = total_length / count
-                initial_avg_length = initial_total_length / count
-                delta_pct = (
-                    100.0 * (avg_length - initial_avg_length) / initial_avg_length
-                    if initial_avg_length != 0
-                    else 0.0
-                )
-
-                # yaml l0 value
-                yaml_l0 = bridle_elements_yaml.get(line_name, None)
-                try:
-                    yaml_l0_val = float(yaml_l0) if yaml_l0 is not None else None
-                except Exception:
-                    yaml_l0_val = yaml_l0
-
-                delta_yaml_pct = (
-                    100.0 * (avg_length - yaml_l0_val) / yaml_l0_val
-                    if yaml_l0_val not in (None, 0)
-                    else 0.0
-                )
-
-                results.append(
-                    f"{line_name}: curr: {avg_length:.3f} m, "
-                    f"initial: {initial_avg_length:.3f} m, "
-                    f"delta: {delta_pct:+.2f} %, "
-                    f"yaml: {yaml_l0_val} m, "
-                    f"delta_yaml: {delta_yaml_pct:+.2f} %"
-                )
-
-        # print once
-        for result in results:
-            print(result)
 
     printing_rest_lengths(tracking_data, struc_geometry)
 

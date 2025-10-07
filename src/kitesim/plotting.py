@@ -97,7 +97,7 @@ def set_plot_style():
 
 def plot_normalized_elongation(
     ax,
-    kite_connectivity,
+    kite_connectivity_arr,
     struc_nodes,
     rest_lengths,
     pulley_line_indices,  # kept for signature; used only to skip
@@ -106,13 +106,13 @@ def plot_normalized_elongation(
 
     cmap = plt.get_cmap("viridis")
 
-    num_conns = len(kite_connectivity)
+    num_conns = len(kite_connectivity_arr)
     rest_lengths = np.asarray(rest_lengths, dtype=float)
     norm_values = np.full(num_conns, np.nan, dtype=float)
 
     # map undirected pair -> index (if duplicates exist, last one wins; that’s fine for plotting)
     pair_to_idx = {}
-    for idx, (i, j, *_) in enumerate(kite_connectivity):
+    for idx, (i, j, *_) in enumerate(kite_connectivity_arr):
         ci, cj = int(i), int(j)
         pair_to_idx[frozenset((ci, cj))] = idx
 
@@ -122,7 +122,7 @@ def plot_normalized_elongation(
     pulley_triples = []  # will store (ci, cj, ck) for later plotting with cmap
 
     # compute norm only for non-pulley lines; collect pulley triples
-    for idx, (i, j, *_) in enumerate(kite_connectivity):
+    for idx, (i, j, *_) in enumerate(kite_connectivity_arr):
         if (
             idx in pulley_set
             and str(idx) in (pulley_line_to_other_node_pair_dict or {}).keys()
@@ -154,7 +154,7 @@ def plot_normalized_elongation(
     vmax = float(np.nanmax(norm_values))
 
     # plot only non-pulley lines with cmap
-    for idx, (i, j, *_) in enumerate(kite_connectivity):
+    for idx, (i, j, *_) in enumerate(kite_connectivity_arr):
         if idx in pulley_set:
             continue
         ci, cj = int(i), int(j)
@@ -251,13 +251,14 @@ def plot_normalized_elongation(
 
 def main(
     struc_nodes,
-    kite_connectivity,
+    kite_connectivity_arr,
     rest_lengths,
     struc_nodes_initial=None,
     f_ext=None,
     title="PSM State",
     body_aero=None,
-    chord_length=2.6,  # new argument for scaling force vectors
+    ##TODO: V3 chord-length used for scaling vectors -> should not be hardcoded
+    chord_length=2.6,
     is_with_node_indices=False,
     lightred_color="#FF5F5F",
     pulley_line_indices=None,
@@ -269,7 +270,7 @@ def main(
 
     Args:
         struc_nodes (np.ndarray): Current node positions (n_nodes, 3).
-        kite_connectivity (array-like): List/array of [i, j, ...] giving spring connections.
+        kite_connectivity_arr (array-like): List/array of [i, j, ...] giving spring connections.
         struc_nodes_initial (np.ndarray, optional): Initial node positions (n_nodes, 3).
         f_ext (np.ndarray or None): Optional external forces, shape (n_nodes, 3) or flat.
         title (str): Figure title.
@@ -278,7 +279,7 @@ def main(
     Returns:
         None. Displays a 3D plot.
     """
-    kite_connectivity = np.array(kite_connectivity)  # Ensure numeric array
+    kite_connectivity_arr = np.array(kite_connectivity_arr)  # Ensure numeric array
 
     fig = plt.figure()
     ax = fig.add_subplot(projection="3d")
@@ -298,7 +299,7 @@ def main(
             *(struc_nodes_initial.T), color="blue", marker="o", s=10, label="Initial"
         )
         # Draw initial lines in pink
-        for idx, (i, j, *rest) in enumerate(kite_connectivity):
+        for idx, (i, j, *rest) in enumerate(kite_connectivity_arr):
             p1, p2 = struc_nodes_initial[i], struc_nodes_initial[j]
             ax.plot(
                 [p1[0], p2[0]],
@@ -317,7 +318,7 @@ def main(
     # Plot normalized elongation
     plot_normalized_elongation(
         ax,
-        kite_connectivity,
+        kite_connectivity_arr,
         struc_nodes,
         rest_lengths,
         pulley_line_indices,
@@ -388,7 +389,7 @@ def main(
 
 def interactive_plot(
     tracking_data,
-    kite_connectivity,
+    kite_connectivity_arr,
     rest_lengths,
     f_ext=None,
     title="PSM State",
@@ -403,7 +404,7 @@ def interactive_plot(
 
     Args:
         tracking_data (dict): Output from tracking.setup_tracking_arrays.
-        kite_connectivity (array-like): Connectivity for plotting.
+        kite_connectivity_arr (array-like): Connectivity for plotting.
         rest_lengths (np.ndarray): Rest lengths for each connection.
         f_ext (np.ndarray or None): External forces (nt, n_nodes, 3) or None.
         title (str): Plot title.
@@ -418,7 +419,7 @@ def interactive_plot(
 
     positions = tracking_data["positions"]  # shape (nt, n_nodes, 3)
     nt = positions.shape[0]
-    kite_conn = np.array(kite_connectivity)
+    kite_conn = np.array(kite_connectivity_arr)
     rest_lengths = np.array(rest_lengths)
 
     if f_ext is not None and f_ext.ndim == 3:
