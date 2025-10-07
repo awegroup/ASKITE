@@ -121,11 +121,12 @@ def run_kite_fem(
         relax_update=config_structural_kite_fem["relax_update"],
         k_update=config_structural_kite_fem["k_update"],
         I_stiffness=config_structural_kite_fem["I_stiffness"],
+        print_info=config_structural_kite_fem["print_info"]
     )
     struc_nodes = kite_fem_structure.coords_current
     # reshape from flat to (n_nodes, 3)
     struc_nodes = struc_nodes.reshape(-1, 3)
-    f_int = kite_fem_structure.fi
+    f_int = -kite_fem_structure.fi
     # remove moments
     f_int = f_int.reshape(-1, 6)[:, :3].flatten()
 
