@@ -9,20 +9,6 @@ This code is designed for aero-structural coupled simulations, which can be util
 It includes the [TU Delft V3 Kite](https://awegroup.github.io/TUDELFT_V3_KITE/) as an example, and relies for the aerodynamic calculation on the [Vortex-StepMethod](https://github.com/awegroup/Vortex-Step-Method) and for the structural calculation, the user can choose between the (Particle System Simulator)[https://github.com/awegroup/Particle_System_Simulator] or [kite-fem](https://github.com/awegroup/kite_fem).
 
 
-# Project Structure
-
-| File/Directory         | Content |
-|-----------------------|---------|
-| data/                 | Input data (YAML, geometry, etc.) and simulation results. |
-| docs/                 | Sphinx documentation and images. |
-| examples/             | Main entry points for running and analyzing simulations. See below. |
-| requirements.txt      | Project dependencies. |
-| settings/             | Configuration files (e.g., config.yaml). |
-| src/                  | Main Python package source code (see details below). |
-| tests/                | Test scripts and utilities. |
-| venv/                 | Python virtual environment (not tracked in git). |
-| README.md             | This file. |
-
 ## Main Simulation Workflow
 
 The typical workflow consists of:
@@ -37,25 +23,6 @@ The typical workflow consists of:
 	- Loads the HDF5 results file.
 	- Prints summary information about the run.
 	- Provides interactive 3D visualization of the kite structure and its evolution.
-
-## Details for `src/` Directory
-
-The `src/kitesim/` directory contains the main simulation modules:
-
-| Module                        | Purpose |
-|-------------------------------|---------|
-| aerodynamic.py                | Aerodynamic model setup and calculations |
-| aerostructural_coupled_solver.py | Main coupled solver for aero-structural simulation |
-| structural_pss.py             | Structural solver using the Particle System Simulator (PSS) |
-| structural_pyfe3d.py          | Structural solver using pyfe3d (alternative) |
-| aero2struc.py                 | Mapping between aerodynamic and structural meshes |
-| read_struc_geometry_yaml.py   | Utilities for reading geometry and configuration from YAML |
-| plotting.py                   | 3D and interactive plotting utilities |
-| tracking.py                   | Tracking and post-processing of simulation data |
-| utils.py                      | General utilities (file I/O, config, etc.) |
-| logging_config.py             | Logging setup for the package |
-| solver.py, struc2aero.py      | Additional solver and mapping utilities |
-| __init__.py                   | Package initialization |
 
 ## Example Usage
 
