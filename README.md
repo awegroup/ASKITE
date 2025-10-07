@@ -78,7 +78,7 @@ See the docstrings in those scripts for more details on their workflow and confi
 ## More details per folder
 [data](doc/data/data.md)
 
-## Detailed List for `src` Directory
+**Detailed List for `src` Directory**
 The `src` directory contains various Python packages involved in the project:
 <!-- - [coconut](doc/coconut.md) - Description or purpose of the `coconut` package. -->
 - [aerodynamic](doc/src/aerodynamic/aerodynamic.md) - Description or purpose of the `aerodynamic` package.
@@ -88,49 +88,6 @@ The `src` directory contains various Python packages involved in the project:
 - [post_processing](doc/src/post_processing/post_processing.md) - Description or purpose of the `post_processing` package.
 - [solver](doc/src/solver/solver.md) - Description or purpose of the `solver` package.
 - [structural](doc/src/structural/structural.md) - Description or purpose of the `structural` package.
-
-# Performing a simulation
-
-## Understanding the code structure
-The `scripts.py` folder contains python files and jupyter-notebooks that run a simulation. Each simulation undergoes roughly the same steps. Here the steps for the `main.ipynb` are discussed:
-
-<details>
-<summary>1. Initialisation</summary>
-
-1. **Setting up the environment**: The code starts by setting up the environment for autoreloading and defining the working directory. It then appends the current working directory to the system path.
-2. **Importing necessary modules**: Various modules are imported from different packages such as `src.initialisation`, `src.particleSystem`, `src.coupling`, `src.structural`, `src.solver`, `src.post_processing`, `src.aerodynamic`, and `test`. Other necessary Python libraries are also imported.
-3. **Loading configuration**: The configuration for the simulation is loaded from a YAML file using the `config` dataclass from `src.initialisation.yaml_loader`.
-4. **Initializing mutable variables**: Mutable variables such as `points` and `vel_app` are initialized.
-5. **Defining connectivity matrix and parameters**: The connectivity matrix and parameters for the particle system are defined using the `define_connectivity_matrix` and `define_params` functions from `input_particleSystem`.
-6. **Defining initial conditions**: The initial conditions for the kite are defined using the `define_initial_conditions_kite` function from `input_particleSystem`.
-7. **Setting up rotational resistance (if applicable)**: If the kite model is "V9_60C", rotational resistance is set up using the `extract_rotational_resistances_dicts` and `initialize_bending_spring` functions from `particles_with_rotational_resistance`.
-8. **Creating the ParticleSystem object**: A `ParticleSystem` object is created with the connectivity matrix, initial conditions, and parameters.
-9. **Printing initial dimensions**: The initial dimensions of the kite, such as the scaling factor, reference chord, wing span, wing height, wing area, and projected area, are printed.
-
-</details>
-<details>
-<summary>2. Aero-Structural iterations</summary>
-
-The simulation process involves several steps:
-
-1. **Setting up simulation parameters**: Various parameters for the simulation are set, such as the simulation name, whether to perform VK optimization, whether it's a circular case, whether to run only one time step, whether to print intermediate results, and whether to include gravity.
-
-2. **Running the aerostructural [solver](doc/src/solver/solver.md)**: The `run_aerostructural_solver` function from `solver_main` is called with the initial points, apparent velocity, particle system, parameters dictionary, configuration, input VSM, input bridle aero, and the previously set simulation parameters. This function returns the final points, print data, plot data, and animation data.
-
-</details>
-
-<details>
-<summary> 3. Post-processing</summary>
-
-The process involves several steps:
-
-1. **Loading data**: A list of data names is defined, and then each corresponding data file is loaded from the specified directory using the `dill` library. The loaded data is stored in a dictionary, and then each data item is assigned to its respective variable.
-
-2. **Post-processing**: Several flags are set to determine whether to print results, plot data, animate the simulation, and save the results. Depending on these flags, the corresponding functions from `post_processing_main` are called.
-
-3. **Saving data**: If the `is_with_save` flag is set to `True`, the data to be saved is defined in a list of lists, where each inner list contains the data item and its name. If the specified folder doesn't exist, it is created. Then, each data item is serialized and saved to a file in the specified folder using the `dill` library.
-
-</details>
 
 
 ## Installation Instructions
