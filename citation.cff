@@ -1,1 +1,66 @@
-#TODO: populate this
+cff-version: 1.2.0
+message: "If you are using this software, please cite it as shown below."
+authors:
+  - given-names: "Jelle Agatho Wilhelm"
+    family-names: "Poland"
+    orcid: "https://orcid.org/0000-0003-3164-5648"
+title: "ASKITE"
+keywords:
+  - "Airborne Wind Energy"
+  - "Kites"
+  - "Aero-structural coupled simulations"
+  - "FSI"
+version: "0.1.0"
+doi: "10.1111/11111"
+date-released: "2023-01-01"
+license: "MIT"
+url: "https://github.com/awegroup/ASKITE"
+references:
+  - type: article
+    authors:
+      - given-names: "Jelle A. W."
+        family-names: "Poland"
+        orcid: "https://orcid.org/0000-0003-3164-5648"
+      - given-names: "Roland"
+        family-names: "Schmehl"
+        orcid: "https://orcid.org/0000-0002-4112-841X"
+    title: "Modelling Aero-Structural Deformation of Flexible Membrane Kites"
+    doi: "10.3390/en16145264"
+    journal: "Energies"
+    volume: "16"
+    issue: "14"
+    pages: "5264"
+    year: "2023"
+  - type: article
+    authors:
+      - given-names: "Jelle A. W."
+        family-names: "Poland"
+        orcid: "https://orcid.org/0000-0003-3164-5648"
+      - given-names: "Roland"
+        family-names: "Schmehl"
+        orcid: "https://orcid.org/0000-0002-4112-841X"
+    title: "A Virtual Wind Tunnel for Deforming Airborne Wind Energy Kites"
+    doi: "10.1088/1742-6596/2767/7/072001"
+    journal: "Journal of Physics: Conference Series"
+    volume: "2767"
+    issue: "7"
+    pages: "072001"
+    year: "2024"
+    license: "CC BY 4.0"
+preferred-citation:
+  type: article
+  authors:
+    - given-names: "Jelle A. W."
+      family-names: "Poland"
+      orcid: "https://orcid.org/0000-0003-3164-5648"
+    - given-names: "Roland"
+      family-names: "Schmehl"
+      orcid: "https://orcid.org/0000-0002-4112-841X"
+  title: "A Virtual Wind Tunnel for Deforming Airborne Wind Energy Kites"
+  doi: "10.1088/1742-6596/2767/7/072001"
+  journal: "Journal of Physics: Conference Series"
+  volume: "2767"
+  issue: "7"
+  pages: "072001"
+  year: "2024"
+  license: "CC BY 4.0"
