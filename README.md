@@ -24,25 +24,8 @@ The typical workflow consists of:
 	- Prints summary information about the run.
 	- Provides interactive 3D visualization of the kite structure and its evolution.
 
-## Example Usage
-
-To run a new simulation:
-
-```bash
-python examples/run_simulation.py
-```
-
-To load and interactively analyze a previous simulation:
-
-```bash
-python examples/load_simulation.py
-```
-
-See the docstrings in those scripts for more details on their workflow and configuration.
-
----
-
 ## More details per folder
+
 [data](doc/data/data.md)
 
 **Detailed List for `src` Directory**
