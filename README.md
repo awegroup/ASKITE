@@ -5,8 +5,8 @@
 
 ## Purpose
 
-This code is designed for aero-structural coupled simulations, which can be utilized in the kite design process to determine the performance characteristics of soft-wing kites without requiring actual flight testing.
-It includes the [TU Delft V3 Kite](https://awegroup.github.io/TUDELFT_V3_KITE/) as an example, and relies for the aerodynamic calculation on the [Vortex-Step-Method](https://github.com/awegroup/Vortex-Step-Method) and for the structural calculation, the user can choose between the [Particle_System_Simulator](https://github.com/awegroup/Particle_System_Simulator) or [kite-fem](https://github.com/awegroup/kite_fem).
+This code is designed for aero-structural coupled simulations, which can be utilized for design, control or optimization.
+It includes the [TU Delft V3 Kite](https://awegroup.github.io/TUDELFT_V3_KITE/) as an example, and relies for the aerodynamic calculation on the [Vortex-Step-Method](https://github.com/awegroup/Vortex-Step-Method) and for the structural calculation, the user can choose between using the [Particle_System_Simulator](https://github.com/awegroup/Particle_System_Simulator) or [kite-fem](https://github.com/awegroup/kite_fem).
 
 
 ## Main Simulation Workflow
