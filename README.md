@@ -28,9 +28,7 @@ The typical workflow consists of:
 
 [data](doc/data/data.md)
 
-**Detailed List for `src` Directory**
 The `src` directory contains various Python packages involved in the project:
-<!-- - [coconut](doc/coconut.md) - Description or purpose of the `coconut` package. -->
 - [aerodynamic](doc/src/aerodynamic/aerodynamic.md) - Description or purpose of the `aerodynamic` package.
 - [coupling](doc/src/coupling/coupling.md) - Description or purpose of the `coupling` package.
 - [initialisation](doc/src/initialisation/initialisation.md) - Description or purpose of the `initialisation` package.
