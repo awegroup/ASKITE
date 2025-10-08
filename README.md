@@ -41,12 +41,12 @@ The `src` directory contains various Python packages involved in the project:
 ## Installation Instructions
 1. Clone the repository:
     ```bash
-    git clone https://github.com/ocayon/Vortex-Step-Method
+    git clone https://github.com/awegroup/ASKITE
     ```
 
 2. Navigate to the repository folder:
     ```bash
-    cd Vortex-Step-Method
+    cd ASKITE
     ```
     
 3. Create a virtual environment:
@@ -102,19 +102,14 @@ See [pyproject.toml](pyproject.toml)
 
 **Machine Learning**
 
-The code base is adapted to work with a machine learning model trained on more than a hundred thousands Reynolds-average Navier Stokes (RANS) Computational Fluid Dynamics (CFD) simulations made for leading-edge inflatable airfoils, documented in the MSc. thesis of [K.R.G. Masure](https://resolver.tudelft.nl/uuid:865d59fc-ccff-462e-9bac-e81725f1c0c9), the [code base is also open-source accessible](https://github.com/awegroup/Pointwise-Openfoam-toolchain).
+The code base is adapted to work with a machine learning model trained on more than a hundred thousands Reynolds-average Navier Stokes (RANS) computational fluid dynamics (CFD) simulations made for leading-edge inflatable airfoils, documented in the MSc thesis of [K.R.G. Masure](https://resolver.tudelft.nl/uuid:865d59fc-ccff-462e-9bac-e81725f1c0c9), the [code base is also open-source accessible](https://github.com/awegroup/Pointwise-Openfoam-toolchain).
 
-As the three trained models, for Reynolds number = 1e6, 5e6 and 1e7 are too large (~2.3GB) for GitHub, they have to be downloaded separately, and added to the `data/ml_models` folder. They are accessible trough [Zenodo](https://doi.org/10.5281/zenodo.16925758), and so is the [CFD data](https://doi.org/10.5281/zenodo.16925833) on which the models are trained. More description on its usages is found in [Airfoil Aerodynamics](docs/AirfoilAerodynamics.md).
+As the three trained models, for Reynolds number = 1e6, 5e6 and 1e7 are too large (~2.3GB) for GitHub, they have to be downloaded separately, and added to the `data/ml_models` folder. They are accessible trough [Zenodo](https://doi.org/10.5281/zenodo.16925758), and so is the [CFD data](https://doi.org/10.5281/zenodo.16925833) on which the models are trained.
 
 ## Contributing Guide
 Please report issues and create pull requests using the URL:
 ```
-https://github.com/ocayon/Vortex-Step-Method/
-```
-
-This is required because you cannot/should not do it using the URL
-```
-https://github.com/awegroup/Vortex-Step-Method
+https://github.com/awegroup/ASKITE
 ```
 
 We welcome contributions to this project! Whether you're reporting a bug, suggesting a feature, or writing code, here’s how you can contribute:
