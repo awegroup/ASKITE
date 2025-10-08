@@ -50,14 +50,14 @@ structural_pss:
 
 ## structural kite_fem
 structural_kite_fem:
-  max_iterations: !!int 1000
-  tolerance: !!float 5 # smaller than ## coupled tol value
+  max_iterations: !!int 2000
+  tolerance: !!float 1 # smaller than ## coupled tol value
   step_limit: !!float 0.1
   relax_init: !!float 0.1
   relax_update: !!float 0.95
   k_update: !!int 1
   I_stiffness: !!int 25 #V3 kite: 25
-  print_info: !!bool false
+  print_info: !!bool true
   
 ## aero2struc
 aero2struc:
