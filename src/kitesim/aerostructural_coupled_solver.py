@@ -330,7 +330,7 @@ def main(
                 if config["structural_solver"] == "pss":
                     rest_lengths = psystem.extract_rest_length
                 elif config["structural_solver"] == "kite_fem":
-                    rest_lengths = kite_fem_structure.modify_get_spring_rest_length()
+                    rest_lengths = structural_kite_fem.get_rest_lengths(kite_fem_structure,kite_connectivity_arr)
                     kite_fem_structure.plot_convergence()
 
                 plotting.main(
@@ -453,7 +453,7 @@ def main(
     if config["structural_solver"] == "pss":
         rest_lengths = psystem.extract_rest_length
     elif config["structural_solver"] == "kite_fem":
-        rest_lengths = kite_fem_structure.modify_get_spring_rest_length()
+        rest_lengths = structural_kite_fem.get_rest_lengths(kite_fem_structure,kite_connectivity_arr)
 
     if config["is_with_final_plot"]:
         plotting.main(

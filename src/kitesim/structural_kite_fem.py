@@ -99,6 +99,38 @@ def instantiate(
         struc_nodes_initial,
     )
 
+def get_rest_lengths(kite_fem_structure,kite_connectivity_arr):
+    #get connectivity data kite_fem and kite_connectivity
+    n1s = []
+    n2s = []
+    n1_conn = []
+    n2_conn = []
+    springtypes = []
+    for spring_element in kite_fem_structure.spring_elements:
+        n1s.append(spring_element.spring.n1)
+        n2s.append(spring_element.spring.n2)
+        springtypes.append(spring_element.springtype)
+    for connectivity in kite_connectivity_arr:
+        n1_conn.append(connectivity[0])
+        n2_conn.append(connectivity[1])
+    
+    #get rest lengths
+    l0s = kite_fem_structure.modify_get_spring_rest_length()
+    
+    for i,springtype in enumerate(springtypes):
+        if springtype == "pulley":
+            l0s[i] /= 2
+    
+    #Map l0s from kitefem output to askite input
+    l0_map = {(min(n1, n2), max(n1, n2)): l0 for n1, n2, l0 in zip(n1s, n2s, l0s)}
+    mapped_l0s = []
+    for n1c, n2c in zip(n1_conn, n2_conn):
+        key = (min(n1c, n2c), max(n1c, n2c))
+        l0_val = l0_map.get(key)
+        mapped_l0s.append(l0_val)
+    mapped_l0s = np.array(mapped_l0s)
+    return mapped_l0s
+
 def run_kite_fem(
     kite_fem_structure,
     f_ext_flat,
