@@ -51,7 +51,7 @@ structural_pss:
 ## structural kite_fem
 structural_kite_fem:
   max_iterations: !!int 2000
-  tolerance: !!float 1 # smaller than ## coupled tol value
+  tolerance: !!float 5 # smaller than ## coupled tol value
   step_limit: !!float 0.1
   relax_init: !!float 0.1
   relax_update: !!float 0.95
@@ -69,7 +69,7 @@ aero2struc:
 aero_structural_solver:
   max_iter: !!int 100
   it_check: !!int 5
-  tol: !!float 25
+  tol: !!float 10
 
 ## Physical constants
 grav_constant: !!seq [0, 0, 9.81]
