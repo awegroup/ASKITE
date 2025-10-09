@@ -115,10 +115,11 @@ def main():
                 struc_nodes,
                 kite_connectivity_arr,
                 power_tape_index,
-                fixed_nodes=config["structural_pss"]["fixed_point_indices"],
+                k_arr=k_arr,
+                c_arr=c_arr,
+                linktype_arr=linktype_arr,
                 pulley_nodes=pulley_node_indices,
             )
-
         # setting kite_fem related output to None
         kite_fem_structure = None
 

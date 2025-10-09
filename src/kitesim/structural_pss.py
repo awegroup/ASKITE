@@ -107,8 +107,8 @@ def run_pss(psystem, f_ext, config_structural_pss):
 
     t_vector_internal = np.linspace(
         config_structural_pss["dt"],
-        config_structural_pss["internal_time_steps"] * config_structural_pss["dt"],
-        config_structural_pss["internal_time_steps"],
+        config_structural_pss["n_internal_time_steps"] * config_structural_pss["dt"],
+        config_structural_pss["n_internal_time_steps"],
     )
     E_kin = []
     f_int = []
@@ -147,6 +147,9 @@ def plot_3d_kite_structure(
     struc_nodes,
     kite_connectivity_arr,
     power_tape_index,
+    k_arr=None,
+    c_arr=None,
+    linktype_arr=None,
     fixed_nodes=None,
     pulley_nodes=None,
 ):
@@ -155,7 +158,11 @@ def plot_3d_kite_structure(
 
     Args:
         struc_nodes (np.ndarray): Array of 3D coordinates for each node (n_nodes, 3).
-        kite_connectivity_arr (list): List of [i, j, k, c, type] for each connection.
+        kite_connectivity_arr (np.ndarray): Array of [ci, cj] node pairs for each connection.
+        power_tape_index (int): Index of the power tape connection.
+        k_arr (np.ndarray, optional): Array of stiffness values for each connection.
+        c_arr (np.ndarray, optional): Array of damping values for each connection.
+        linktype_arr (np.ndarray, optional): Array of link types for each connection.
         fixed_nodes (iterable, optional): Indices of fixed nodes.
         pulley_nodes (iterable, optional): Indices of pulley nodes.
 
@@ -176,14 +183,12 @@ def plot_3d_kite_structure(
     else:
         pulley_nodes = set(np.atleast_1d(pulley_nodes))
 
-    # Extract node masses from kite_connectivity_arr (using the m_array would be better if available)
+    # Initialize node masses dictionary (placeholder)
     node_masses = {}
+    print(f"kite_connectivity_arr shape: {kite_connectivity_arr.shape}")
+
     for conn in kite_connectivity_arr:
         i, j = int(conn[0]), int(conn[1])
-        if hasattr(conn[4], "value"):
-            link_type = conn[4].value
-        else:
-            link_type = conn[4]
 
         # Initialize masses if not already in dictionary
         if i not in node_masses:
@@ -218,31 +223,39 @@ def plot_3d_kite_structure(
 
     # First pass to identify TE lines and bridle lines
     # This is necessary because we need to know which noncompressive lines are TE lines before plotting
-    for conn in kite_connectivity_arr:
+    for idx, conn in enumerate(kite_connectivity_arr):
         i, j = int(conn[0]), int(conn[1])
 
-        if hasattr(conn[4], "value"):
-            link_type = conn[4].value
+        # Get link type from linktype_arr if available
+        if linktype_arr is not None and idx < len(linktype_arr):
+            link_type = linktype_arr[idx]
+            if hasattr(link_type, "value"):
+                link_type = link_type.value
         else:
-            link_type = conn[4]
+            link_type = "default"
 
         # Mark te_line_idx_list nodes (this is a placeholder - in actual code,
         # we would use the te_line_idx_list parameter to identify TE lines)
         # For now, we're just propagating the te_line_nodes set
-        if link_type.lower() == "noncompressive":
+        if str(link_type).lower() == "noncompressive":
             if i in te_line_nodes or j in te_line_nodes:
                 te_line_nodes.add(i)
                 te_line_nodes.add(j)
 
     # Plot connections with appropriate styling
-    for conn in kite_connectivity_arr:
+    for idx, conn in enumerate(kite_connectivity_arr):
         i, j = int(conn[0]), int(conn[1])
-        k, c = float(conn[2]), float(conn[3])
 
-        if hasattr(conn[4], "value"):
-            link_type = conn[4].value
+        # Get k, c, and link_type from separate arrays if available
+        k = float(k_arr[idx]) if k_arr is not None and idx < len(k_arr) else 0.0
+        c = float(c_arr[idx]) if c_arr is not None and idx < len(c_arr) else 0.0
+
+        if linktype_arr is not None and idx < len(linktype_arr):
+            link_type = linktype_arr[idx]
+            if hasattr(link_type, "value"):
+                link_type = link_type.value
         else:
-            link_type = conn[4]
+            link_type = "default"
 
         x_vals = [struc_nodes[i][0], struc_nodes[j][0]]
         y_vals = [struc_nodes[i][1], struc_nodes[j][1]]
@@ -250,11 +263,11 @@ def plot_3d_kite_structure(
 
         # Default styling
         style = line_styles.get(
-            link_type.lower(), {"color": "gray", "linestyle": "-", "linewidth": 1}
+            str(link_type).lower(), {"color": "gray", "linestyle": "-", "linewidth": 1}
         )
 
         # Separate noncompressive elements into TE lines and bridle lines
-        if link_type.lower() == "noncompressive":
+        if str(link_type).lower() == "noncompressive":
             if i in te_line_nodes or j in te_line_nodes:
                 style["color"] = "orange"
                 if "Canopy TE" not in used_labels:
@@ -272,7 +285,7 @@ def plot_3d_kite_structure(
                     style.pop("label", None)
 
         # Track nodes for tubular frame and pulley lines
-        if link_type.lower() == "default":
+        if str(link_type).lower() == "default":
             tubular_frame_nodes.add(i)
             tubular_frame_nodes.add(j)
             if "Tubular Frame" not in used_labels:
@@ -280,7 +293,7 @@ def plot_3d_kite_structure(
             else:
                 style.pop("label", None)
 
-        if link_type.lower() == "pulley":
+        if str(link_type).lower() == "pulley":
             pulley_line_nodes.add(i)
             pulley_line_nodes.add(j)
             if "Pulley Lines" not in used_labels:
@@ -350,15 +363,20 @@ def plot_3d_kite_structure(
                 node_labels.append("Free Node")
                 used_labels.add("Free Node")
 
-    for idx, (i, j, k, _, line_type) in enumerate(kite_connectivity_arr):
+    for idx, conn in enumerate(kite_connectivity_arr):
+        i, j = int(conn[0]), int(conn[1])
+
         # Get coordinates
         p1 = np.array(struc_nodes[i])
         p2 = np.array(struc_nodes[j])
 
         # Midpoint for label
         midpoint = (p1 + p2) / 2
-        # label = f"{line_type.name}\nk={k:.1e}"
-        label = f"{idx}"
+
+        # Get k value if available
+        k_val = float(k_arr[idx]) if k_arr is not None and idx < len(k_arr) else 0.0
+
+        # label = f"{idx}"
         # compute distance between p1 and p2
         distance = np.linalg.norm(p2 - p1)
         label = f"{1e3*distance:.1f} mm"
@@ -373,7 +391,7 @@ def plot_3d_kite_structure(
             fontsize=6,
             color="blue",
         )
-        if power_tape_index == idx:
+        if power_tape_index is not None and power_tape_index == idx:
             # Highlight the power tape line
             ax.plot(
                 [p1[0], p2[0]],

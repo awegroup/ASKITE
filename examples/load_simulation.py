@@ -21,7 +21,7 @@ def main():
 
     # load files
     results_dir = (
-        Path(PROJECT_DIR) / "results" / f"TUDELFT_V3_KITE" / f"2025_10_07_0941h"
+        Path(PROJECT_DIR) / "results" / f"TUDELFT_V3_KITE" / f"2025_10_07_1134h"
     )
     h5_path = Path(results_dir) / "sim_output.h5"
     meta_data_dict, tracking_data = load_sim_output(h5_path)
@@ -37,6 +37,8 @@ def main():
     # - functions that make an animation of the kite going through the iterations
     # - etc.
     f_residual = tracking_data["f_int"] - tracking_data["f_ext"]
+
+    print(f'f_ext final: {tracking_data["f_ext"][-1]}')
 
     # --- Interactive plot ---
     plotting.interactive_plot(

@@ -4,7 +4,7 @@ vel_kite: !!seq [0, 0, 0]
 acc_kite: !!seq [0, 0, 0]
 
 ## case settings
-structural_solver: !!str "kite_fem" #"kite_fem" or "pss"
+structural_solver: !!str "pss" #"kite_fem" or "pss"
 is_with_gravity: !!bool true
 is_with_aero_bridle: !!bool false
 is_with_aero_tether: !!bool false
