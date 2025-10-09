@@ -89,7 +89,6 @@ def instantiate(
         pulley_matrix=pulley_matrix,
     )
     struc_nodes_initial = np.array([node_data[0] for node_data in initial_conditions])
-    kite_fem_structure.update_internal_forces()
 
     return (
         kite_fem_structure,
