@@ -263,6 +263,60 @@ def main(
     )
 
     ######################################################################
+    # Initialization of external forces pre-simulation loop
+    ######################################################################
+
+    ### STRUC --> AERO
+    le_arr, te_arr = struc2aero.main(
+        struc_nodes,
+        struc_node_le_indices,
+        struc_node_te_indices,
+        config["aerodynamic"]["n_aero_panels_per_struc_section"],
+    )
+
+    ### AERO
+    f_aero_wing_vsm_format, body_aero, results_aero = aerodynamic_vsm.run_vsm_package(
+        body_aero=body_aero,
+        solver=vsm_solver,
+        le_arr=le_arr,
+        te_arr=te_arr,
+        va_vector=vel_app,
+        aero_input_type="reuse_initial_polar_data",
+        initial_polar_data=initial_polar_data,
+        is_with_plot=config["is_with_aero_plot_per_iteration"],
+    )
+    logging.debug(
+        f"Aero symmetry check, f_aero_y: {np.sum([force[1] for force in f_aero_wing_vsm_format])}"
+    )
+    ### AERO --> STRUC
+    f_aero_wing = aero2struc.main(
+        config["aero2struc"]["coupling_method"],
+        f_aero_wing_vsm_format,
+        struc_nodes,
+        np.array(results_aero["panel_cp_locations"]),
+        aero2struc_mapping,
+        config["is_with_coupling_plot_per_iteration"],
+        config["aero2struc"],
+    )
+
+    ### BRIDLE AERO
+    f_aero_bridle = aerodynamic_bridle_line_drag.main(
+        struc_nodes,
+        bridle_connectivity_arr,
+        bridle_diameter_arr,
+        vel_app,
+        config["rho"],
+        config["aerodynamic_bridle"]["cd_cable"],
+        config["aerodynamic_bridle"]["cf_cable"],
+    )
+    f_aero = f_aero_wing + f_aero_bridle
+
+    ## EXTERNAL FORCE
+    f_ext = f_aero + f_ext_gravity
+    f_ext = np.round(f_ext, 5)
+    f_ext_flat = f_ext.flatten()
+
+    ######################################################################
     # SIMULATION LOOP
     ######################################################################
     ## propagating the simulation for each timestep and saving results
@@ -270,6 +324,47 @@ def main(
         for i, step in enumerate(t_vector):
             if i > 0:
                 struc_nodes_prev = struc_nodes.copy()
+
+            ### STRUC
+            end_time_f_ext = time.time()
+            begin_time_f_int = time.time()
+            if config["structural_solver"] == "pss":
+                psystem, is_structural_converged, struc_nodes, f_int = (
+                    structural_pss.run_pss(
+                        psystem,
+                        f_ext_flat,
+                        config["structural_pss"],
+                    )
+                )
+            elif config["structural_solver"] == "kite_fem":
+                kite_fem_structure, is_structural_converged, struc_nodes, f_int = (
+                    structural_kite_fem.run_kite_fem(
+                        kite_fem_structure, f_ext_flat, config["structural_kite_fem"]
+                    )
+                )
+            end_time_f_int = time.time()
+
+            ### PLOT per iteration
+            if config["is_with_struc_plot_per_iteration"]:
+                if config["structural_solver"] == "pss":
+                    rest_lengths = psystem.extract_rest_length
+                elif config["structural_solver"] == "kite_fem":
+                    rest_lengths = structural_kite_fem.get_rest_lengths(
+                        kite_fem_structure, kite_connectivity_arr
+                    )
+                    kite_fem_structure.plot_convergence()
+
+                plotting.main(
+                    struc_nodes,
+                    kite_connectivity_arr,
+                    rest_lengths,
+                    f_ext=f_ext,
+                    title=f"i: {i}",
+                    body_aero=body_aero,
+                    is_with_node_indices=False,
+                    pulley_line_indices=pulley_line_indices,
+                    pulley_line_to_other_node_pair_dict=pulley_line_to_other_node_pair_dict,
+                )
 
             ## external force
             begin_time_f_ext = time.time()
@@ -326,67 +421,21 @@ def main(
             f_ext = np.round(f_ext, 5)
             f_ext_flat = f_ext.flatten()
 
-            if config["is_with_struc_plot_per_iteration"]:
-                if config["structural_solver"] == "pss":
-                    rest_lengths = psystem.extract_rest_length
-                elif config["structural_solver"] == "kite_fem":
-                    rest_lengths = structural_kite_fem.get_rest_lengths(kite_fem_structure,kite_connectivity_arr)
-                    kite_fem_structure.plot_convergence()
-
-                plotting.main(
-                    struc_nodes,
-                    kite_connectivity_arr,
-                    rest_lengths,
-                    f_ext=f_ext,
-                    title=f"i: {i}",
-                    body_aero=body_aero,
-                    is_with_node_indices=False,
-                    pulley_line_indices=pulley_line_indices,
-                    pulley_line_to_other_node_pair_dict=pulley_line_to_other_node_pair_dict,
-                )
-                
-            ### RESIDUAL FEM
-            if config["structural_solver"] == "kite_fem":
-                if i > 0:
-                    f_residual = f_int + f_ext_flat
-                if i ==0:
-                    f_residual = f_ext_flat
-                f_residual_list.append(np.linalg.norm(np.abs(f_residual)))
-                logging.debug(
-                    f"residual force in y-direction: {np.sum([f_residual[1::3]]):.3f}N"
-                )
-            
-            ### STRUC
-            end_time_f_ext = time.time()
-            begin_time_f_int = time.time()
-            if config["structural_solver"] == "pss":
-                psystem, is_structural_converged, struc_nodes, f_int = (
-                    structural_pss.run_pss(
-                        psystem,
-                        f_ext_flat,
-                        config["structural_pss"],
-                    )
-                )
-            elif config["structural_solver"] == "kite_fem":
-                kite_fem_structure, is_structural_converged, struc_nodes, f_int = (
-                    structural_kite_fem.run_kite_fem(
-                        kite_fem_structure, f_ext_flat, config["structural_kite_fem"]
-                    )
-                )
-            end_time_f_int = time.time()
-
             ### FORCING SYMMETRY
             if config["is_with_forcing_symmetry"]:
                 logging.info("Forcing symmetry in y-direction")
                 struc_nodes = forcing_symmetry(struc_nodes)
 
-            ### RESIDUAL PSM
+            ### RESIDUAL
             if config["structural_solver"] == "pss":
                 f_residual = f_int + f_ext_flat
                 f_residual_list.append(np.linalg.norm(np.abs(f_residual)))
                 logging.debug(
                     f"residual force in y-direction: {np.sum([f_residual[1::3]]):.3f}N"
                 )
+            elif config["structural_solver"] == "kite_fem":
+                f_residual = f_int + f_ext_flat
+                f_residual_list.append(np.linalg.norm(np.abs(f_residual)))
 
             ### TRACKING
             # Update unified tracking dataframe (replaces position update)
@@ -453,7 +502,9 @@ def main(
     if config["structural_solver"] == "pss":
         rest_lengths = psystem.extract_rest_length
     elif config["structural_solver"] == "kite_fem":
-        rest_lengths = structural_kite_fem.get_rest_lengths(kite_fem_structure,kite_connectivity_arr)
+        rest_lengths = structural_kite_fem.get_rest_lengths(
+            kite_fem_structure, kite_connectivity_arr
+        )
 
     if config["is_with_final_plot"]:
         plotting.main(

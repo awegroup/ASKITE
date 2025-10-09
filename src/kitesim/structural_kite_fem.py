@@ -90,7 +90,7 @@ def instantiate(
     )
     struc_nodes_initial = np.array([node_data[0] for node_data in initial_conditions])
     kite_fem_structure.update_internal_forces()
-    
+
     return (
         kite_fem_structure,
         initial_conditions,
@@ -99,8 +99,9 @@ def instantiate(
         struc_nodes_initial,
     )
 
-def get_rest_lengths(kite_fem_structure,kite_connectivity_arr):
-    #get connectivity data kite_fem and kite_connectivity
+
+def get_rest_lengths(kite_fem_structure, kite_connectivity_arr):
+    # get connectivity data kite_fem and kite_connectivity
     n1s = []
     n2s = []
     n1_conn = []
@@ -113,15 +114,15 @@ def get_rest_lengths(kite_fem_structure,kite_connectivity_arr):
     for connectivity in kite_connectivity_arr:
         n1_conn.append(connectivity[0])
         n2_conn.append(connectivity[1])
-    
-    #get rest lengths
+
+    # get rest lengths
     l0s = kite_fem_structure.modify_get_spring_rest_length()
-    
-    for i,springtype in enumerate(springtypes):
+
+    for i, springtype in enumerate(springtypes):
         if springtype == "pulley":
             l0s[i] /= 2
-    
-    #Map l0s from kitefem output to askite input
+
+    # Map l0s from kitefem output to askite input
     l0_map = {(min(n1, n2), max(n1, n2)): l0 for n1, n2, l0 in zip(n1s, n2s, l0s)}
     mapped_l0s = []
     for n1c, n2c in zip(n1_conn, n2_conn):
@@ -130,6 +131,7 @@ def get_rest_lengths(kite_fem_structure,kite_connectivity_arr):
         mapped_l0s.append(l0_val)
     mapped_l0s = np.array(mapped_l0s)
     return mapped_l0s
+
 
 def run_kite_fem(
     kite_fem_structure,
@@ -153,14 +155,14 @@ def run_kite_fem(
         relax_update=config_structural_kite_fem["relax_update"],
         k_update=config_structural_kite_fem["k_update"],
         I_stiffness=config_structural_kite_fem["I_stiffness"],
-        print_info=config_structural_kite_fem["print_info"]
+        print_info=config_structural_kite_fem["print_info"],
     )
     struc_nodes = kite_fem_structure.coords_current
     # reshape from flat to (n_nodes, 3)
     struc_nodes = struc_nodes.reshape(-1, 3)
     f_int = -kite_fem_structure.fi
-    #set fixed nodes to the values of -fe_6d 
-    f_int = np.where(kite_fem_structure.bu==True,f_int,-fe_6d)
+    # set fixed nodes to the values of -fe_6d
+    f_int = np.where(kite_fem_structure.bu == True, f_int, -fe_6d)
     # remove moments
     f_int = f_int.reshape(-1, 6)[:, :3].flatten()
     return kite_fem_structure, is_structural_converged, struc_nodes, f_int
