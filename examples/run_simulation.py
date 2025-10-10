@@ -10,8 +10,10 @@ Github: ...
 import numpy as np
 from pathlib import Path
 from kitesim.logging_config import *
+from datetime import datetime
 from kitesim.utils import (
     load_and_save_config_files,
+    load_yaml,
     load_sim_output,
     save_results,
     printing_rest_lengths,
@@ -33,8 +35,24 @@ def main():
     kite_name = "TUDELFT_V3_KITE"  # the dir name with the relevant .yaml files
 
     # load config.yaml & geometry.yaml, save both, and return them as dicts
+    config_path = Path(PROJECT_DIR) / "data" / f"{kite_name}" / "config.yaml"
+    struc_geometry_path = (
+        Path(PROJECT_DIR)
+        / "data"
+        / f"{kite_name}"
+        / "struc_geometry_manually_adjusted.yaml"
+    )
+    aero_geometry_path = (
+        Path(PROJECT_DIR) / "data" / f"{kite_name}" / "aero_geometry.yaml"
+    )
+    results_dir = (
+        Path(PROJECT_DIR)
+        / "results"
+        / f"{kite_name}"
+        / f'{datetime.now().strftime("%Y_%m_%d_%H%M")}h'
+    )
     config, struc_geometry, aero_geometry, results_dir = load_and_save_config_files(
-        kite_name, PROJECT_DIR
+        config_path, struc_geometry_path, aero_geometry_path, results_dir
     )
     logging.info(f"config files saved in {results_dir}\n")
 

@@ -2,7 +2,6 @@ import yaml
 from pathlib import Path
 import numpy as np
 import pandas as pd
-from datetime import datetime
 from scipy.spatial import ConvexHull
 import h5py
 
@@ -21,7 +20,9 @@ def load_yaml(path: Path) -> dict:
         return yaml.safe_load(f)
 
 
-def load_and_save_config_files(kite_name, PROJECT_DIR):
+def load_and_save_config_files(
+    config_path, struc_geometry_path, aero_geometry_path, results_dir
+):
     """
     Load configuration files and save copies to a timestamped results directory.
 
@@ -33,21 +34,10 @@ def load_and_save_config_files(kite_name, PROJECT_DIR):
         config_kite (dict): The loaded kite configuration.
         results_dir (Path): Path to the results directory where configs are saved.
     """
-    config = load_yaml(Path(PROJECT_DIR) / "data" / f"{kite_name}" / "config.yaml")
-    struc_geometry = load_yaml(
-        Path(PROJECT_DIR) / "data" / f"{kite_name}" / "struc_geometry.yaml"
-    )
-    aero_geometry = load_yaml(
-        Path(PROJECT_DIR) / "data" / f"{kite_name}" / "aero_geometry.yaml"
-    )
+    config = load_yaml(config_path)
+    struc_geometry = load_yaml(struc_geometry_path)
+    aero_geometry = load_yaml(aero_geometry_path)
 
-    # create a results folder on this date and time and save the config files
-    results_dir = (
-        Path(PROJECT_DIR)
-        / "results"
-        / f"{kite_name}"
-        / f'{datetime.now().strftime("%Y_%m_%d_%H%M")}h'
-    )
     results_dir.mkdir(parents=True, exist_ok=True)
     with open(results_dir / "config.yaml", "w") as f:
         yaml.dump(config, f, sort_keys=False)
