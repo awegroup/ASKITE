@@ -40,7 +40,7 @@ def main():
         Path(PROJECT_DIR)
         / "data"
         / f"{kite_name}"
-        / "struc_geometry_manually_adjusted.yaml"
+        / "struc_geometry_level_1_manual.yaml"
     )
     aero_geometry_path = (
         Path(PROJECT_DIR) / "data" / f"{kite_name}" / "aero_geometry.yaml"

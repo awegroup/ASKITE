@@ -20,6 +20,7 @@ def plot_struct_geometry_all_in_surfplan_yaml(yaml_path, show_plot=True):
     bridle_particles_data = bridle_particles_cfg.get("data", [])
     bridle_connections_cfg = config.get("bridle_connections", {})
     bridle_connections_data = bridle_connections_cfg.get("data", [])
+    bridle_point_node = config.get("bridle_point_node", [0, 0, 0])
 
     if not wing_particles_data and not bridle_particles_data:
         print("No structural data available to plot.")
@@ -35,6 +36,16 @@ def plot_struct_geometry_all_in_surfplan_yaml(yaml_path, show_plot=True):
         for row in bridle_particles_data
     }
 
+    # Add bridle_point node (node 0 - KCU attachment point)
+    bridle_point_coord = np.array(
+        [
+            float(bridle_point_node[0]),
+            float(bridle_point_node[1]),
+            float(bridle_point_node[2]),
+        ]
+    )
+    bridle_coords[0] = bridle_point_coord
+
     all_coords = dict(wing_coords)
     all_coords.update(bridle_coords)
 
@@ -47,7 +58,7 @@ def plot_struct_geometry_all_in_surfplan_yaml(yaml_path, show_plot=True):
     # Prepare figure
     fig = plt.figure(figsize=(15, 10))
     ax = fig.add_subplot(111, projection="3d")
-    ax.set_title("struc_geometry_all_in_surfplan.yaml")
+    ax.set_title(yaml_path.stem)
     ax.set_xlabel("X [m]")
     ax.set_ylabel("Y [m]")
     ax.set_zlabel("Z [m]")
@@ -131,43 +142,116 @@ def plot_struct_geometry_all_in_surfplan_yaml(yaml_path, show_plot=True):
 
     # Plot bridle nodes
     if bridle_coords:
-        bridle_points = np.array(list(bridle_coords.values()))
-        ax.scatter(
-            bridle_points[:, 0],
-            bridle_points[:, 1],
-            bridle_points[:, 2],
-            c="darkorange",
-            s=base_marker,
-            alpha=0.8,
-            label="Bridle Node",
-        )
+        # Separate node 0 (KCU) from other bridle nodes
+        bridle_points_regular = []
         for node_id, coord in bridle_coords.items():
+            if node_id != 0:
+                bridle_points_regular.append(coord)
+
+        # Plot regular bridle nodes
+        if bridle_points_regular:
+            bridle_points_regular = np.array(bridle_points_regular)
+            ax.scatter(
+                bridle_points_regular[:, 0],
+                bridle_points_regular[:, 1],
+                bridle_points_regular[:, 2],
+                c="darkorange",
+                s=base_marker,
+                alpha=0.8,
+                label="Bridle Node",
+            )
+
+        # Plot node 0 (KCU) with distinctive marker
+        if 0 in bridle_coords:
+            kcu_coord = bridle_coords[0]
+            ax.scatter(
+                [kcu_coord[0]],
+                [kcu_coord[1]],
+                [kcu_coord[2]],
+                c="red",
+                s=base_marker * 3,
+                marker="^",
+                alpha=1.0,
+                label="KCU (Node 0)",
+                edgecolors="black",
+                linewidths=2,
+            )
+
+        # Annotate all bridle nodes
+        for node_id, coord in bridle_coords.items():
+            color = "red" if node_id == 0 else "darkorange"
+            fontsize = 10 if node_id == 0 else 8
+            fontweight = "bold" if node_id == 0 else "normal"
             ax.text(
                 coord[0],
                 coord[1],
                 coord[2],
                 f"{node_id}",
-                fontsize=8,
-                color="darkorange",
+                fontsize=fontsize,
+                color=color,
+                weight=fontweight,
             )
 
     # Plot bridle connections
+    pulley_plotted = False  # Track if we've added the pulley label
+    regular_plotted = False  # Track if we've added the regular bridle label
+
     for conn in bridle_connections_data:
         if len(conn) < 3:
             continue
-        ci = int(conn[1])
-        cj = int(conn[2])
-        if ci in all_coords and cj in all_coords:
-            p1 = all_coords[ci]
-            p2 = all_coords[cj]
-            ax.plot(
-                [p1[0], p2[0]],
-                [p1[1], p2[1]],
-                [p1[2], p2[2]],
-                c="darkorange",
-                linewidth=1.0,
-                alpha=0.7,
-            )
+
+        # Check if this is a pulley connection (4 elements: name, ci, ck, cj)
+        is_pulley = len(conn) >= 4
+
+        if is_pulley:
+            # Pulley connection: ci -> ck -> cj (two line segments)
+            ci = int(conn[1])
+            ck = int(conn[2])  # Pulley node
+            cj = int(conn[3])
+
+            if ci in all_coords and ck in all_coords and cj in all_coords:
+                p1 = all_coords[ci]
+                pk = all_coords[ck]
+                p2 = all_coords[cj]
+
+                # Plot first segment (ci -> ck)
+                ax.plot(
+                    [p1[0], pk[0]],
+                    [p1[1], pk[1]],
+                    [p1[2], pk[2]],
+                    c="purple",
+                    linewidth=1.5,
+                    alpha=0.8,
+                    label="Pulley Connection" if not pulley_plotted else "",
+                )
+                # Plot second segment (ck -> cj)
+                ax.plot(
+                    [pk[0], p2[0]],
+                    [pk[1], p2[1]],
+                    [pk[2], p2[2]],
+                    c="purple",
+                    linewidth=1.5,
+                    alpha=0.8,
+                )
+                pulley_plotted = True
+        else:
+            # Regular connection: ci -> cj (one line segment)
+            ci = int(conn[1])
+            cj = int(conn[2])
+
+            if ci in all_coords and cj in all_coords:
+                p1 = all_coords[ci]
+                p2 = all_coords[cj]
+                ax.plot(
+                    [p1[0], p2[0]],
+                    [p1[1], p2[1]],
+                    [p1[2], p2[2]],
+                    c="darkorange",
+                    linewidth=1.0,
+                    alpha=0.7,
+                    label="Bridle Connection" if not regular_plotted else "",
+                )
+                regular_plotted = True
 
     # Equal aspect ratio
     if all_coords:
@@ -197,6 +281,6 @@ if __name__ == "__main__":
         Path(PROJECT_DIR)
         / "data"
         / "TUDELFT_V3_KITE"
-        / "struc_geometry_all_in_surfplan_merged_nodes.yaml"
+        / "struc_geometry_level_2_manual.yaml"
     )
     plot_struct_geometry_all_in_surfplan_yaml(example_yaml_path)

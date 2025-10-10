@@ -44,7 +44,7 @@ def initialize(
     )
 
     vel_app = np.array(config["vel_wind"]) - np.array(config["vel_kite"])
-    body_aero.va = (vel_app, 0)
+    body_aero.va = vel_app
     wing = body_aero.wings[0]
     new_sections = wing.refine_aerodynamic_mesh()
     initial_polar_data = []
@@ -114,7 +114,9 @@ def run_vsm_package(
         initial_polar_data=initial_polar_data,
     )
     # set again where velocity vector is coming from
-    body_aero.va = (va_vector, yaw_rate)
+    # The VSM va setter accepts keyword arguments but properties don't support that in Python
+    # So we call the underlying setter method directly using the descriptor protocol
+    type(body_aero).va.fset(body_aero, va_vector, yaw_rate=yaw_rate)
     if is_with_plot:
         plot_vsm_geometry(body_aero)
 
