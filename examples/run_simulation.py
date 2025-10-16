@@ -33,6 +33,7 @@ def main():
     """Main function"""
     PROJECT_DIR = Path(__file__).resolve().parents[1]
     kite_name = "TUDELFT_V3_KITE"  # the dir name with the relevant .yaml files
+    kite_name = "3plate_kite"
 
     # load config.yaml & geometry.yaml, save both, and return them as dicts
     config_path = Path(PROJECT_DIR) / "data" / f"{kite_name}" / "config.yaml"
