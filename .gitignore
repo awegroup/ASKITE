@@ -169,11 +169,11 @@ Pipfile
 pyvenv.cfg
 
 # Ignoring these directories
-# Ignoring all except V3_25, TUDELFT_V3_KITE, and 3plate_kite
+# Ignoring all except V3_25, TUDELFT_V3_KITE, and 2plate_kite
 data/*
 !data/V3_25/
 !data/TUDELFT_V3_KITE/
-!data/3plate_kite/
+!data/2plate_kite/
 !data/config.yaml
 
 processed_data/*

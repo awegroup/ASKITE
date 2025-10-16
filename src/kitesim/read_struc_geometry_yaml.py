@@ -245,7 +245,6 @@ def initialize_bridle_line_system(
                 f"-- linktype should be noncompressive, linktype: {bridle_elements_dict[conn_name]["linktype"]}"
             )
             # add this new connection to the connectivity array, and also increase counter
-
             k = (struc_geometry[material]["youngs_modulus"] * cross_sectional_area) / l0
             c = (
                 struc_geometry[material]["damping_per_stiffness"] * k
