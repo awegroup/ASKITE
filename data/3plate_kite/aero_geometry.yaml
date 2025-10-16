@@ -1,0 +1,26 @@
+# Kite system geometry for simulation based on provided Julia code
+
+wing_sections:
+  # ---------------------------------------------------------------
+  # headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
+  # airfoil_id: 1 (since only one polar/interpolator is used)
+  # The kite is represented by 4 chordwise points at y = width/2, -width/2 and at y = 0.
+  # Chord positions from get_kite_points(s): P2 (center right), P3 (center left)
+  # Bridle/other points are omitted for simplicity.
+  # Units: meters
+  # ---------------------------------------------------------------
+  headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
+  data:
+    - [1, 0.0,  4.08, 8.9, 2.0,  4.08, 8.9]      # Right tip chord (P2)
+    - [1, 0.0, -4.08, 8.9, 2.0, -4.08, 8.9]      # Left tip chord  (P3)
+    - [1, 0.0, 0.0,   12.05,  2.0, 0.0,   12.05]       # Bridle attachment (P4/P5 merged, approx.)
+
+wing_airfoils:
+  # ---------------------------------------------------------------
+  # Only one polar, which is interpolated in code; you may later link to a CSV file.
+  # ---------------------------------------------------------------
+  alpha_range: [-180, 180, 1] # deg
+  reynolds: 1e6
+  headers: [airfoil_id, type, info_dict]
+  data:
+    - [1, polars, {csv_file_path: "polars/1.csv"}]

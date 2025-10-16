@@ -1,0 +1,28 @@
+# Kite system geometry for simulation - CONVERGED CONFIGURATION
+# Generated from converged simulation output (iteration 4, converged=True)
+
+wing_sections:
+  # ---------------------------------------------------------------
+  # headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
+  # airfoil_id: 1 (since only one polar/interpolator is used)
+  # Converged positions from structural simulation
+  # Units: meters
+  # ---------------------------------------------------------------
+  headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
+  data:
+    # Right tip chord (nodes 1-2)
+    - [1, -2.52658787,  3.90998347, 8.63399119, -0.56907534,  3.88818007, 8.98058423]
+    # Left tip chord (nodes 5-6)
+    - [1, -2.45823156, -4.29483032, 8.46964736, -0.50150718, -4.25484541, 8.81709563]
+    # Center/apex chord (nodes 3-4)
+    - [1, -3.10388086, -0.25998045, 11.66322754, -1.14745968, -0.25104609, 12.00319579]
+
+wing_airfoils:
+  # ---------------------------------------------------------------
+  # Only one polar, which is interpolated in code; you may later link to a CSV file.
+  # ---------------------------------------------------------------
+  alpha_range: [-180, 180, 1] # deg
+  reynolds: 1e6
+  headers: [airfoil_id, type, info_dict]
+  data:
+    - [1, polars, {csv_file_path: "polars/1.csv"}]
