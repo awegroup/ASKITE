@@ -138,7 +138,7 @@ def run_kite_fem(
     config_structural_kite_fem,
 ):
     # reset to this iteration (sets coords_current to initial coords)
-    kite_fem_structure.reset()
+    kite_fem_structure.reinitialise()
 
     # [fx, fy, fz, mx, my, mz] for each node
     f_ext_reshaped = f_ext_flat.reshape(-1, 3)
