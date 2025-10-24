@@ -40,7 +40,7 @@ def test_compute_line_aerodynamic_force_parallel_flow():
     p1 = np.array([0.0, 0.0, 0.0])
     p2 = np.array([0.0, 0.0, 10.0])
 
-    result = compute_line_aerodynamic_force(va, (p1, p2, diameter), cd_cable, cf_cable, rho)
+    result = compute_line_aerodynamic_force(p1, p2, diameter, va, cd_cable, cf_cable, rho)
 
     length = np.linalg.norm(p2 - p1)
     speed = np.linalg.norm(va)
@@ -62,8 +62,8 @@ def test_compute_line_aerodynamic_force_general_case_matches_expected():
     va = np.array([3.0, 4.0, 0.0])
 
     expected = _expected_force(va, p1, p2, diameter, cd_cable, cf_cable, rho)
-    result = compute_line_aerodynamic_force(va, (p1, p2, diameter), cd_cable, cf_cable, rho)
-    swapped = compute_line_aerodynamic_force(va, (p2, p1, diameter), cd_cable, cf_cable, rho)
+    result = compute_line_aerodynamic_force(p1, p2, diameter, va, cd_cable, cf_cable, rho)
+    swapped = compute_line_aerodynamic_force(p2, p1, diameter, va, cd_cable, cf_cable, rho)
 
     np.testing.assert_allclose(result, expected, rtol=1e-12, atol=1e-12)
     np.testing.assert_allclose(swapped, expected, rtol=1e-12, atol=1e-12)
