@@ -21,10 +21,10 @@ from kitesim.utils import (
 from kitesim import (
     aero2struc,
     aerodynamic_vsm,
-    structural_kite_fem,
+    structural_kite_fem_level_2,
     structural_pss,
     aerostructural_coupled_solver,
-    read_struc_geometry_yaml,
+    read_struc_geometry_level_2_yaml,
 )
 
 
@@ -32,7 +32,7 @@ from kitesim import (
 def main():
     """Main function"""
     PROJECT_DIR = Path(__file__).resolve().parents[1]
-    kite_name = "TUDELFT_V3_KITE"  # the dir name with the relevant .yaml files
+    kite_name = "2plate_kite"  # the dir name with the relevant .yaml files
     # kite_name = "3plate_kite"  # the dir name with the relevant .yaml files
     # load config.yaml & geometry.yaml, save both, and return them as dicts
     config_path = Path(PROJECT_DIR) / "data" / f"{kite_name}" / "config.yaml"
@@ -40,7 +40,7 @@ def main():
         Path(PROJECT_DIR)
         / "data"
         / f"{kite_name}"
-        / "struc_geometry_level_1_manual.yaml"
+        / "struc_geometry_level_2.yaml"
     )
     aero_geometry_path = (
         Path(PROJECT_DIR) / "data" / f"{kite_name}" / "aero_geometry.yaml"
@@ -94,7 +94,7 @@ def main():
         linktype_arr,
         pulley_line_indices,
         pulley_line_to_other_node_pair_dict,
-    ) = read_struc_geometry_yaml.main(struc_geometry)
+    ) = read_struc_geometry_level_2_yaml.main(struc_geometry)
 
     # logging initial conditions
     logging.info(f"\n\nINITIAL CONDITIONS, NODES \n")
@@ -150,7 +150,7 @@ def main():
             kite_fem_pulley_matrix,
             kite_fem_spring_matrix,
             struc_nodes_initial,
-        ) = structural_kite_fem.instantiate(
+        ) = structural_kite_fem_level_2.instantiate(
             config,
             struc_geometry,
             struc_nodes,
