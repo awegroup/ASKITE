@@ -166,10 +166,10 @@ leading_edge_tubes:
   - [le_run_10, 19, 21, 0.191916]
   - [le_run_11, 21, 23, 0.195751]
   - [le_run_12, 23, 25, 0.198697]
-  - [le_run_13, 25, 27, 0.200784]
+  - [le_run_13, 25, 27, 0.200784] #
   - [le_run_14, 27, 29, 0.202016]
   - [le_run_15, 29, 31, 0.202418] #fix tubes
-  - [le_run_16, 31, 33, 0.202016]
+  - [le_run_16, 31, 33, 0.202016] #
   - [le_run_17, 33, 35, 0.200784]
   - [le_run_18, 35, 37, 0.198697]
   - [le_run_19, 37, 39, 0.195751]
@@ -181,8 +181,8 @@ leading_edge_tubes:
   - [le_run_25, 49, 51, 0.156811]
   - [le_run_26, 51, 53, 0.132314]
   - [le_run_27, 53, 55, 0.112914]
-  - [le_run_28, 55, 56, 0.112708]
-  - [le_run_29, 55, 56, 0.112503]
+  # - [le_run_28, 55, 56, 0.112708]
+  # - [le_run_29, 55, 56, 0.112503]
 #############################':
 ## Bridle ###################':
 bridle_particles:
@@ -202,7 +202,7 @@ bridle_particles:
   - [68, -0.711827, -1.113164, 7.054963]
   - [69, -0.692391, -3.921859, 9.027294]
   - [70, -0.633144, -0.941442, 3.348039]
-  - [71, -0.630632, -0.910001, 3.150542] #chang eor remove
+  - [71, 0.547410, -3.802240, 7.614964] #chang eor remove
   - [72, -0.618402, -2.172485, 6.506305]
   - [73, -0.616812, -3.825134, 8.898422]
   - [74, -0.607355, -2.644934, 8.26555]
@@ -236,7 +236,7 @@ bridle_particles:
   - [102, -0.711827, 1.113164, 7.054963]
   - [103, -0.692391, 3.921859, 9.027294]
   - [104, -0.633144, 0.941442, 3.348039]
-  - [105, -0.630632, 0.910001, 3.150542] #change or remove
+  - [105, 0.547410, 3.802240, 7.614964] #change or remove
   - [106, -0.618402, 2.172485, 6.506305]
   - [107, -0.616812, 3.825134, 8.898422]
   - [108, -0.607355, 2.644934, 8.26555]
@@ -273,7 +273,7 @@ bridle_connections:
   - [a3, 62, 64]
   - [a3, 96, 98]
   - [a4, 69, 73]
-  - [a4, 103, 107]
+  - [a4, 103, 107] #a1-4 correct
   - [A1, 59, 66]
   - [A1, 93, 100]
   - [A2, 61, 67]
@@ -292,8 +292,8 @@ bridle_connections:
   - [amain, 102, 104]
   - [amain2, 72, 70]
   - [amain2, 106, 104]
-  - [a5.1, 70, 71] #merge to node 70
-  - [a5.1, 104, 105] #merge to node 104
+  # - [a5.1, 70, 71] #merge to node 70
+  # - [a5.1, 104, 105] #merge to node 104
   - [b1, 60, 59]
   - [b1, 94, 93]
   - [b2, 63, 61]
@@ -336,16 +336,22 @@ bridle_connections:
   # front lines
   - [a6,70,84,80] # pulley
   - [a6,104,118,114] # pulley
-  - [amain,71,0]
-  - [amain,105,0]
+  - [amain,70,0]
+  - [amain,104,0]
+  - [amain,104,0]
+  - [amain,104,0]
+
   # rear lines
-  - [brmain 3,114,120,126] # pulley
-  - [brmain 3,80,86,127] # pulley
+  - [brmain 3,114,119,126] # pulley
+  - [brmain 3,80,85,127] # pulley
   - [M-line,125,113,126] # pulley
   - [M-line,125,79,127] # pulley
   - [Steering Tape,126,0]
   - [Power Tape,125,0]
   - [Steering Tape,127,0]
+  - [br5,119,120]
+  - [br5,85,86]
+
   
 bridle_lines:
   headers: [name, rest_length, diameter, material, linktype]
@@ -363,7 +369,7 @@ bridle_lines:
   - [AIII, 1.821612, 0.003, dyneema, "noncompressive"]
   - [amain, 3.711733, 0.004, dyneema, "noncompressive"]
   - [amain2, 3.389739, 0.004, dyneema, "noncompressive"]
-  - [a5.1, 0.01, 0.005, dyneema, "noncompressive"] #remove
+  # - [a5.1, 0.01, 0.005, dyneema, "noncompressive"] #remove
   - [b1, 0.197785, 0.002, dyneema, "noncompressive"]
   - [b2, 0.185876, 0.002, dyneema, "noncompressive"]
   - [b3, 0.180014, 0.002, dyneema, "noncompressive"]
@@ -375,6 +381,8 @@ bridle_lines:
   - [br2, 4.180, 0.002, dyneema, "noncompressive"]
   - [br3, 4.4094, 0.002, dyneema, "noncompressive"]
   - [br4, 3.550, 0.002, dyneema, "noncompressive"]
+  - [br5, 0.825, 0.002, dyneema, "noncompressive"]
+
   # - [br5, 0.580461, 0.002, dyneema, "noncompressive"]
   # - [br6, 0.590505, 0.002, dyneema, "noncompressive"]
   - [BRII, 2.333, 0.002, dyneema, "noncompressive"]
@@ -391,7 +399,7 @@ bridle_lines:
   - [A5, 2.782, 0.008, dyneema, "noncompressive"]
   - [amain, 4.297, 0.02, dyneema, "noncompressive"]
   # rear lines
-  - [brmain 3, 14.172, 0.002, dyneema, "pulley"]
+  - [brmain 3, 12.168, 0.002, dyneema, "pulley"]
   - [M-line, 4.856, 0.005, dyneema, "pulley"]
   - [Steering Tape, 1.800, 0.005, dyneema, "noncompressive"]
   - [Power Tape, 3.335, 0.005, dyneema, "noncompressive"]
