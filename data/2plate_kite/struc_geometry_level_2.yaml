@@ -32,17 +32,21 @@ wing_particles:
     - [1, 0.0,  4.08, 8.9]   # LE_right
     - [2, 2.0,  4.08, 8.9]   # TE_right
     # midpoints between strut1 and 2
-    - [3, 0.0,  2.04, 10.475]   # LE_right
-    - [4, 2.0,  2.04, 10.475]   # TE_right
+    - [3, 0.0,  2.72, 9.95]   # LE_right
+    - [4, 2.0,  2.72, 9.95]   # TE_right
+    - [5, 0.0,  1.36, 11]   # LE_right
+    - [6, 2.0,  1.36, 11]   # LE_right
     # Center/apex chord (y = 0.0, z = 12.05)
-    - [5, 0.0,  0.0,  12.05]  # LE_center (apex)
-    - [6, 2.0,  0.0,  12.05]  # TE_center (apex)
+    - [7, 0.0,  0.0,  12.05]  # LE_center (apex)
+    - [8, 2.0,  0.0,  12.05]  # TE_center (apex)
     #midpoints between strut2 and 3
-    - [7, 0.0,  -2.04, 10.475]   # LE_right
-    - [8, 2.0,  -2.04, 10.475]   # TE_right
+    - [9, 0.0,  -2.72, 9.95]   # LE_right
+    - [10, 2.0,  -2.72, 9.95]   # TE_right
+    - [11, 0.0,  -1.36, 11]   # LE_right
+    - [12, 2.0,  -1.36, 11]   # LE_right
     # Left chord (y = -4.08, z = 8.9)
-    - [9, 0.0, -4.08, 8.9]   # LE_left
-    - [10, 2.0, -4.08, 8.9]   # TE_left
+    - [13, 0.0, -4.08, 8.9]   # LE_left
+    - [14, 2.0, -4.08, 8.9]   # TE_left
 
 strut_tubes:
   headers: [name, ci, cj, strut_diam_le, strut_diam_te, le_diameter, node_indices]
@@ -53,31 +57,33 @@ strut_tubes:
     - 0.12
     - 0.10
     - 0.15
-    - [1,11,14,2]
+    - [1,15,18,2]
   - - strut_2
-    - 5
-    - 6
+    - 7
+    - 8
     - 0.12
     - 0.10
     - 0.17
-    - [5,12,15,6]
-  - - strut_1
-    - 9
-    - 10
+    - [7,16,19,8]
+  - - strut_3
+    - 13
+    - 14
     - 0.12
     - 0.10
     - 0.15
-    - [9,13,16,10]
+    - [13,17,20,14]
 
 
 leading_edge_tubes:
   headers: [name, ci, cj, diameter]
   data:
   - [le_right_1,  1, 3, 0.15]
-  - [le_right_2,  3, 5, 0.17]
-  - [le_left_1,   5, 7, 0.17]
-  - [le_left_2,   7, 9, 0.15]
-  
+  - [le_right_2,  3, 5, 0.16]
+  - [le_right_3,  5, 7, 0.17]
+  - [le_left_1,   7, 9, 0.17]
+  - [le_left_2,   9, 11, 0.16]
+  - [le_left_3,   11, 13, 0.15]
+
 
 #############################
 ## Bridle ###################
@@ -89,48 +95,48 @@ bridle_particles:
   headers: [id, x, y, z]
   data: 
   #corresponding to kite attachment points
-  - [11, 0.5,  4.08, 8.9]   # 1/4c
-  - [12, 0.5,  0.0,  12.05]  # 1/4c
-  - [13, 0.5, -4.08, 8.9]   # 1/4c
-  - [14, 1.25,  4.08, 8.9]   # 1/4c
-  - [15, 1.25,  0.0,  12.05]  # 1/4c
-  - [16, 1.25, -4.08, 8.9]   # 1/4c
+  - [15, 0.5,  4.08, 8.9]   # 1/4c
+  - [16, 0.5,  0.0,  12.05]  # 1/4c
+  - [17, 0.5, -4.08, 8.9]   # 1/4c
+  - [18, 1.25,  4.08, 8.9]   # 1/4c
+  - [19, 1.25,  0.0,  12.05]  # 1/4c
+  - [20, 1.25, -4.08, 8.9]   # 1/4c
 
   #corresponding to bridal nodes
-  - [17, 0, 3.66327495147671, 7.99096741866242]
-  - [18, 0, -3.66327495147671, 7.99096741866242]  
+  - [21, 0, 3.66327495147671, 7.99096741866242]
+  - [22, 0, -3.66327495147671, 7.99096741866242]  
 bridle_connections:
  # Bridle lines connecting structure to ground
  # name, ci, cj, [ck] (ck optional for pulleys)
  headers: [name, ci, cj]
  data:
  # Lines from ground (node 0) to wing tips and apex
- - [bridle_right_le, 0, 17]   # Ground to right LE pulley
+ - [bridle_right_le, 0, 21]   # Ground to right LE pulley
  - [bridle_right_te, 0, 2]   # Ground to right TE
- - [bridle_center_le, 0, 5]  # Ground to center LE (apex)
- - [Power Tape, 0, 6]  # Ground to center TE (apex)
- - [bridle_left_le, 0, 19]    # Ground to left LE pulley
- - [bridle_left_te, 0, 10]    # Ground to left TE
+ - [bridle_center_le, 0, 7]  # Ground to center LE (apex)
+ - [Power Tape, 0, 8]  # Ground to center TE (apex)
+ - [bridle_left_le, 0, 22]    # Ground to left LE pulley
+ - [bridle_left_te, 0, 14]    # Ground to left TE
  # pulleys
- - [pulley_right_le, 1, 17, 11]   # Ground to right LE
- - [pulley_left_le, 9, 18, 13]   # Ground to right LE
+ - [pulley_right_le, 1, 21, 15]   # Ground to right LE
+ - [pulley_left_le, 13, 22, 17]   # Ground to right LE
 
 
 bridle_lines:
  headers: [name, rest_length, diameter, material, linktype]
  data:
  # Lines to right panel 
- - [bridle_right_le, 8.7906, 0.0025, dyneema, "default"]
- - [bridle_right_te, 9.798, 0.0025, dyneema, "default"]
+ - [bridle_right_le, 8.7906, 0.0025, dyneema, "noncompressive"]
+ - [bridle_right_te, 9.798, 0.0025, dyneema, "noncompressive"]
 
  # Lines to center/apex
  # Length ≈ sqrt(0² + 0² + 12.05²) = 12.05 m
- - [bridle_center_le, 12.05, 0.0025, dyneema, "default"]
- - [Power Tape, 12.05, 0.0025, dyneema, "default"]
+ - [bridle_center_le, 12.05, 0.0025, dyneema, "noncompressive"]
+ - [Power Tape, 12.05, 0.0025, dyneema, "noncompressive"]
 
  # Lines to left panel
- - [bridle_left_le, 8.7906, 0.0025, dyneema, "default"]
- - [bridle_left_te, 9.798, 0.0025, dyneema, "default"]
+ - [bridle_left_le, 8.7906, 0.0025, dyneema, "noncompressive"]
+ - [bridle_left_te, 9.798, 0.0025, dyneema, "noncompressive"]
 
  #lines from pulleys
  - [pulley_right_le, 2.118, 0.0025, dyneema, "pulley"]

@@ -44,35 +44,71 @@ def initialize_particles(
         struc_nodes.append(np.array([x, y, z]))
         m_arr.append(0)
 
+
+
+    
     #add extra nodes for canopy
     strut_node_le_indices = []
     strut_node_te_indices = []
     strut_indices = []
+    nodes_per_strut = int(0)
     for name, ci, cj, strut_diam_le, strut_diam_te, le_diameter, node_indices in struc_geometry["strut_tubes"]["data"]:
         strut_node_le_indices.append(ci)
         strut_node_te_indices.append(cj)
+        nodes_per_strut = max(len(node_indices),nodes_per_strut)
         strut_indices.append(node_indices)
 
-    nodes_per_strut = len(strut_indices[0])
     canopy_section_le_indices = [idx for idx in struc_node_le_indices if idx not in strut_node_le_indices]
     canopy_section_te_indices = [idx for idx in struc_node_te_indices if idx not in strut_node_te_indices]
     canopy_sections = []
 
+
+    # add extra nodes along struts such that the amount per strut is the same
+    for i,indices in enumerate(strut_indices):
+        nodes = len(indices)
+        missing_nodes = nodes_per_strut-nodes
+        for i in range(missing_nodes):
+            coords_front = struc_nodes[indices[-3]]
+            coords_back = struc_nodes[indices[-2]]
+            ratio = (i+1)/(missing_nodes+1)
+            x = coords_front[0] + ratio * (coords_back[0] - coords_front[0])
+            y = coords_front[1] + ratio * (coords_back[1] - coords_front[1])
+            z = coords_front[2] + ratio * (coords_back[2] - coords_front[2])
+            struc_nodes.append(np.array([x, y, z]))
+            m_arr.append(0)
+            node_idx += 1
+            indices.insert(-2+i,node_idx)
+
+    for i, indices in enumerate(strut_indices):
+        # Project all intermediate nodes onto the line between first and last node
+        start_pos = struc_nodes[indices[0]]
+        end_pos = struc_nodes[indices[-1]]
+        line_vector = end_pos - start_pos
+        for j in range(1, len(indices) - 1):
+            node_idx = indices[j]
+            current_pos = struc_nodes[node_idx]
+            # Project current node onto the line between start and end
+            projection_scalar = np.dot(current_pos - start_pos, line_vector) / np.dot(line_vector, line_vector)
+            projected_pos = start_pos + projection_scalar * line_vector
+            struc_nodes[node_idx] = projected_pos
+            
+
+
+
     for n1,n2 in zip(canopy_section_le_indices,canopy_section_te_indices):
         # Find closest indices to n1 in strut_node_le_indices
-        distances = [abs(idx - n1) for idx in strut_node_le_indices]
-        closest_idx = distances.index(min(distances))
-        strut_right_le = strut_node_le_indices[closest_idx]
+        neg_distances = [(idx - n1) for idx in strut_node_le_indices if idx < n1]
+        strut_right_le = strut_node_le_indices[strut_node_le_indices.index(min(neg_distances, key=abs, default=n1) + n1)] if neg_distances else n1
         # Find closest index with positive offset
         pos_distances = [(idx - n1) for idx in strut_node_le_indices if idx > n1]
         strut_left_le = strut_node_le_indices[strut_node_le_indices.index(min(pos_distances, key=abs, default=n1) + n1)] if pos_distances else n1
         # Find closest indices to n2 in strut_node_te_indices
-        distances = [abs(idx - n2) for idx in strut_node_te_indices]
-        closest_idx = distances.index(min(distances))
-        strut_right_te = strut_node_te_indices[closest_idx]
+        neg_distances = [(idx - n1) for idx in strut_node_te_indices if idx < n1]
+        strut_right_te = strut_node_te_indices[strut_node_te_indices.index(min(neg_distances, key=abs, default=n1) + n1)] if neg_distances else n1
         # Find closest index with positive offset
         pos_distances = [(idx - n2) for idx in strut_node_te_indices if idx > n2]
         strut_left_te = strut_node_te_indices[strut_node_te_indices.index(min(pos_distances, key=abs, default=n2) + n2)] if pos_distances else n2
+
 
         leading_edge_tube_indices = np.arange(strut_right_le,strut_left_le+2,2)
         trailing_edge_tube_indics = np.arange(strut_right_te,strut_left_te+2,2)
@@ -103,6 +139,7 @@ def initialize_particles(
             canopy_section_indices.append(node_idx)
         canopy_section_indices.append(n2)
         canopy_sections.append(canopy_section_indices)
+
 
     return (
         struc_nodes,
@@ -217,8 +254,7 @@ def initialize_wing_structure(
                     c_arr.append(0)
                     linktype_arr.append("noncompressive")
 
-    for i,connection in enumerate(kite_connectivity_arr):
-        print(connection,l0_arr[i])
+
 
     return (
         # node level
@@ -255,16 +291,16 @@ def initialize_bridle_line_system(
     # First append the bridle_point_node, as this node (KCU) should have index 0
     # Then append rest of the defined bridle_particles
 
-    for node_idx, x, y, z in struc_geometry["bridle_particles"]["data"]:
-        struc_nodes.append(np.array([x, y, z]))
-        m_arr.append(0.0)
+    # for node_idx, x, y, z in struc_geometry["bridle_particles"]["data"]:
+    #     struc_nodes.append(np.array([x, y, z]))
+    #     m_arr.append(0.0)
 
     ### element level ###
 
     # Create an element dict of dicts: { name → {l0:..., d:..., ...} }
-    bridle_elements_dict = {
-        row[0]: dict(zip(struc_geometry["bridle_elements"]["headers"][1:], row[1:]))
-        for row in struc_geometry["bridle_elements"]["data"]
+    bridle_lines_dict = {
+        row[0]: dict(zip(struc_geometry["bridle_lines"]["headers"][1:], row[1:]))
+        for row in struc_geometry["bridle_lines"]["data"]
     }
 
     # initialize a connectivity counter, that starts with the number of wing_connections
@@ -282,9 +318,9 @@ def initialize_bridle_line_system(
         cj = int(conn_data[2])
 
         # computing the mass of the bridle line, and adding it 0.5 to each particle using m_arr
-        l0 = bridle_elements_dict[conn_name]["l0"]
-        material = bridle_elements_dict[conn_name]["material"]
-        cross_sectional_area = np.pi * (bridle_elements_dict[conn_name]["d"] / 2) ** 2
+        l0 = bridle_lines_dict[conn_name]["rest_length"]
+        material = bridle_lines_dict[conn_name]["material"]
+        cross_sectional_area = np.pi * (bridle_lines_dict[conn_name]["diameter"] / 2) ** 2
         m_line = struc_geometry[material]["density"] * cross_sectional_area * l0
         m_arr[ci] += m_line / 2
         m_arr[cj] += m_line / 2
@@ -293,7 +329,7 @@ def initialize_bridle_line_system(
         # In here we will treat both ci-cj and cj-ck
         if len(conn_data[1:]) == 3:
             logging.debug(
-                f"-- linktype should be pulley, linktype: {bridle_elements_dict[conn_name]["linktype"]}"
+                f"-- linktype should be pulley, linktype: {bridle_lines_dict[conn_name]["linktype"]}"
             )
             # adding pulley_node_indices
             pulley_node_indices.append(cj)
@@ -334,11 +370,11 @@ def initialize_bridle_line_system(
             # add this new connection to the connectivity array, and also increase counter
             kite_connectivity_arr.append([ci, cj])
             bridle_connectivity_arr.append([ci, cj])
-            bridle_diameter_arr.append(bridle_elements_dict[conn_name]["d"])
+            bridle_diameter_arr.append(bridle_lines_dict[conn_name]["diameter"])
             l0_arr.append(l0)
             k_arr.append(k)
             c_arr.append(c)
-            linktype_arr.append(bridle_elements_dict[conn_name]["linktype"])
+            linktype_arr.append(bridle_lines_dict[conn_name]["linktype"])
 
             # Create a special mapping for the Structural Particle System Solver
             # key: pulley_line_index
@@ -364,11 +400,11 @@ def initialize_bridle_line_system(
             # add this new connection to the connectivity array, and also increase counter
             kite_connectivity_arr.append([cj, ck])
             bridle_connectivity_arr.append([cj, ck])
-            bridle_diameter_arr.append(bridle_elements_dict[conn_name]["d"])
+            bridle_diameter_arr.append(bridle_lines_dict[conn_name]["diameter"])
             l0_arr.append(l0)
             k_arr.append(k)
             c_arr.append(c)
-            linktype_arr.append(bridle_elements_dict[conn_name]["linktype"])
+            linktype_arr.append(bridle_lines_dict[conn_name]["linktype"])
 
             # Create a special mapping for the Structural Particle System Solver
             # key: pulley_line_index
@@ -391,7 +427,7 @@ def initialize_bridle_line_system(
         # if there is no third connections this line represents a knot-to-knot line, a regular spring damper
         elif len(conn_data[1:]) == 2:
             logging.debug(
-                f"-- linktype should be noncompressive, linktype: {bridle_elements_dict[conn_name]["linktype"]}"
+                f"-- linktype should be noncompressive, linktype: {bridle_lines_dict[conn_name]["linktype"]}"
             )
             # add this new connection to the connectivity array, and also increase counter
             k = (struc_geometry[material]["youngs_modulus"] * cross_sectional_area) / l0
@@ -400,11 +436,11 @@ def initialize_bridle_line_system(
             )  # Rayleigh damping
             kite_connectivity_arr.append([ci, cj])
             bridle_connectivity_arr.append([ci, cj])
-            bridle_diameter_arr.append(bridle_elements_dict[conn_name]["d"])
+            bridle_diameter_arr.append(bridle_lines_dict[conn_name]["diameter"])
             l0_arr.append(l0)
             k_arr.append(k)
             c_arr.append(c)
-            linktype_arr.append(bridle_elements_dict[conn_name]["linktype"])
+            linktype_arr.append(bridle_lines_dict[conn_name]["linktype"])
 
         else:
             raise ValueError(
@@ -520,8 +556,6 @@ def main(struc_geometry):
         linktype_arr,
     )
 
-
-    breakpoint()
 
     # explicit numpy arrays
     struc_nodes = np.array(struc_nodes)

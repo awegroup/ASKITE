@@ -32,7 +32,7 @@ from kitesim import (
 def main():
     """Main function"""
     PROJECT_DIR = Path(__file__).resolve().parents[1]
-    kite_name = "2plate_kite"  # the dir name with the relevant .yaml files
+    kite_name = "TUDELFT_V3_KITE"  # the dir name with the relevant .yaml files
     # kite_name = "3plate_kite"  # the dir name with the relevant .yaml files
     # load config.yaml & geometry.yaml, save both, and return them as dicts
     config_path = Path(PROJECT_DIR) / "data" / f"{kite_name}" / "config.yaml"
@@ -40,7 +40,7 @@ def main():
         Path(PROJECT_DIR)
         / "data"
         / f"{kite_name}"
-        / "struc_geometry_level_2.yaml"
+        / "struc_geometry_all_in_surfplan.yaml"
     )
     aero_geometry_path = (
         Path(PROJECT_DIR) / "data" / f"{kite_name}" / "aero_geometry.yaml"

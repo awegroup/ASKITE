@@ -1,5 +1,6 @@
 import numpy as np
 from kite_fem.FEMStructure import FEM_structure
+from kite_fem.Plotting import plot_structure,plot_convergence
 from matplotlib import pyplot as plt
 
 
@@ -29,7 +30,7 @@ def instantiate(
 
     pulley_matrix = []
     spring_matrix = []
-
+    beam_matrix = []
     # Deduplicate pulleys: remember which (ci,cj,ck) we’ve emitted already
     seen_pulley_triplets = set()
 
@@ -74,7 +75,10 @@ def instantiate(
             ##TODO: fix not so clean solution
             if ci_map != cj_map:
                 pulley_matrix.append([ci_map, cj_map, ck, k_eff, c_eff, l0_total])
-
+        elif lt == "inflatable_beam":
+            diameter = k
+            pressure = c
+            beam_matrix.append([ci,cj,float(diameter),float(pressure),float(l0)])
         else:
             # Regular spring: [ci, cj, k, c, l0, springtype]
             spring_matrix.append([ci, cj, float(k), float(c), float(l0), lt])
@@ -87,8 +91,31 @@ def instantiate(
         initial_conditions=initial_conditions,
         spring_matrix=spring_matrix,
         pulley_matrix=pulley_matrix,
+        beam_matrix=beam_matrix,
     )
     struc_nodes_initial = np.array([node_data[0] for node_data in initial_conditions])
+    ax,fig = plot_structure(kite_fem_structure,plot_nodes=False,linewidth = [1,0.75,1,3.5])
+    for i,node in enumerate(struc_nodes):
+        ax.scatter(node[0], node[1], node[2], c='red', s=20)
+        ax.text(node[0], node[1], node[2], str(i), fontsize=8)
+    fe = np.zeros(kite_fem_structure.N)
+    print(len(struc_nodes))
+    fe[2::6] = 1
+    # fe[2*6+1] = 50
+    # fe[56*6+1] = -50
+
+    kite_fem_structure.solve(fe=fe, max_iterations=300, tolerance=20, step_limit=.15, relax_init=.25, relax_update=0.95, k_update=1,I_stiffness=300)
+    fi = kite_fem_structure.fe
+    res = fe-fi
+    ax3,fig3 = plot_structure(kite_fem_structure,fe=fe,fe_magnitude=1, plot_nodes=False,linewidth = [1,0.75,1,3.5])
+
+    # ax3,fig3 = plot_convergence(kite_fem_structure)
+    ax.legend()
+
+    plt.show()
+    breakpoint()
+
+    
 
     return (
         kite_fem_structure,
