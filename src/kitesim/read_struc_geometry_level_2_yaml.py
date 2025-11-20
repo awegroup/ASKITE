@@ -77,7 +77,7 @@ def initialize_particles(
             struc_nodes.append(np.array([x, y, z]))
             m_arr.append(0)
             node_idx += 1
-            indices.insert(-2+i,node_idx)
+            indices.insert(-2,node_idx)
 
     for i, indices in enumerate(strut_indices):
         # Project all intermediate nodes onto the line between first and last node
@@ -85,12 +85,12 @@ def initialize_particles(
         end_pos = struc_nodes[indices[-1]]
         line_vector = end_pos - start_pos
         for j in range(1, len(indices) - 1):
-            node_idx = indices[j]
-            current_pos = struc_nodes[node_idx]
+            idx = indices[j]
+            current_pos = struc_nodes[idx]
             # Project current node onto the line between start and end
             projection_scalar = np.dot(current_pos - start_pos, line_vector) / np.dot(line_vector, line_vector)
             projected_pos = start_pos + projection_scalar * line_vector
-            struc_nodes[node_idx] = projected_pos
+            struc_nodes[idx] = projected_pos
             
 
 
@@ -139,7 +139,6 @@ def initialize_particles(
             canopy_section_indices.append(node_idx)
         canopy_section_indices.append(n2)
         canopy_sections.append(canopy_section_indices)
-
 
     return (
         struc_nodes,
@@ -193,7 +192,7 @@ def initialize_wing_structure(
             k_arr.append(diameter)
             c_arr.append(struc_geometry["pressure"])
             linktype_arr.append("inflatable_beam")
-    
+
     #leading edge tube
     for name, ci, cj, diameter in struc_geometry["leading_edge_tubes"]["data"]:
         rest_length = np.linalg.norm(struc_nodes[ci]-struc_nodes[cj])

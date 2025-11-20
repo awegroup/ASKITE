@@ -40,10 +40,10 @@ wing_particles:
     - [7, 0.0,  0.0,  12.05]  # LE_center (apex)
     - [8, 2.0,  0.0,  12.05]  # TE_center (apex)
     #midpoints between strut2 and 3
-    - [9, 0.0,  -2.72, 9.95]   # LE_right
-    - [10, 2.0,  -2.72, 9.95]   # TE_right
-    - [11, 0.0,  -1.36, 11]   # LE_right
-    - [12, 2.0,  -1.36, 11]   # LE_right
+    - [9, 0.0,  -1.36, 11]   # LE_right
+    - [10, 2.0,  -1.36, 11]   # LE_right
+    - [11, 0.0,  -2.72, 9.95]   # LE_right
+    - [12, 2.0,  -2.72, 9.95]   # TE_right
     # Left chord (y = -4.08, z = 8.9)
     - [13, 0.0, -4.08, 8.9]   # LE_left
     - [14, 2.0, -4.08, 8.9]   # TE_left

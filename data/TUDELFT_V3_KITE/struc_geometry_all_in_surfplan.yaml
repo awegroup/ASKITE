@@ -154,33 +154,34 @@ strut_tubes:
 leading_edge_tubes:
   headers: [name, ci, cj, diameter]
   data:
-  - [le_run_1, 1, 3, 0.112503]
-  - [le_run_2, 3, 5, 0.112708]
-  - [le_run_3, 5, 7, 0.112914]
-  - [le_run_4, 7, 9, 0.132314]
-  - [le_run_5, 9, 11, 0.156811]
-  - [le_run_6, 11, 13, 0.166446]
-  - [le_run_7, 13, 15, 0.174542]
-  - [le_run_8, 15, 17, 0.181391]
-  - [le_run_9, 17, 19, 0.18715]
-  - [le_run_10, 19, 21, 0.191916]
-  - [le_run_11, 21, 23, 0.195751]
-  - [le_run_12, 23, 25, 0.198697]
-  - [le_run_13, 25, 27, 0.200784] #
-  - [le_run_14, 27, 29, 0.202016]
-  - [le_run_15, 29, 31, 0.202418] #fix tubes
-  - [le_run_16, 31, 33, 0.202016] #
-  - [le_run_17, 33, 35, 0.200784]
-  - [le_run_18, 35, 37, 0.198697]
-  - [le_run_19, 37, 39, 0.195751]
-  - [le_run_20, 39, 41, 0.191916]
-  - [le_run_21, 41, 43, 0.18715]
-  - [le_run_22, 43, 45, 0.181391]
-  - [le_run_23, 45, 47, 0.174542]
-  - [le_run_24, 47, 49, 0.166446]
-  - [le_run_25, 49, 51, 0.156811]
-  - [le_run_26, 51, 53, 0.132314]
-  - [le_run_27, 53, 55, 0.112914]
+  - [le_run_1, 1, 3, 0.112708]
+  - [le_run_2, 3, 5, 0.112914]
+  - [le_run_3, 5, 7, 0.132314]
+  - [le_run_4, 7, 9, 0.156811]
+  - [le_run_5, 9, 11, 0.166446]
+  - [le_run_6, 11, 13, 0.174542]
+  - [le_run_7, 13, 15, 0.181391]
+  - [le_run_8, 15, 17, 0.18715]
+  - [le_run_9, 17, 19, 0.191916]
+  - [le_run_10, 19, 21, 0.195751]
+  - [le_run_11, 21, 23, 0.198697]
+  - [le_run_12, 23, 25, 0.200784] #
+  - [le_run_13, 25, 27, 0.202016]
+  - [le_run_14, 27, 29, 0.202418] #fix tubes
+  - [le_run_15, 29, 31, 0.202016] #
+  - [le_run_16, 31, 33, 0.200784]
+  - [le_run_17, 33, 35, 0.198697]
+  - [le_run_18, 35, 37, 0.195751]
+  - [le_run_19, 37, 39, 0.191916]
+  - [le_run_20, 39, 41, 0.18715]
+  - [le_run_21, 41, 43, 0.181391]
+  - [le_run_22, 43, 45, 0.174542]
+  - [le_run_23, 45, 47, 0.166446]
+  - [le_run_24, 47, 49, 0.156811]
+  - [le_run_25, 49, 51, 0.132314]
+  - [le_run_26, 51, 53, 0.112914]
+  - [le_run_27, 53, 55, 0.112708]
+
   # - [le_run_28, 55, 56, 0.112708]
   # - [le_run_29, 55, 56, 0.112503]
 #############################':
@@ -274,24 +275,24 @@ bridle_connections:
   - [a3, 96, 98]
   - [a4, 69, 73]
   - [a4, 103, 107] #a1-4 correct
-  - [A1, 59, 66]
-  - [A1, 93, 100]
-  - [A2, 61, 67]
-  - [A2, 95, 101]
-  - [A3, 64, 74]
-  - [A3, 98, 108]
+  - [ab1, 59, 66]
+  - [ab1, 93, 100]
+  - [ab2, 61, 67]
+  - [ab2, 95, 101]
+  - [ab3, 64, 74]
+  - [ab3, 98, 108]
+  - [A1, 66, 68]
+  - [A1, 100, 102]
+  - [A2, 67, 68]
+  - [A2, 101, 102]
+  - [A3, 74, 72]
+  - [A3, 108, 106]
   - [A4, 73, 72]
   - [A4, 107, 106]
-  - [AI, 66, 68]
-  - [AI, 100, 102]
-  - [AII, 67, 68]
-  - [AII, 101, 102]
-  - [AIII, 74, 72]
-  - [AIII, 108, 106]
-  - [amain, 68, 70]
-  - [amain, 102, 104]
-  - [amain2, 72, 70]
-  - [amain2, 106, 104]
+  - [AI, 68, 70]
+  - [AI, 102, 104]
+  - [AII, 72, 70]
+  - [AII, 106, 104]
   # - [a5.1, 70, 71] #merge to node 70
   # - [a5.1, 104, 105] #merge to node 104
   - [b1, 60, 59]
@@ -302,12 +303,12 @@ bridle_connections:
   - [b3, 99, 98]
   - [b4, 75, 73]
   - [b4, 109, 107]
-  - [e1, 76, 66]
-  - [e1, 110, 100]
-  - [e2, 77, 67]
-  - [e2, 111, 101]
-  - [e3, 78, 74]
-  - [e3, 112, 108]
+  - [cd1, 76, 66]
+  - [cd1, 110, 100]
+  - [cd2, 77, 67]
+  - [cd2, 111, 101]
+  - [cd3, 78, 74]
+  - [cd3, 112, 108]
   - [br1, 90, 83]
   - [br1, 124, 117]
   - [br2, 89, 83]
@@ -334,8 +335,10 @@ bridle_connections:
   ### Additional ###################
   ##############################
   # front lines
-  - [a6,70,84,80] # pulley
-  - [a6,104,118,114] # pulley
+  - [AIII,70,71,80] # pulley
+  - [AIII,104,105,114] # pulley
+  - [a5,71,84]
+  - [a5,105,118]
   - [amain,70,0]
   - [amain,104,0]
   - [amain,104,0]
@@ -356,27 +359,35 @@ bridle_connections:
 bridle_lines:
   headers: [name, rest_length, diameter, material, linktype]
   data:
-  - [a1, 0.214896, 0.002, dyneema, "noncompressive"]
-  - [a2, 0.207939, 0.002, dyneema, "noncompressive"]
-  - [a3, 0.213602, 0.002, dyneema, "noncompressive"]
-  - [a4, 0.177977, 0.002, dyneema, "noncompressive"]
-  - [A1, 1.715543, 0.002, dyneema, "noncompressive"]
-  - [A2, 1.629437, 0.002, dyneema, "noncompressive"]
-  - [A3, 1.623267, 0.002, dyneema, "noncompressive"]
-  - [A4, 2.907486, 0.002, dyneema, "noncompressive"]
-  - [AI, 1.930738, 0.003, dyneema, "noncompressive"]
-  - [AII, 1.834374, 0.003, dyneema, "noncompressive"]
-  - [AIII, 1.821612, 0.003, dyneema, "noncompressive"]
-  - [amain, 3.711733, 0.004, dyneema, "noncompressive"]
-  - [amain2, 3.389739, 0.004, dyneema, "noncompressive"]
+  #front
+  - [a1, 0.165, 0.002, dyneema, "noncompressive"]
+  - [a2, 0.165, 0.002, dyneema, "noncompressive"] #update with measurement
+  - [a3, 0.1625, 0.002, dyneema, "noncompressive"]
+  - [a4, 0.1625, 0.002, dyneema, "noncompressive"] #update with measurement
+  - [a5, 0.234, 0.002, dyneema, "noncompressive"]
+  - [b1, 0.165, 0.002, dyneema, "noncompressive"]
+  - [b2, 0.165, 0.002, dyneema, "noncompressive"]
+  - [b3, 0.1625, 0.002, dyneema, "noncompressive"]
+  - [b4, 0.1625, 0.002, dyneema, "noncompressive"]
+  - [ab1, 1.833, 0.002, dyneema, "noncompressive"]
+  - [ab2, 1.79, 0.002, dyneema, "noncompressive"]
+  - [ab3, 1.723, 0.002, dyneema, "noncompressive"]
+  - [cd1, 1.833, 0.002, dyneema, "noncompressive"]
+  - [cd2, 1.79, 0.002, dyneema, "noncompressive"]
+  - [cd3, 1.723, 0.002, dyneema, "noncompressive"]
+  - [A1, 1.860, 0.002, dyneema, "noncompressive"]
+  - [A2, 1.798, 0.002, dyneema, "noncompressive"]
+  - [A3, 1.791, 0.002, dyneema, "noncompressive"]
+  - [A4, 2.877, 0.002, dyneema, "noncompressive"]
+  - [AI, 3.670, 0.003, dyneema, "noncompressive"]
+  - [AII, 3.360, 0.003, dyneema, "noncompressive"]
+  - [amain, 3.903, 0.004, dyneema, "noncompressive"]
+
+  # - [amain2, 3.389739, 0.004, dyneema, "noncompressive"]
   # - [a5.1, 0.01, 0.005, dyneema, "noncompressive"] #remove
-  - [b1, 0.197785, 0.002, dyneema, "noncompressive"]
-  - [b2, 0.185876, 0.002, dyneema, "noncompressive"]
-  - [b3, 0.180014, 0.002, dyneema, "noncompressive"]
-  - [b4, 0.152655, 0.002, dyneema, "noncompressive"]
-  - [e1, 2.064223, 0.002, dyneema, "noncompressive"]
-  - [e2, 1.954245, 0.002, dyneema, "noncompressive"]
-  - [e3, 1.90091, 0.002, dyneema, "noncompressive"]
+
+
+  #rear
   - [br1, 4.407, 0.002, dyneema, "noncompressive"]
   - [br2, 4.180, 0.002, dyneema, "noncompressive"]
   - [br3, 4.4094, 0.002, dyneema, "noncompressive"]
@@ -395,9 +406,9 @@ bridle_lines:
   ### Additional ###################
   ##############################
     # front lines
-  - [a6, 11.372, 0.005, dyneema, "pulley"]
-  - [A5, 2.782, 0.008, dyneema, "noncompressive"]
-  - [amain, 4.297, 0.02, dyneema, "noncompressive"]
+  - [AIII, 11.420, 0.005, dyneema, "pulley"]
+  # - [A5, 2.782, 0.008, dyneema, "noncompressive"]
+  # - [amain, 4.297, 0.02, dyneema, "noncompressive"]
   # rear lines
   - [brmain 3, 12.168, 0.002, dyneema, "pulley"]
   - [M-line, 4.856, 0.005, dyneema, "pulley"]

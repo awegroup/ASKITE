@@ -96,20 +96,21 @@ def instantiate(
     struc_nodes_initial = np.array([node_data[0] for node_data in initial_conditions])
     ax,fig = plot_structure(kite_fem_structure,plot_nodes=False,linewidth = [1,0.75,1,3.5])
     for i,node in enumerate(struc_nodes):
-        ax.scatter(node[0], node[1], node[2], c='red', s=20)
-        ax.text(node[0], node[1], node[2], str(i), fontsize=8)
+        # ax.scatter(node[0], node[1], node[2], c='red', s=20)
+        ax.text(node[0], node[1], node[2], str(i), fontsize=8,zorder=100)
     fe = np.zeros(kite_fem_structure.N)
-    print(len(struc_nodes))
-    fe[2::6] = 1
-    # fe[2*6+1] = 50
-    # fe[56*6+1] = -50
+    fe[2::6] = 10.6*100/(kite_fem_structure.num_nodes-1)
+    fe[2*6+1] = 20
+    fe[56*6+1] = -20
+    
+    kite_fem_structure.solve(fe=fe, max_iterations=1000, tolerance=5, step_limit=.15, relax_init=.25, relax_update=0.95, k_update=1,I_stiffness=10)
 
-    kite_fem_structure.solve(fe=fe, max_iterations=300, tolerance=20, step_limit=.15, relax_init=.25, relax_update=0.95, k_update=1,I_stiffness=300)
-    fi = kite_fem_structure.fe
+
+    fi = kite_fem_structure.fi
     res = fe-fi
-    ax3,fig3 = plot_structure(kite_fem_structure,fe=fe,fe_magnitude=1, plot_nodes=False,linewidth = [1,0.75,1,3.5])
+    ax3,fig3 = plot_structure(kite_fem_structure,fe=res,fe_magnitude=2, plot_nodes=True,linewidth = [1,0.75,1,3.5])
 
-    # ax3,fig3 = plot_convergence(kite_fem_structure)
+    ax3,fig3 = plot_convergence(kite_fem_structure)
     ax.legend()
 
     plt.show()
