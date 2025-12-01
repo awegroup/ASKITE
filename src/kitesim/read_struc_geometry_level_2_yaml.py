@@ -79,6 +79,7 @@ def initialize_particles(
             node_idx += 1
             indices.insert(-2,node_idx)
 
+    simplified_bridle_points = []
     for i, indices in enumerate(strut_indices):
         # Project all intermediate nodes onto the line between first and last node
         start_pos = struc_nodes[indices[0]]
@@ -91,8 +92,8 @@ def initialize_particles(
             projection_scalar = np.dot(current_pos - start_pos, line_vector) / np.dot(line_vector, line_vector)
             projected_pos = start_pos + projection_scalar * line_vector
             struc_nodes[idx] = projected_pos
-            
-
+            simplified_bridle_points.append([idx,current_pos,projected_pos])
+    simplified_bridle_points = np.array(simplified_bridle_points, dtype=object)
 
 
     for n1,n2 in zip(canopy_section_le_indices,canopy_section_te_indices):
@@ -139,7 +140,7 @@ def initialize_particles(
             canopy_section_indices.append(node_idx)
         canopy_section_indices.append(n2)
         canopy_sections.append(canopy_section_indices)
-
+    strut_sections = strut_indices
     return (
         struc_nodes,
         m_arr,
@@ -147,7 +148,9 @@ def initialize_particles(
         struc_node_te_indices,
         strut_node_le_indices,
         strut_node_te_indices,
-        canopy_sections)
+        canopy_sections,
+        strut_sections,
+        simplified_bridle_points)
 
 def initialize_wing_structure(
     struc_geometry,
@@ -158,7 +161,8 @@ def initialize_wing_structure(
     k_arr,
     c_arr,
     linktype_arr,
-    canopy_sections
+    canopy_sections,
+    strut_sections,
 ):
     """
     Create the structural nodes and connectivity for the kite structure.
@@ -173,12 +177,10 @@ def initialize_wing_structure(
     """
 
     # Struts
-    strut_sections = []
     for name, ci, cj, strut_diam_le, strut_diam_te, le_diameter, node_indices in struc_geometry["strut_tubes"]["data"]:
         c1s = node_indices[0:-1]
         c2s = node_indices[1:]
         length = np.linalg.norm(struc_nodes[node_indices[0]]-struc_nodes[node_indices[-1]])
-        strut_sections.append(node_indices)
         for c1,c2 in zip(c1s,c2s):
             rest_length = np.linalg.norm(struc_nodes[c1]-struc_nodes[c2])
             #determine diameter of element, scale linearly from le to te
@@ -187,15 +189,23 @@ def initialize_wing_structure(
             diameter_n1 =  strut_diam_le - (strut_diam_le-strut_diam_te)/length*l1
             diameter_n2 =  strut_diam_le - (strut_diam_le-strut_diam_te)/length*l2
             diameter = (diameter_n1+diameter_n2)/2
+            mass = 2*np.pi*(diameter/2)*rest_length*170/1000
+            # m_arr[c1] += mass/2
+            # m_arr[c2] += mass/2
             kite_connectivity_arr.append([c1,c2])
             l0_arr.append(rest_length)
             k_arr.append(diameter)
             c_arr.append(struc_geometry["pressure"])
             linktype_arr.append("inflatable_beam")
+    # for struct_sect in strut_sections:
+    #     print(struct_sect)
 
     #leading edge tube
     for name, ci, cj, diameter in struc_geometry["leading_edge_tubes"]["data"]:
         rest_length = np.linalg.norm(struc_nodes[ci]-struc_nodes[cj])
+        mass = 2*np.pi*(diameter/2)*rest_length*170/1000
+        # m_arr[ci] += mass/2
+        # m_arr[cj] += mass/2
         kite_connectivity_arr.append([ci,cj])
         l0_arr.append(rest_length)
         k_arr.append(diameter)
@@ -205,7 +215,7 @@ def initialize_wing_structure(
     #combine and order canopy_and strut sections by first indices
     all_sections = canopy_sections + strut_sections
     all_sections.sort(key=lambda section: section[0])
-
+    
     # Connect canopy sections along chord
     for canopy_section in canopy_sections:
         c1s = canopy_section[0:-1]
@@ -277,6 +287,7 @@ def initialize_bridle_line_system(
     k_arr,
     c_arr,
     linktype_arr,
+    simplified_bridle_points,
 ):
     """
     Initialize the bridle line system for the kite.
@@ -321,8 +332,6 @@ def initialize_bridle_line_system(
         material = bridle_lines_dict[conn_name]["material"]
         cross_sectional_area = np.pi * (bridle_lines_dict[conn_name]["diameter"] / 2) ** 2
         m_line = struc_geometry[material]["density"] * cross_sectional_area * l0
-        m_arr[ci] += m_line / 2
-        m_arr[cj] += m_line / 2
 
         # If there is third connections, this line is a pulley!
         # In here we will treat both ci-cj and cj-ck
@@ -363,6 +372,29 @@ def initialize_bridle_line_system(
                 l0
             )
             c = struc_geometry[material]["damping_per_stiffness"] * k
+            
+            #######################################
+            #updating l0 to include simplification in bridle attachment point
+            
+            if ci in simplified_bridle_points[:,0]:
+                i = np.where(simplified_bridle_points[:,0] == ci)[0][0]
+                original_pos = simplified_bridle_points[i, 1]
+                projected_pos = simplified_bridle_points[i, 2]
+                original_lenth = np.linalg.norm(original_pos-struc_nodes[ck])
+                new_length = np.linalg.norm(projected_pos-struc_nodes[ck])
+                delta = original_lenth-new_length
+                l0 -= delta
+
+            if ck in simplified_bridle_points[:,0]:
+                i = np.where(simplified_bridle_points[:,0] == ck)[0][0]
+                original_pos = simplified_bridle_points[i, 1]
+                projected_pos = simplified_bridle_points[i, 2]
+                original_lenth = np.linalg.norm(original_pos-struc_nodes[ck])
+                new_length = np.linalg.norm(projected_pos-struc_nodes[ck])
+                delta = original_lenth-new_length
+                l0 -= delta
+
+
 
             #######################################
             # Dealing with ci-cj
@@ -404,6 +436,10 @@ def initialize_bridle_line_system(
             k_arr.append(k)
             c_arr.append(c)
             linktype_arr.append(bridle_lines_dict[conn_name]["linktype"])
+            #add mass
+            m_arr[ci] += m_line / 4
+            m_arr[cj] += m_line / 2
+            m_arr[ck] += m_line / 4
 
             # Create a special mapping for the Structural Particle System Solver
             # key: pulley_line_index
@@ -433,6 +469,27 @@ def initialize_bridle_line_system(
             c = (
                 struc_geometry[material]["damping_per_stiffness"] * k
             )  # Rayleigh damping
+            #######################################
+            #updating l0 to include simplification in bridle attachment point
+            if ci in simplified_bridle_points[:,0]:
+                i = np.where(simplified_bridle_points[:,0] == ci)[0][0]
+                original_pos = simplified_bridle_points[i, 1]
+                projected_pos = simplified_bridle_points[i, 2]
+                original_lenth = np.linalg.norm(original_pos-struc_nodes[cj])
+                new_length = np.linalg.norm(projected_pos-struc_nodes[cj])
+                delta = original_lenth-new_length
+                l0 -= delta
+            elif cj in simplified_bridle_points[:,0]:
+                i = np.where(simplified_bridle_points[:,0] == cj)[0][0]
+                original_pos = simplified_bridle_points[i, 1]
+                projected_pos = simplified_bridle_points[i, 2]
+                original_lenth = np.linalg.norm(original_pos-struc_nodes[ci])
+                new_length = np.linalg.norm(projected_pos-struc_nodes[ci])
+                delta = original_lenth-new_length
+                l0 -= delta
+
+            m_arr[ci] += m_line / 2
+            m_arr[cj] += m_line / 2
             kite_connectivity_arr.append([ci, cj])
             bridle_connectivity_arr.append([ci, cj])
             bridle_diameter_arr.append(bridle_lines_dict[conn_name]["diameter"])
@@ -481,7 +538,7 @@ def main(struc_geometry):
     struc_nodes = []
     m_arr = []
     struc_nodes.append(np.array(struc_geometry["bridle_point_node"]))
-    m_arr.append(struc_geometry["kcu_mass"])
+    m_arr.append(0)
 
     # initialize element level lists
     kite_connectivity_arr = []
@@ -497,7 +554,9 @@ def main(struc_geometry):
         struc_node_te_indices,
         strut_node_le_indices,
         strut_node_te_indices,
-        canopy_sections 
+        canopy_sections,
+        strut_sections,
+        simplified_bridle_points
     ) = initialize_particles(
           struc_geometry,
           struc_nodes,
@@ -523,7 +582,8 @@ def main(struc_geometry):
         k_arr,
         c_arr,
         linktype_arr,
-        canopy_sections
+        canopy_sections,
+        strut_sections
     )
 
     ### Analyze Bridle Structure
@@ -553,6 +613,7 @@ def main(struc_geometry):
         k_arr,
         c_arr,
         linktype_arr,
+        simplified_bridle_points
     )
 
 
@@ -578,6 +639,9 @@ def main(struc_geometry):
         power_tape_index,
         steering_tape_indices,
         pulley_node_indices,
+        canopy_sections,
+        strut_sections,
+        simplified_bridle_points,
         # element level
         kite_connectivity_arr,
         bridle_connectivity_arr,

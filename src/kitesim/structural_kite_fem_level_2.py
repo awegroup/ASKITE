@@ -1,6 +1,6 @@
 import numpy as np
 from kite_fem.FEMStructure import FEM_structure
-from kite_fem.Plotting import plot_structure,plot_convergence
+from kite_fem.Plotting import plot_structure,plot_convergence,plot_structure_with_strain
 from matplotlib import pyplot as plt
 
 
@@ -73,6 +73,8 @@ def instantiate(
 
             # pyfe3d pulley: [ci, cj, ck, k_eff, c_eff, l0_total]
             ##TODO: fix not so clean solution
+            k_eff = max(k_eff,5000)
+            k_eff = min(k_eff,8000)
             if ci_map != cj_map:
                 pulley_matrix.append([ci_map, cj_map, ck, k_eff, c_eff, l0_total])
         elif lt == "inflatable_beam":
@@ -81,6 +83,8 @@ def instantiate(
             beam_matrix.append([ci,cj,float(diameter),float(pressure),float(l0)])
         else:
             # Regular spring: [ci, cj, k, c, l0, springtype]
+            k = max(k,5000)
+            k = min(k,5000)
             spring_matrix.append([ci, cj, float(k), float(c), float(l0), lt])
 
     # initial_conditions = initial_conditions  # [[x,y,z,vel_x,vel_y,vel_z,m,fixed]]
@@ -94,29 +98,7 @@ def instantiate(
         beam_matrix=beam_matrix,
     )
     struc_nodes_initial = np.array([node_data[0] for node_data in initial_conditions])
-    ax,fig = plot_structure(kite_fem_structure,plot_nodes=False,linewidth = [1,0.75,1,3.5])
-    for i,node in enumerate(struc_nodes):
-        # ax.scatter(node[0], node[1], node[2], c='red', s=20)
-        ax.text(node[0], node[1], node[2], str(i), fontsize=8,zorder=100)
-    fe = np.zeros(kite_fem_structure.N)
-    fe[2::6] = 10.6*100/(kite_fem_structure.num_nodes-1)
-    fe[2*6+1] = 20
-    fe[56*6+1] = -20
-    
-    kite_fem_structure.solve(fe=fe, max_iterations=1000, tolerance=5, step_limit=.15, relax_init=.25, relax_update=0.95, k_update=1,I_stiffness=10)
 
-
-    fi = kite_fem_structure.fi
-    res = fe-fi
-    ax3,fig3 = plot_structure(kite_fem_structure,fe=res,fe_magnitude=2, plot_nodes=True,linewidth = [1,0.75,1,3.5])
-
-    ax3,fig3 = plot_convergence(kite_fem_structure)
-    ax.legend()
-
-    plt.show()
-    breakpoint()
-
-    
 
     return (
         kite_fem_structure,
