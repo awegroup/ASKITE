@@ -386,6 +386,7 @@ def initialize_bridle_line_system(
     pulley_line_indices = []
     pulley_line_to_other_node_pair_dict = {}
     steering_tape_indices = []
+    power_tape_index = 0
     for _, conn_data in enumerate(struc_geometry["bridle_connections"]["data"]):
 
         conn_name = conn_data[0]
@@ -567,12 +568,15 @@ def initialize_bridle_line_system(
             raise ValueError(
                 "bridle_connections should have 2 or 3 connections (ci,cj,ck), not more or less"
             )
+        try:
+            if conn_name == "Power Tape":
+                power_tape_index = conn_idx_counter
 
-        if conn_name == "Power Tape":
-            power_tape_index = conn_idx_counter
-
-        if conn_name == "Steering Tape":
-            steering_tape_indices.append(conn_idx_counter)
+            if conn_name == "Steering Tape":
+                steering_tape_indices.append(conn_idx_counter)
+        except:
+            power_tape_index = 0
+            steering_tape_indices.append(0)
 
         ## increasing the counter
         conn_idx_counter += 1
