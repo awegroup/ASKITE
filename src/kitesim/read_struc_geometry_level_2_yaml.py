@@ -263,7 +263,72 @@ def initialize_wing_structure(
                     c_arr.append(0)
                     linktype_arr.append("noncompressive")
 
+    #assign masses canopy
+    def triangle_area(p1, p2, p3):
+        # Vectors for two sides of the triangle
+        v1 = p2 - p1
+        v2 = p3 - p1
+        # Cross product magnitude gives 2 * triangle area
+        return 0.5 * np.linalg.norm(np.cross(v1, v2))
 
+    def quad_area(A, B, C, D):
+        A = np.array(A)
+        B = np.array(B)
+        C = np.array(C)
+        D = np.array(D)
+
+        # Split quad into triangles ABC and ACD
+        area1 = triangle_area(A, B, C)
+        area2 = triangle_area(A, C, D)
+        return area1 + area2
+
+    for i in range(len(canopy_sections) - 1):
+        section_a = canopy_sections[i]
+        section_b = canopy_sections[i + 1]
+        # Create quads by connecting adjacent nodes in consecutive sections
+        for j in range(len(section_a) - 1):
+            quad = [section_a[j], section_a[j+1], section_b[j+1], section_b[j]]
+            # Get coordinates and calculate area
+            corners = [struc_nodes[node] for node in quad]
+            area = quad_area(corners[0], corners[1], corners[2], corners[3])
+            # Distribute quad mass to its 4 nodes (each gets 1/4 of quad mass)
+            quad_mass = area * struc_geometry["canopy_density"] / 1000  # Convert g/m^2 to kg/m^2
+            for node in quad:
+                m_arr[node] += quad_mass / 4
+    
+    mass_canopy = np.sum(m_arr)
+
+    le_indices = np.array(all_sections)[:,0]
+
+    # Calculate total length of inflatable tubes
+    total_inflatable_length = 0
+
+    # Add up lengths in leading edge
+    for i in range(len(le_indices) - 1):
+        total_inflatable_length += np.linalg.norm(struc_nodes[le_indices[i]] - struc_nodes[le_indices[i+1]])
+
+    # Add up lengths in strut sections
+    for section in strut_sections:
+        for j in range(len(section) - 1):
+            total_inflatable_length += np.linalg.norm(struc_nodes[section[j]] - struc_nodes[section[j+1]])
+
+    # Calculate target mass for inflatable tubes
+    target_mass_inflatable = struc_geometry["mass_without_bridles"] - mass_canopy
+
+    # Distribute mass along leading edge based on segment lengths
+    for i in range(len(le_indices) - 1):
+        segment_length = np.linalg.norm(struc_nodes[le_indices[i]] - struc_nodes[le_indices[i+1]])
+        segment_mass = target_mass_inflatable * (segment_length / total_inflatable_length)
+        m_arr[le_indices[i]] += segment_mass / 2
+        m_arr[le_indices[i+1]] += segment_mass / 2
+
+    # Distribute mass along strut sections based on segment lengths
+    for section in strut_sections:
+        for j in range(len(section) - 1):
+            segment_length = np.linalg.norm(struc_nodes[section[j]] - struc_nodes[section[j+1]])
+            segment_mass = target_mass_inflatable * (segment_length / total_inflatable_length)
+            m_arr[section[j]] += segment_mass / 2
+            m_arr[section[j+1]] += segment_mass / 2
 
     return (
         # node level
