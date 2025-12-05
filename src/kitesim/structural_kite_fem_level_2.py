@@ -73,8 +73,7 @@ def instantiate(
 
             # pyfe3d pulley: [ci, cj, ck, k_eff, c_eff, l0_total]
             ##TODO: fix not so clean solution
-            k_eff = max(k_eff,5000)
-            k_eff = min(k_eff,8000)
+            k_eff = 10000
             if ci_map != cj_map:
                 pulley_matrix.append([ci_map, cj_map, ck, k_eff, c_eff, l0_total])
         elif lt == "inflatable_beam":
@@ -83,8 +82,7 @@ def instantiate(
             beam_matrix.append([ci,cj,float(diameter),float(pressure),float(l0)])
         else:
             # Regular spring: [ci, cj, k, c, l0, springtype]
-            k = max(k,5000)
-            k = min(k,5000)
+            k = 10000
             spring_matrix.append([ci, cj, float(k), float(c), float(l0), lt])
 
     # initial_conditions = initial_conditions  # [[x,y,z,vel_x,vel_y,vel_z,m,fixed]]
