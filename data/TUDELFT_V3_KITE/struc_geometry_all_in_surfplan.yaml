@@ -7,7 +7,6 @@ pulley_mass: 0.1
 kcu_mass: 8.4
 # properties kite
 pressure: 0.3      #[bar]
-canopy_stiffness: 5000
 canopy_density: 170 #g/m2
 mass_without_bridles: 11 #kg
 

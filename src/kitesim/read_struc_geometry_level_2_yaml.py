@@ -194,8 +194,8 @@ def initialize_wing_structure(
             # m_arr[c2] += mass/2
             kite_connectivity_arr.append([c1,c2])
             l0_arr.append(rest_length)
-            k_arr.append(diameter)
-            c_arr.append(struc_geometry["pressure"])
+            k_arr.append(diameter) #use k array to store diameter
+            c_arr.append(struc_geometry["pressure"]) #use c array to store pressure
             linktype_arr.append("inflatable_beam")
     # for struct_sect in strut_sections:
     #     print(struct_sect)
@@ -207,9 +207,9 @@ def initialize_wing_structure(
         # m_arr[ci] += mass/2
         # m_arr[cj] += mass/2
         kite_connectivity_arr.append([ci,cj])
-        l0_arr.append(rest_length)
-        k_arr.append(diameter)
-        c_arr.append(struc_geometry["pressure"])
+        l0_arr.append(rest_length)  
+        k_arr.append(diameter) #use k array to store diameter
+        c_arr.append(struc_geometry["pressure"])  #use c array to store pressure
         linktype_arr.append("inflatable_beam")
 
     #combine and order canopy_and strut sections by first indices
@@ -224,7 +224,7 @@ def initialize_wing_structure(
             rest_length = np.linalg.norm(struc_nodes[c1] - struc_nodes[c2])
             kite_connectivity_arr.append([c1, c2])
             l0_arr.append(rest_length)
-            k_arr.append(struc_geometry["canopy_stiffness"])
+            k_arr.append(5000)
             c_arr.append(0)
             linktype_arr.append("noncompressive")
 
@@ -241,7 +241,7 @@ def initialize_wing_structure(
                 rest_length = np.linalg.norm(struc_nodes[section1[i]]-struc_nodes[section2[i]])
                 kite_connectivity_arr.append([section1[i], section2[i]])
                 l0_arr.append(rest_length)
-                k_arr.append(struc_geometry["canopy_stiffness"])
+                k_arr.append(5000)
                 c_arr.append(0)
                 linktype_arr.append("noncompressive")
                 
@@ -250,7 +250,7 @@ def initialize_wing_structure(
                     rest_length = np.linalg.norm(struc_nodes[section1[i]]-struc_nodes[section2[i-1]])
                     kite_connectivity_arr.append([section1[i], section2[i-1]])
                     l0_arr.append(rest_length)
-                    k_arr.append(struc_geometry["canopy_stiffness"])
+                    k_arr.append(5000)
                     c_arr.append(0)
                     linktype_arr.append("noncompressive")
                 
@@ -259,7 +259,7 @@ def initialize_wing_structure(
                     rest_length = np.linalg.norm(struc_nodes[section1[i-1]]-struc_nodes[section2[i]])
                     kite_connectivity_arr.append([section1[i-1], section2[i]])
                     l0_arr.append(rest_length)
-                    k_arr.append(struc_geometry["canopy_stiffness"])
+                    k_arr.append(5000)
                     c_arr.append(0)
                     linktype_arr.append("noncompressive")
 
@@ -469,7 +469,7 @@ def initialize_bridle_line_system(
             bridle_connectivity_arr.append([ci, cj])
             bridle_diameter_arr.append(bridle_lines_dict[conn_name]["diameter"])
             l0_arr.append(l0)
-            k_arr.append(k)
+            k_arr.append(5000)
             c_arr.append(c)
             linktype_arr.append(bridle_lines_dict[conn_name]["linktype"])
 
@@ -499,7 +499,7 @@ def initialize_bridle_line_system(
             bridle_connectivity_arr.append([cj, ck])
             bridle_diameter_arr.append(bridle_lines_dict[conn_name]["diameter"])
             l0_arr.append(l0)
-            k_arr.append(k)
+            k_arr.append(5000)
             c_arr.append(c)
             linktype_arr.append(bridle_lines_dict[conn_name]["linktype"])
             #add mass
@@ -560,7 +560,7 @@ def initialize_bridle_line_system(
             bridle_connectivity_arr.append([ci, cj])
             bridle_diameter_arr.append(bridle_lines_dict[conn_name]["diameter"])
             l0_arr.append(l0)
-            k_arr.append(k)
+            k_arr.append(5000)
             c_arr.append(c)
             linktype_arr.append(bridle_lines_dict[conn_name]["linktype"])
 

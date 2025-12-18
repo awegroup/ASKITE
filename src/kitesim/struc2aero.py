@@ -38,27 +38,27 @@ def main(
     le_arr = np.array([struc_nodes[i] for i in struc_node_le_indices])
     te_arr = np.array([struc_nodes[i] for i in struc_node_te_indices])
 
-    # TODO: remove hardcoded values
-    ## Correct leading edge and trailing edge points for the full wing
-    delta_te_arr_LAP_to_full_wing = [
-        0.04,
-        0.23,
-        0.24,
-        0.26,
-        0.28,
-        0.28,
-        0.26,
-        0.24,
-        0.23,
-        0.04,
-    ]
-    for idx in range(len(le_arr)):
-        # Compute direction vector from LE to TE
-        vec_le_te = te_arr[idx] - le_arr[idx]
-        vec_le_te_norm = vec_le_te / np.linalg.norm(vec_le_te)
-        # Apply offset along this direction to TE
-        te_arr[idx] += delta_te_arr_LAP_to_full_wing[idx] * vec_le_te_norm
-        le_arr[idx] -= 0.04 * vec_le_te_norm
+    # # TODO: remove hardcoded values
+    # ## Correct leading edge and trailing edge points for the full wing
+    # delta_te_arr_LAP_to_full_wing = [
+    #     0.04,
+    #     0.23,
+    #     0.24,
+    #     0.26,
+    #     0.28,
+    #     0.28,
+    #     0.26,
+    #     0.24,
+    #     0.23,
+    #     0.04,
+    # ]
+    # for idx in range(len(le_arr)):
+    #     # Compute direction vector from LE to TE
+    #     vec_le_te = te_arr[idx] - le_arr[idx]
+    #     vec_le_te_norm = vec_le_te / np.linalg.norm(vec_le_te)
+    #     # Apply offset along this direction to TE
+    #     te_arr[idx] += delta_te_arr_LAP_to_full_wing[idx] * vec_le_te_norm
+    #     le_arr[idx] -= 0.04 * vec_le_te_norm
 
     if n_aero_panels_per_struc_section == 1:
         return le_arr, te_arr

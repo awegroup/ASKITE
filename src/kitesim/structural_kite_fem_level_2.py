@@ -1,5 +1,6 @@
 import numpy as np
 from kite_fem.FEMStructure import FEM_structure
+from kite_fem.Functions import relaxbridles
 from kite_fem.Plotting import plot_structure,plot_convergence,plot_structure_with_strain
 from matplotlib import pyplot as plt
 
@@ -15,6 +16,8 @@ def instantiate(
     m_arr,
     linktype_arr,
     pulley_line_to_other_node_pair_dict,
+    canopy_sections,
+    strut_sections,
 ):
 
     # --- initial conditions ---
@@ -73,7 +76,6 @@ def instantiate(
 
             # pyfe3d pulley: [ci, cj, ck, k_eff, c_eff, l0_total]
             ##TODO: fix not so clean solution
-            k_eff = 10000
             if ci_map != cj_map:
                 pulley_matrix.append([ci_map, cj_map, ck, k_eff, c_eff, l0_total])
         elif lt == "inflatable_beam":
@@ -82,7 +84,6 @@ def instantiate(
             beam_matrix.append([ci,cj,float(diameter),float(pressure),float(l0)])
         else:
             # Regular spring: [ci, cj, k, c, l0, springtype]
-            k = 10000
             spring_matrix.append([ci, cj, float(k), float(c), float(l0), lt])
 
     # initial_conditions = initial_conditions  # [[x,y,z,vel_x,vel_y,vel_z,m,fixed]]
@@ -95,8 +96,11 @@ def instantiate(
         pulley_matrix=pulley_matrix,
         beam_matrix=beam_matrix,
     )
-    struc_nodes_initial = np.array([node_data[0] for node_data in initial_conditions])
 
+    #Relax the bridle lines
+    canopy_nodes = list(set([node for section in canopy_sections + strut_sections for node in section]))
+    kite_fem_structure = relaxbridles(kite_fem_structure,canopy_nodes,[0])
+    struc_nodes_initial = kite_fem_structure.coords_init.reshape(-1,3)
 
     return (
         kite_fem_structure,
@@ -145,8 +149,6 @@ def run_kite_fem(
     f_ext_flat,
     config_structural_kite_fem,
 ):
-    # reset to this iteration (sets coords_current to initial coords)
-    kite_fem_structure.reinitialise()
 
     # [fx, fy, fz, mx, my, mz] for each node
     f_ext_reshaped = f_ext_flat.reshape(-1, 3)
@@ -159,6 +161,7 @@ def run_kite_fem(
         tolerance=config_structural_kite_fem["tolerance"],
         step_limit=config_structural_kite_fem["step_limit"],
         relax_init=config_structural_kite_fem["relax_init"],
+        relax_min=config_structural_kite_fem["relax_min"],
         relax_update=config_structural_kite_fem["relax_update"],
         k_update=config_structural_kite_fem["k_update"],
         I_stiffness=config_structural_kite_fem["I_stiffness"],

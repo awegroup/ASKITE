@@ -84,6 +84,9 @@ def main():
         power_tape_index,
         steering_tape_indices,
         pulley_node_indices,
+        canopy_sections,
+        strut_sections,
+        simplified_bridle_points,
         # element level
         kite_connectivity_arr,
         bridle_connectivity_arr,
@@ -161,6 +164,8 @@ def main():
             m_arr,
             linktype_arr,
             pulley_line_to_other_node_pair_dict,
+            canopy_sections,
+            strut_sections,
         )
         # setting psm related output to None
         psystem = None
