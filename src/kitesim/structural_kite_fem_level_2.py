@@ -1,8 +1,6 @@
 import numpy as np
 from kite_fem.FEMStructure import FEM_structure
 from kite_fem.Functions import relaxbridles
-from kite_fem.Plotting import plot_structure,plot_convergence,plot_structure_with_strain
-from matplotlib import pyplot as plt
 
 
 def instantiate(
