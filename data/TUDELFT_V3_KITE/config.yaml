@@ -51,7 +51,7 @@ structural_pss:
 ## structural kite_fem
 structural_kite_fem:
   max_iterations: !!int 2000
-  tolerance: !!float 5 # smaller than ## coupled tol value
+  tolerance: !!float 0.01 
   step_limit: !!float 0.1
   relax_init: !!float 0.1
   relax_update: !!float 0.95
