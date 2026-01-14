@@ -56,7 +56,7 @@ structural_kite_fem:
   relax_init: !!float 0.1
   relax_update: !!float 0.95
   k_update: !!int 1
-  I_stiffness: !!int 25 #V3 kite: 25
+  I_stiffness: !!int 15 #V3 kite: 25
   print_info: !!bool false
   
 ## aero2struc
@@ -72,7 +72,7 @@ aero_structural_solver:
   tol: !!float 10
 
 ## Physical constants
-grav_constant: !!seq [0, 0, 9.81]
+grav_constant: !!seq [0, 0, -9.81]
 rho: !!float 1.225 # air density in kg/m^3
 mu: !!float 1.789e-05 # dynamic viscosity in kg/(m*s)
 
