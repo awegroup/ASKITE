@@ -75,6 +75,7 @@ def main():
     ##################
     ### STRUCTURAL ###
     ##################
+
     (
         # node level
         struc_nodes,

@@ -62,6 +62,8 @@ def initialize_particles(
     canopy_section_te_indices = [idx for idx in struc_node_te_indices if idx not in strut_node_te_indices]
     canopy_sections = []
 
+    #TODO: Add extra nodes along chord here, make input through configuration file?
+    nodes_per_strut += 1
 
     # add extra nodes along struts such that the amount per strut is the same
     for i,indices in enumerate(strut_indices):

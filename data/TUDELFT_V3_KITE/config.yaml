@@ -59,7 +59,6 @@ structural_kite_fem:
   k_update: !!int 1
   I_stiffness: !!int 15 #V3 kite: 25
   print_info: !!bool false
-  detailed: !!bool true 
   
 ## aero2struc
 aero2struc:

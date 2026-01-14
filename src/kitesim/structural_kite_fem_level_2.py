@@ -1,6 +1,6 @@
 import numpy as np
 from kite_fem.FEMStructure import FEM_structure
-from kite_fem.Functions import relaxbridles
+from kite_fem.Functions import relaxbridles, adapt_stiffnesses
 
 
 def instantiate(
@@ -153,7 +153,7 @@ def run_kite_fem(
     fe_6d = [[fe[0], fe[1], fe[2], 0, 0, 0] for fe in f_ext_reshaped]
     fe_6d = np.array(fe_6d).flatten()
 
-    is_structural_converged = kite_fem_structure.solve(
+    is_structural_converged,residual = kite_fem_structure.solve(
         fe=fe_6d,
         max_iterations=config_structural_kite_fem["max_iterations"],
         tolerance=config_structural_kite_fem["tolerance"],
@@ -165,6 +165,9 @@ def run_kite_fem(
         I_stiffness=config_structural_kite_fem["I_stiffness"],
         print_info=config_structural_kite_fem["print_info"],
     )
+
+    adapt_stiffnesses(kite_fem_structure)
+
     struc_nodes = kite_fem_structure.coords_current
     # reshape from flat to (n_nodes, 3)
     struc_nodes = struc_nodes.reshape(-1, 3)

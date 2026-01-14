@@ -309,13 +309,12 @@ def main(
         config["aerodynamic_bridle"]["cd_cable"],
         config["aerodynamic_bridle"]["cf_cable"],
     )
-    f_aero = f_aero_wing 
+    f_aero = f_aero_wing + f_aero_bridle
     ## EXTERNAL FORCE
     f_ext = f_aero + f_ext_gravity
     f_ext = np.round(f_ext, 5)
     f_ext_flat = f_ext.flatten()
-    print(f_ext_flat)
-    breakpoint()
+
 
     ######################################################################
     # SIMULATION LOOP
@@ -415,7 +414,7 @@ def main(
                 config["aerodynamic_bridle"]["cd_cable"],
                 config["aerodynamic_bridle"]["cf_cable"],
             )
-            f_aero = f_aero_wing
+            f_aero = f_aero_wing + f_aero_bridle
 
             ## EXTERNAL FORCE
             f_ext = f_aero + f_ext_gravity

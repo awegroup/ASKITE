@@ -169,10 +169,10 @@ leading_edge_tubes:
   - [le_run_9, 17, 19, 0.191916]
   - [le_run_10, 19, 21, 0.195751]
   - [le_run_11, 21, 23, 0.198697]
-  - [le_run_12, 23, 25, 0.200784] #
+  - [le_run_12, 23, 25, 0.200784] 
   - [le_run_13, 25, 27, 0.202016]
-  - [le_run_14, 27, 29, 0.202418] #fix tubes
-  - [le_run_15, 29, 31, 0.202016] #
+  - [le_run_14, 27, 29, 0.202418] 
+  - [le_run_15, 29, 31, 0.202016] 
   - [le_run_16, 31, 33, 0.200784]
   - [le_run_17, 33, 35, 0.198697]
   - [le_run_18, 35, 37, 0.195751]
@@ -207,7 +207,7 @@ bridle_particles:
   - [68, -0.711827, -1.113164, 7.054963]
   - [69, -0.692391, -3.921859, 9.027294]
   - [70, -0.633144, -0.941442, 3.348039]
-  - [71, 0.247410, -3.802240, 7.614964] #chang eor remove -0.3x
+  - [71, 0.247410, -3.802240, 7.614964] 
   - [72, -0.618402, -2.172485, 6.506305]
   - [73, -0.616812, -3.825134, 8.898422]
   - [74, -0.607355, -2.644934, 8.26555]
@@ -221,7 +221,7 @@ bridle_particles:
   - [82, 0.396111, -1.921865, 5.940081]
   - [83, 0.473306, -1.155974, 6.347061]
   - [84, 0.61538, -4.142726, 8.125716]
-  - [85, 0.721499, -3.720852, 7.405888] #remove or change
+  - [85, 0.721499, -3.720852, 7.405888]
   - [86, 0.791897, -4.137746, 8.114315]
   - [87, 0.839226, -3.891515, 9.018042]
   - [88, 1.085876, -3.06996, 9.964095]
@@ -241,7 +241,7 @@ bridle_particles:
   - [102, -0.711827, 1.113164, 7.054963]
   - [103, -0.692391, 3.921859, 9.027294]
   - [104, -0.633144, 0.941442, 3.348039]
-  - [105, 0.247410, 3.802240, 7.614964] #change or remove
+  - [105, 0.247410, 3.802240, 7.614964] 
   - [106, -0.618402, 2.172485, 6.506305]
   - [107, -0.616812, 3.825134, 8.898422]
   - [108, -0.607355, 2.644934, 8.26555]
@@ -255,7 +255,7 @@ bridle_particles:
   - [116, 0.396111, 1.921865, 5.940081]
   - [117, 0.473306, 1.155974, 6.347061]
   - [118, 0.61538, 4.142726, 8.125716]
-  - [119, 0.721499, 3.720852, 7.405888] #remove or change
+  - [119, 0.721499, 3.720852, 7.405888]
   - [120, 0.791897, 4.137746, 8.114315]
   - [121, 0.839226, 3.891515, 9.018042]
   - [122, 1.085876, 3.06996, 9.964095]
@@ -315,20 +315,6 @@ bridle_connections:
   - [abcd3, 64, 74, 136]
   - [abcd3, 98, 108, 139]
 
-  # - [ab1, 59, 66]
-  # - [ab1, 93, 100]
-  # - [ab2, 61, 67]
-  # - [ab2, 95, 101]
-  # - [ab3, 64, 74]
-  # - [ab3, 98, 108]
-  # - [cd1, 76, 66]
-  # - [cd1, 110, 100]
-  # - [cd2, 77, 67]
-  # - [cd2, 111, 101]
-  # - [cd3, 78, 74]
-  # - [cd3, 112, 108]
-
-
   - [A1, 66, 68]
   - [A1, 100, 102]
   - [A2, 67, 68]
@@ -341,10 +327,6 @@ bridle_connections:
   - [AI, 102, 104]
   - [AII, 72, 70]
   - [AII, 106, 104]
-  # - [a5.1, 70, 71] #merge to node 70
-  # - [a5.1, 104, 105] #merge to node 104
-
-
 
 
   - [br1, 90, 83]
@@ -355,16 +337,12 @@ bridle_connections:
   - [br3, 122, 116]
   - [br4, 87, 82]
   - [br4, 121, 116]
-  # - [br5, 84, 85]
-  # - [br5, 118, 119]
-  # - [br6, 86, 85]
-  # - [br6, 120, 119]
+
   - [BRII, 83, 81]
   - [BRII, 117, 115]
   - [BRI, 82, 81]
   - [BRI, 116, 115]
-  # - [BR3, 85, 80]
-  # - [BR3, 119, 114]
+
   - [brmain 1, 81, 80]
   - [brmain 1, 115, 114]
   - [brmain ext, 80, 79]
@@ -375,8 +353,8 @@ bridle_connections:
   # front lines
   - [AIII,70,71,80] # pulley
   - [AIII,104,105,114] # pulley
-  - [a5,71,53] #84
-  - [a5,105,3] #118
+  - [a5,71,53] 
+  - [a5,105,3] 
   - [amain,70,0]
   - [amain,104,0]
   - [amain,104,0]
@@ -405,21 +383,9 @@ bridle_lines:
   - [abcd1, 3.261, 0.002, dyneema, "pulley"]
   - [abcd2, 3.3180, 0.002, dyneema, "pulley"]
   - [abcd3, 3.3076, 0.002, dyneema, "pulley"]
-  # - [a1, 0.165, 0.002, dyneema, "noncompressive"]
-  # - [a2, 0.165, 0.002, dyneema, "noncompressive"] #update with measurement
-  # - [a3, 0.1625, 0.002, dyneema, "noncompressive"]
-  # - [a4, 0.1625, 0.002, dyneema, "noncompressive"] #update with measurement
+
   - [a5, 0.234, 0.002, dyneema, "noncompressive"]
-  # - [b1, 0.165, 0.002, dyneema, "noncompressive"]
-  # - [b2, 0.165, 0.002, dyneema, "noncompressive"]
-  # - [b3, 0.1625, 0.002, dyneema, "noncompressive"]
-  # - [b4, 0.1625, 0.002, dyneema, "noncompressive"]
-  # - [ab1, 1.833, 0.002, dyneema, "noncompressive"]
-  # - [ab2, 1.79, 0.002, dyneema, "noncompressive"]
-  # - [ab3, 1.723, 0.002, dyneema, "noncompressive"]
-  # - [cd1, 1.833, 0.002, dyneema, "noncompressive"]
-  # - [cd2, 1.79, 0.002, dyneema, "noncompressive"]
-  # - [cd3, 1.723, 0.002, dyneema, "noncompressive"]
+
   - [c1, 0.445, 0.002, dyneema, "noncompressive"]
   - [d1, 0.405, 0.002, dyneema, "noncompressive"]
   - [c2, 0.400, 0.002, dyneema, "noncompressive"]
@@ -435,9 +401,6 @@ bridle_lines:
   - [AII, 3.360, 0.003, dyneema, "noncompressive"]
   - [amain, 3.903, 0.004, dyneema, "noncompressive"]
 
-  # - [amain2, 3.389739, 0.004, dyneema, "noncompressive"]
-  # - [a5.1, 0.01, 0.005, dyneema, "noncompressive"] #remove
-
 
   #rear
   - [br1, 4.407, 0.002, dyneema, "noncompressive"]
@@ -446,11 +409,9 @@ bridle_lines:
   - [br4, 3.550, 0.002, dyneema, "noncompressive"]
   - [br5, 0.825, 0.002, dyneema, "noncompressive"]
 
-  # - [br5, 0.580461, 0.002, dyneema, "noncompressive"]
-  # - [br6, 0.590505, 0.002, dyneema, "noncompressive"]
+
   - [BRII, 2.333, 0.002, dyneema, "noncompressive"]
   - [BRI, 2.045, 0.002, dyneema, "noncompressive"]
-  # - [BR3, 5.208639, 0.002, dyneema, "noncompressive"]
   - [brmain 1, 0.610, 0.003, dyneema, "noncompressive"]
   - [brmain ext, 0.07, 0.004, dyneema, "noncompressive"]
 
@@ -459,21 +420,10 @@ bridle_lines:
   ##############################
     # front lines
   - [AIII, 11.420, 0.005, dyneema, "pulley"]
-  # - [A5, 2.782, 0.008, dyneema, "noncompressive"]
-  # - [amain, 4.297, 0.02, dyneema, "noncompressive"]
+
   # rear lines
   - [brmain 3, 12.168, 0.002, dyneema, "pulley"]
   - [M-line, 4.856, 0.005, dyneema, "pulley"]
-  - [Steering Tape, 1.8, 0.005, dyneema, "noncompressive"]
-  - [Power Tape, 3.335, 0.005, dyneema, "noncompressive"]
+  - [Steering Tape, 1.6, 0.005, dyneema, "noncompressive"]
+  - [Power Tape, 2.2, 0.005, dyneema, "noncompressive"]
 
-  #   # front lines
-  # - [a6, 11.372, 0.005, dyneema, "pulley"]
-  # - [A5, 2.782, 0.008, dyneema, "noncompressive"]
-  # - [amain, 4.297, 0.02, dyneema, "noncompressive"]
-  # # rear lines
-  # - [br6, 14.172, 0.002, dyneema, "pulley"]
-  # - [BR-main-1, 0.874, 0.005, dyneema, "noncompressive"]
-  # - [M-line, 2.196, 0.005, dyneema, "pulley"]
-  # - [Steering Tape, 1.506, 0.005, dyneema, "noncompressive"]
-  # - [Power Tape, 3.129, 0.005, dyneema, "noncompressive"]
