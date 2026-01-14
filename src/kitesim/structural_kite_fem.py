@@ -1,6 +1,6 @@
 import numpy as np
 from kite_fem.FEMStructure import FEM_structure
-from kite_fem.Functions import adapt_stiffnesses
+from kite_fem.Functions import adapt_stiffnesses,relaxbridles
 
 
 def instantiate(
@@ -29,7 +29,7 @@ def instantiate(
 
     pulley_matrix = []
     spring_matrix = []
-
+    canopy_nodes = []
     # Deduplicate pulleys: remember which (ci,cj,ck) we’ve emitted already
     seen_pulley_triplets = set()
 
@@ -78,7 +78,10 @@ def instantiate(
         else:
             # Regular spring: [ci, cj, k, c, l0, springtype]
             spring_matrix.append([ci, cj, float(k), float(c), float(l0), lt])
-
+            if ci not in canopy_nodes:
+                canopy_nodes.append(ci)
+            if cj not in canopy_nodes:
+                canopy_nodes.append(cj)
     # initial_conditions = initial_conditions  # [[x,y,z,vel_x,vel_y,vel_z,m,fixed]]
     # pulley_matrix = pulley_matrix  # [[ci, cj, ck, k_eff, c_eff, l0_total], ...]
     # spring_matrix = spring_matrix  # [[ci, cj, k, c, l0, springtype], ...]
@@ -88,8 +91,9 @@ def instantiate(
         spring_matrix=spring_matrix,
         pulley_matrix=pulley_matrix,
     )
-    struc_nodes_initial = np.array([node_data[0] for node_data in initial_conditions])
-
+    
+    kite_fem_structure = relaxbridles(kite_fem_structure,canopy_nodes,[0])
+    struc_nodes_initial = kite_fem_structure.coords_init.reshape(-1,3)
     return (
         kite_fem_structure,
         initial_conditions,
