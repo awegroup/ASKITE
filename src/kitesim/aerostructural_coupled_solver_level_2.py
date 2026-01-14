@@ -11,7 +11,7 @@ from kitesim import (
     structural_pss,
     tracking,
     plotting,
-    structural_kite_fem,
+    structural_kite_fem_level_2,
     aerodynamic_bridle_line_drag,
 )
 
@@ -338,7 +338,7 @@ def main(
                 )
             elif config["structural_solver"] == "kite_fem":
                 kite_fem_structure, is_structural_converged, struc_nodes, f_int = (
-                    structural_kite_fem.run_kite_fem(
+                    structural_kite_fem_level_2.run_kite_fem(
                         kite_fem_structure, f_ext_flat, config["structural_kite_fem"]
                     )
                 )
@@ -349,7 +349,7 @@ def main(
                 if config["structural_solver"] == "pss":
                     rest_lengths = psystem.extract_rest_length
                 elif config["structural_solver"] == "kite_fem":
-                    rest_lengths = structural_kite_fem.get_rest_lengths(
+                    rest_lengths = structural_kite_fem_level_2.get_rest_lengths(
                         kite_fem_structure, kite_connectivity_arr
                     )
                     kite_fem_structure.plot_convergence()
@@ -502,7 +502,7 @@ def main(
     if config["structural_solver"] == "pss":
         rest_lengths = psystem.extract_rest_length
     elif config["structural_solver"] == "kite_fem":
-        rest_lengths = structural_kite_fem.get_rest_lengths(
+        rest_lengths = structural_kite_fem_level_2.get_rest_lengths(
             kite_fem_structure, kite_connectivity_arr
         )
 

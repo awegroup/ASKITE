@@ -1,6 +1,6 @@
 import numpy as np
 from kite_fem.FEMStructure import FEM_structure
-from matplotlib import pyplot as plt
+from kite_fem.Functions import adapt_stiffnesses
 
 
 def instantiate(
@@ -155,6 +155,9 @@ def run_kite_fem(
         I_stiffness=config_structural_kite_fem["I_stiffness"],
         print_info=config_structural_kite_fem["print_info"],
     )
+
+    adapt_stiffnesses(kite_fem_structure)
+
     struc_nodes = kite_fem_structure.coords_current
     # reshape from flat to (n_nodes, 3)
     struc_nodes = struc_nodes.reshape(-1, 3)

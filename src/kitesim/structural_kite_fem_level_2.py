@@ -159,7 +159,6 @@ def run_kite_fem(
         tolerance=config_structural_kite_fem["tolerance"],
         step_limit=config_structural_kite_fem["step_limit"],
         relax_init=config_structural_kite_fem["relax_init"],
-        relax_min=config_structural_kite_fem["relax_min"],
         relax_update=config_structural_kite_fem["relax_update"],
         k_update=config_structural_kite_fem["k_update"],
         I_stiffness=config_structural_kite_fem["I_stiffness"],

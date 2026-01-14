@@ -23,7 +23,7 @@ from kitesim import (
     aerodynamic_vsm,
     structural_kite_fem_level_2,
     structural_pss,
-    aerostructural_coupled_solver,
+    aerostructural_coupled_solver_level_2,
     read_struc_geometry_level_2_yaml,
 )
 
@@ -229,7 +229,7 @@ def main():
     ########################################
     ### AEROSTUCTURAL COUPLED SIMULATION ###
     ########################################
-    tracking_data, meta = aerostructural_coupled_solver.main(
+    tracking_data, meta = aerostructural_coupled_solver_level_2.main(
         m_arr=m_arr,
         struc_nodes=struc_nodes,
         struc_nodes_initial=struc_nodes_initial,

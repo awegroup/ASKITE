@@ -54,7 +54,7 @@ structural_kite_fem:
   tolerance: !!float 0.01 
   step_limit: !!float 0.1
   relax_init: !!float 0.1
-  relax_update: !!float 0.95
+  relax_update: !!float 0.99
   k_update: !!int 1
   I_stiffness: !!int 15 #V3 kite: 25
   print_info: !!bool false
