@@ -23,7 +23,6 @@ dependencies = [
     "ipywidgets",
     "pydantic",
     "h5py",
-    "tables",
     "tqdm",
     "PSS @ git+https://github.com/awegroup/Particle_System_Simulator.git@v1.0.0",
     "VSM @ git+https://github.com/awegroup/Vortex-Step-Method.git@v2.0.0",

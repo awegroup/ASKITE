@@ -8,7 +8,7 @@ structural_solver: !!str "kite_fem" #"kite_fem" or "pss"
 is_with_gravity: !!bool true
 is_with_aero_bridle: !!bool false
 is_with_aero_tether: !!bool false
-is_run_only_1_time_step: !!bool false
+is_run_only_1_time_step: !!bool true
 is_with_initial_point_velocity: !!bool false
 is_with_forcing_symmetry: !!bool false
 
@@ -20,7 +20,7 @@ steering_tape_final_extension: !!float 0.0
 
 ## output settings
 is_with_initial_structure_plot: !!bool true
-is_with_coupling_plot_per_iteration: !!bool false
+is_with_coupling_plot_per_iteration: !!bool true
 is_with_struc_plot_per_iteration: !!bool false
 is_with_aero_plot_per_iteration: !!bool false
 is_with_final_plot: !!bool true
