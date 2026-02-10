@@ -400,8 +400,8 @@ bridle_lines:
   ##############################
     # front lines
   - [a6, 11.372, 0.005, dyneema, "pulley"]
-  - [A5, 2.782, 0.008, dyneema, "noncompressive"]
-  - [amain, 4.297, 0.02, dyneema, "noncompressive"]
+  - [A5, 2.782, 0.005, dyneema, "noncompressive"]
+  - [amain, 4.297, 0.005, dyneema, "noncompressive"]
   # rear lines
   - [br6, 14.172, 0.002, dyneema, "pulley"]
   - [BR-main-1, 0.874, 0.005, dyneema, "noncompressive"]

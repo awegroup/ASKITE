@@ -7,7 +7,7 @@ import copy
 from kitesim import (
     aerodynamic_vsm,
     struc2aero,
-    aero2struc,
+    aero2struc_level_2,
     structural_pss,
     tracking,
     plotting,
@@ -16,39 +16,77 @@ from kitesim import (
 )
 
 
-# Remove hardcoded values, when changing away from V3
-def forcing_symmetry(struc_nodes):
-    """
-    Forcing symmetry in the y-direction for the kite structure nodes.
-    This is a temporary solution to ensure symmetry in the simulation.
-    """
-    symmetry_pairs_dict = {
-        1: 19,
-        2: 20,
-        3: 17,
-        4: 18,
-        5: 15,
-        6: 16,
-        7: 13,
-        8: 14,
-        9: 11,
-        10: 12,
-        # bridles
-        21: 24,
-        22: 23,
-        25: 26,
-        27: 30,
-        28: 29,
-        31: 32,
-        33: 35,
-        36: 37,
-    }
+def build_symmetry_mapping(struc_nodes, tol=1e-5):
+    """Build a mapping of symmetrical node pairs from the *initial* geometry.
 
-    for key, value in symmetry_pairs_dict.items():
-        struc_nodes[value] = np.array(
-            [struc_nodes[key][0], -struc_nodes[key][1], struc_nodes[key][2]]
+    For every node with y > 0 (positive-span side), find its mirror partner
+    at (x, −y, z) on the negative-span side.  Also identify nodes that sit
+    on the symmetry plane (|y| ≤ tol).
+
+    Call this **once** during initialisation and pass the result to
+    :func:`forcing_symmetry` at every iteration.
+
+    Parameters
+    ----------
+    struc_nodes : np.ndarray, shape (n, 3)
+        Initial (undeformed) node coordinates.
+    tol : float
+        Absolute tolerance for matching mirror coordinates.
+
+    Returns
+    -------
+    symmetry_mapping : dict
+        ``{"pairs": np.ndarray shape (m, 2),
+           "center_indices": list[int]}``
+        *pairs[:, 0]* = positive-y node index (source),
+        *pairs[:, 1]* = negative-y node index (mirror).
+    """
+    pos_indices = [i for i, pt in enumerate(struc_nodes) if pt[1] > tol]
+    neg_indices = [i for i, pt in enumerate(struc_nodes) if pt[1] < -tol]
+    center_indices = [i for i, pt in enumerate(struc_nodes) if abs(pt[1]) <= tol]
+
+    pairs = []
+    for pi in pos_indices:
+        mirrored = np.array(
+            [struc_nodes[pi][0], -struc_nodes[pi][1], struc_nodes[pi][2]]
         )
-    struc_nodes[34][1] = 0
+        for ni in neg_indices:
+            if np.allclose(struc_nodes[ni], mirrored, atol=tol):
+                pairs.append((pi, ni))
+                break
+
+    pairs = np.array(pairs) if pairs else np.empty((0, 2), dtype=int)
+
+    logging.info(
+        f"Symmetry mapping: {len(pairs)} pairs, {len(center_indices)} center nodes"
+    )
+    return {"pairs": pairs, "center_indices": center_indices}
+
+
+def forcing_symmetry(struc_nodes, symmetry_mapping):
+    """Force y-symmetry on the structural nodes using a pre-built mapping.
+
+    For each (source, mirror) pair the mirror node is set to
+    ``[x_source, -y_source, z_source]``.  Centre-plane nodes are forced to
+    ``y = 0``.
+
+    Parameters
+    ----------
+    struc_nodes : np.ndarray, shape (n, 3)
+    symmetry_mapping : dict
+        Output of :func:`build_symmetry_mapping`.
+
+    Returns
+    -------
+    struc_nodes : np.ndarray
+        The (modified in-place) node array.
+    """
+    for src, mir in symmetry_mapping["pairs"]:
+        struc_nodes[mir] = np.array(
+            [struc_nodes[src][0], -struc_nodes[src][1], struc_nodes[src][2]]
+        )
+    for ci in symmetry_mapping["center_indices"]:
+        struc_nodes[ci][1] = 0.0
     return struc_nodes
 
 
@@ -213,6 +251,8 @@ def main(
     ### STRUC
     psystem=None,
     kite_fem_structure=None,
+    canopy_sections=None,
+    strut_sections=None,
 ):
     """
     Runs the aero-structural solver for the given input parameters.
@@ -252,6 +292,10 @@ def main(
     start_time = time.time()
     plotting.set_plot_style()
 
+    # Build symmetry mapping once from initial (undeformed) geometry
+    if config["is_with_forcing_symmetry"]:
+        symmetry_mapping = build_symmetry_mapping(struc_nodes_initial)
+
     ## track initial state
     # Update unified tracking dataframe (replaces position update)
     tracking.update_tracking_arrays(
@@ -285,11 +329,54 @@ def main(
         initial_polar_data=initial_polar_data,
         is_with_plot=config["is_with_aero_plot_per_iteration"],
     )
+
     logging.debug(
         f"Aero symmetry check, f_aero_y: {np.sum([force[1] for force in f_aero_wing_vsm_format])}"
     )
+
+    # # TODO: debuggin here
+    # # print out the cp locations as % of le to te for debugging purposes
+    # alpha_arr = np.array(results_aero["alpha_at_ac"]).ravel()
+    # alpha_arr_geom = np.array(results_aero["alpha_geometric"]).ravel()
+    # cl_arr = np.array(results_aero["cl_distribution"]).ravel()
+    # for i, (panel, alpha, alpha_geom, cl) in enumerate(
+    #     zip(body_aero.panels, alpha_arr, alpha_arr_geom, cl_arr)
+    # ):
+    #     cp = np.array(results_aero["panel_cp_locations"][i])
+    #     le_mid = 0.5 * (panel.LE_point_1 + panel.LE_point_2)
+    #     te_mid = 0.5 * (panel.TE_point_1 + panel.TE_point_2)
+    #     # chordwise fraction along panel chord axis
+    #     cp_rel = np.dot(cp - le_mid, panel.y_airf) / panel.chord
+    #     print(
+    #         f"i:{i}, CP: {cp_rel:.3f}, alpha_corr: {alpha:.2f}deg, alpha_geom: {alpha_geom:.2f}deg, cl: {cl:.3f}, le: {le_mid}, te: {te_mid}"
+    #     )
+    #     F = np.array(results_aero["F_distribution"][i])
+    #     M = np.array(results_aero["M_distribution"][i])
+    #     ac = panel.aerodynamic_center
+    #     y_airf = panel.y_airf
+    #     z_airf = panel.z_airf
+    #     c = panel.chord
+
+    #     r = ac  # reference_point is [0,0,0] in config
+    #     M_local = M - np.cross(r, F)
+    #     m_pitch = np.dot(M_local, z_airf)
+    #     F_perp = F - np.dot(F, z_airf) * z_airf
+    #     F_perp_mag = np.linalg.norm(F_perp)
+    #     lever_raw = m_pitch / max(F_perp_mag, 1e-12)
+    #     lever_clamped = np.clip(lever_raw, -0.25 * c, 0.75 * c)
+    #     cp_rel = 0.25 + lever_clamped / c
+
+    #     print(
+    #         f"i:{i}, cp_rel:{cp_rel:.3f}, lever_raw:{lever_raw/c:.3f}, F_perp:{F_perp_mag:.3e}"
+    #     )
+
+    #     cd, cm = panel.compute_cd_cm(alpha)
+    #     print(
+    #         f"i:{i}, cm:{cm:.4f}, alpha_corr:{alpha:.2f}, alpha_geom:{alpha_geom:.2f}, cp:{cp_rel:.3f}"
+    #     )
+
     ### AERO --> STRUC
-    f_aero_wing = aero2struc.main(
+    f_aero_wing = aero2struc_level_2.main(
         config["aero2struc"]["coupling_method"],
         f_aero_wing_vsm_format,
         struc_nodes,
@@ -297,6 +384,9 @@ def main(
         aero2struc_mapping,
         config["is_with_coupling_plot_per_iteration"],
         config["aero2struc"],
+        canopy_sections,
+        strut_sections,
+        body_aero.panels,
     )
 
     ### BRIDLE AERO
@@ -314,7 +404,6 @@ def main(
     f_ext = f_aero + f_ext_gravity
     f_ext = np.round(f_ext, 5)
     f_ext_flat = f_ext.flatten()
-
 
     ######################################################################
     # SIMULATION LOOP
@@ -394,7 +483,7 @@ def main(
                 f"Aero symmetry check, f_aero_y: {np.sum([force[1] for force in f_aero_wing_vsm_format])}"
             )
             ### AERO --> STRUC
-            f_aero_wing = aero2struc.main(
+            f_aero_wing = aero2struc_level_2.main(
                 config["aero2struc"]["coupling_method"],
                 f_aero_wing_vsm_format,
                 struc_nodes,
@@ -402,18 +491,24 @@ def main(
                 aero2struc_mapping,
                 config["is_with_coupling_plot_per_iteration"],
                 config["aero2struc"],
+                canopy_sections,
+                strut_sections,
+                body_aero.panels,
             )
 
             ### BRIDLE AERO
-            f_aero_bridle = aerodynamic_bridle_line_drag.main(
-                struc_nodes,
-                bridle_connectivity_arr,
-                bridle_diameter_arr,
-                vel_app,
-                config["rho"],
-                config["aerodynamic_bridle"]["cd_cable"],
-                config["aerodynamic_bridle"]["cf_cable"],
-            )
+            if config["is_with_aero_bridle"]:
+                f_aero_bridle = aerodynamic_bridle_line_drag.main(
+                    struc_nodes,
+                    bridle_connectivity_arr,
+                    bridle_diameter_arr,
+                    vel_app,
+                    config["rho"],
+                    config["aerodynamic_bridle"]["cd_cable"],
+                    config["aerodynamic_bridle"]["cf_cable"],
+                )
+            else:
+                f_aero_bridle = np.zeros((len(struc_nodes), 3))
             f_aero = f_aero_wing + f_aero_bridle
 
             ## EXTERNAL FORCE
@@ -424,7 +519,7 @@ def main(
             ### FORCING SYMMETRY
             if config["is_with_forcing_symmetry"]:
                 logging.info("Forcing symmetry in y-direction")
-                struc_nodes = forcing_symmetry(struc_nodes)
+                struc_nodes = forcing_symmetry(struc_nodes, symmetry_mapping)
 
             ### RESIDUAL
             if config["structural_solver"] == "pss":
@@ -499,6 +594,43 @@ def main(
     ######################################################################
     ## END OF SIMULATION FOR LOOP
     ######################################################################
+    # print out the geometric angle of attack of the mid panel
+    panels = body_aero.panels
+
+    # Select middle panel
+    mid_idx = len(panels) // 2
+    panel = panels[mid_idx]
+
+    # Midpoints of leading and trailing edges
+    le_mid = 0.5 * (panel.LE_point_1 + panel.LE_point_2)
+    te_mid = 0.5 * (panel.TE_point_1 + panel.TE_point_2)
+
+    # Chord direction vector
+    vec_chord = te_mid - le_mid
+    vec_chord /= np.linalg.norm(vec_chord)
+
+    # Apparent wind direction (normalize)
+    vec_wind = vel_app / np.linalg.norm(vel_app)
+
+    # Project onto plane of interest (optional: usually x-z plane)
+    # Remove spanwise component if needed
+    vec_chord_2d = np.array([vec_chord[0], vec_chord[2]])
+    vec_wind_2d = np.array([vec_wind[0], vec_wind[2]])
+
+    vec_chord_2d /= np.linalg.norm(vec_chord_2d)
+    vec_wind_2d /= np.linalg.norm(vec_wind_2d)
+
+    # Angle between vectors (signed)
+    dot = np.clip(np.dot(vec_chord_2d, vec_wind_2d), -1.0, 1.0)
+    cross = np.cross(vec_chord_2d, vec_wind_2d)
+
+    angle = np.arctan2(cross, dot)
+
+    print(f"alpha = {np.degrees(angle):.2f}° (va vs mid-span chord)")
+    print(
+        f'alpha = {float(np.rad2deg(results_aero["alpha_at_ac"][mid_idx])):.2f}° (incl. induced velocity, from results_aero["alpha_at_ac"])'
+    )
+
     if config["structural_solver"] == "pss":
         rest_lengths = psystem.extract_rest_length
     elif config["structural_solver"] == "kite_fem":

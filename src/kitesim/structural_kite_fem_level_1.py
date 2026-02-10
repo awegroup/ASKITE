@@ -1,6 +1,6 @@
 import numpy as np
 from kite_fem.FEMStructure import FEM_structure
-from kite_fem.Functions import adapt_stiffnesses,relaxbridles
+from kite_fem.Functions import adapt_stiffnesses, relaxbridles
 
 
 def instantiate(
@@ -91,9 +91,9 @@ def instantiate(
         spring_matrix=spring_matrix,
         pulley_matrix=pulley_matrix,
     )
-    
-    kite_fem_structure = relaxbridles(kite_fem_structure,canopy_nodes,[0])
-    struc_nodes_initial = kite_fem_structure.coords_init.reshape(-1,3)
+
+    # kite_fem_structure = relaxbridles(kite_fem_structure,canopy_nodes,[0])
+    struc_nodes_initial = kite_fem_structure.coords_init.reshape(-1, 3)
     return (
         kite_fem_structure,
         initial_conditions,
@@ -148,7 +148,7 @@ def run_kite_fem(
     fe_6d = [[fe[0], fe[1], fe[2], 0, 0, 0] for fe in f_ext_reshaped]
     fe_6d = np.array(fe_6d).flatten()
 
-    is_structural_converged,residual = kite_fem_structure.solve(
+    is_structural_converged, residual = kite_fem_structure.solve(
         fe=fe_6d,
         max_iterations=config_structural_kite_fem["max_iterations"],
         tolerance=config_structural_kite_fem["tolerance"],
@@ -160,7 +160,7 @@ def run_kite_fem(
         print_info=config_structural_kite_fem["print_info"],
     )
 
-    adapt_stiffnesses(kite_fem_structure)
+    # adapt_stiffnesses(kite_fem_structure)  # disabled: doubles k every iter for >1% strain springs
 
     struc_nodes = kite_fem_structure.coords_current
     # reshape from flat to (n_nodes, 3)

@@ -5,13 +5,13 @@ import logging
 from pathlib import Path
 import copy
 from kitesim import (
+    aero2struc_level_1,
     aerodynamic_vsm,
     struc2aero,
-    aero2struc,
+    structural_kite_fem_level_1,
     structural_pss,
     tracking,
     plotting,
-    structural_kite_fem,
     aerodynamic_bridle_line_drag,
 )
 
@@ -155,8 +155,23 @@ def check_convergence(
 
     # if residual forces are not changing anymore
     elif (
-        i > 15
-        and np.abs(np.mean(f_residual_list[i - 15]) - f_residual_list[i - 10]) < 1
+        i > config["aero_structural_solver"]["n_max_constant_residual_force"]
+        and np.abs(
+            np.mean(
+                f_residual_list[
+                    i
+                    - config["aero_structural_solver"]["n_max_constant_residual_force"]
+                ]
+            )
+            - f_residual_list[
+                i
+                - (
+                    config["aero_structural_solver"]["n_max_constant_residual_force"]
+                    - 5
+                )
+            ]
+        )
+        < 1
     ):
         is_convergence = False
         logging.info("Classic PS non-converging - residual no longer changes")
@@ -226,6 +241,7 @@ def main(
         tracking_data (dict): Dictionary containing time histories of positions, forces, etc.
         meta (dict): Dictionary with meta information about the simulation (timing, convergence, etc).
     """
+    print(f'--> Running structural_solver: {config["structural_solver"]}')
 
     ## PRELOOP
     if config["is_with_gravity"]:
@@ -251,6 +267,10 @@ def main(
     struc_nodes_prev = None  # Initialize previous points for tracking
     start_time = time.time()
     plotting.set_plot_style()
+
+    # Aitken relaxation state
+    omega_relaxation = config["aero_structural_solver"].get("relaxation_factor", 0.3)
+    r_prev_flat = None
 
     ## track initial state
     # Update unified tracking dataframe (replaces position update)
@@ -289,7 +309,7 @@ def main(
         f"Aero symmetry check, f_aero_y: {np.sum([force[1] for force in f_aero_wing_vsm_format])}"
     )
     ### AERO --> STRUC
-    f_aero_wing = aero2struc.main(
+    f_aero_wing = aero2struc_level_1.main(
         config["aero2struc"]["coupling_method"],
         f_aero_wing_vsm_format,
         struc_nodes,
@@ -315,7 +335,6 @@ def main(
     f_ext = np.round(f_ext, 5)
     f_ext_flat = f_ext.flatten()
 
-
     ######################################################################
     # SIMULATION LOOP
     ######################################################################
@@ -325,8 +344,9 @@ def main(
             if i > 0:
                 struc_nodes_prev = struc_nodes.copy()
 
-            ### STRUC
-            end_time_f_ext = time.time()
+            ########################################################
+            ############## INTERNAL FORCE CALCULATION ##############
+            ########################################################
             begin_time_f_int = time.time()
             if config["structural_solver"] == "pss":
                 psystem, is_structural_converged, struc_nodes, f_int = (
@@ -338,18 +358,47 @@ def main(
                 )
             elif config["structural_solver"] == "kite_fem":
                 kite_fem_structure, is_structural_converged, struc_nodes, f_int = (
-                    structural_kite_fem.run_kite_fem(
+                    structural_kite_fem_level_1.run_kite_fem(
                         kite_fem_structure, f_ext_flat, config["structural_kite_fem"]
                     )
                 )
             end_time_f_int = time.time()
+
+            ### Aitken relaxation of structural nodes
+            if struc_nodes_prev is not None:
+                r_k = struc_nodes - struc_nodes_prev
+                r_k_flat = r_k.flatten()
+
+                if (
+                    config["aero_structural_solver"].get(
+                        "is_with_aitken_relaxation", True
+                    )
+                    and r_prev_flat is not None
+                ):
+                    delta_r = r_k_flat - r_prev_flat
+                    denom = np.dot(delta_r, delta_r)
+                    if denom > 1e-30:
+                        omega_relaxation = -omega_relaxation * (
+                            np.dot(r_prev_flat, delta_r) / denom
+                        )
+                        omega_relaxation = np.clip(omega_relaxation, 0.05, 1.0)
+
+                struc_nodes = struc_nodes_prev + omega_relaxation * r_k
+                r_prev_flat = r_k_flat.copy()
+                logging.debug(f"Aitken relaxation omega: {omega_relaxation:.4f}")
+
+                # Sync relaxed positions back to structural solver state
+                if config["structural_solver"] == "pss":
+                    for idx, particle in enumerate(psystem.particles):
+                        particle.update_pos(struc_nodes[idx])
+                        particle.update_vel(np.zeros(3))
 
             ### PLOT per iteration
             if config["is_with_struc_plot_per_iteration"]:
                 if config["structural_solver"] == "pss":
                     rest_lengths = psystem.extract_rest_length
                 elif config["structural_solver"] == "kite_fem":
-                    rest_lengths = structural_kite_fem.get_rest_lengths(
+                    rest_lengths = structural_kite_fem_level_1.get_rest_lengths(
                         kite_fem_structure, kite_connectivity_arr
                     )
                     kite_fem_structure.plot_convergence()
@@ -366,7 +415,9 @@ def main(
                     pulley_line_to_other_node_pair_dict=pulley_line_to_other_node_pair_dict,
                 )
 
-            ## external force
+            ########################################################
+            ############## INTERNAL FORCE CALCULATION ##############
+            ########################################################
             begin_time_f_ext = time.time()
 
             ### STRUC --> AERO
@@ -394,7 +445,7 @@ def main(
                 f"Aero symmetry check, f_aero_y: {np.sum([force[1] for force in f_aero_wing_vsm_format])}"
             )
             ### AERO --> STRUC
-            f_aero_wing = aero2struc.main(
+            f_aero_wing = aero2struc_level_1.main(
                 config["aero2struc"]["coupling_method"],
                 f_aero_wing_vsm_format,
                 struc_nodes,
@@ -405,21 +456,25 @@ def main(
             )
 
             ### BRIDLE AERO
-            f_aero_bridle = aerodynamic_bridle_line_drag.main(
-                struc_nodes,
-                bridle_connectivity_arr,
-                bridle_diameter_arr,
-                vel_app,
-                config["rho"],
-                config["aerodynamic_bridle"]["cd_cable"],
-                config["aerodynamic_bridle"]["cf_cable"],
-            )
+            if config["is_with_aero_bridle"]:
+                f_aero_bridle = aerodynamic_bridle_line_drag.main(
+                    struc_nodes,
+                    bridle_connectivity_arr,
+                    bridle_diameter_arr,
+                    vel_app,
+                    config["rho"],
+                    config["aerodynamic_bridle"]["cd_cable"],
+                    config["aerodynamic_bridle"]["cf_cable"],
+                )
+            else:
+                f_aero_bridle = np.zeros((len(struc_nodes), 3))
             f_aero = f_aero_wing + f_aero_bridle
 
             ## EXTERNAL FORCE
             f_ext = f_aero + f_ext_gravity
             f_ext = np.round(f_ext, 5)
             f_ext_flat = f_ext.flatten()
+            end_time_f_ext = time.time()
 
             ### FORCING SYMMETRY
             if config["is_with_forcing_symmetry"]:
@@ -427,15 +482,21 @@ def main(
                 struc_nodes = forcing_symmetry(struc_nodes)
 
             ### RESIDUAL
+            f_residual = f_int + f_ext_flat
+
+            # Zero out residual at fixed (constrained) nodes — their imbalance
+            # is carried by the constraint reaction force, not by f_int.
+            # Without this, the residual includes e.g. the weight of node 0
+            # (~92 N) which can never converge to zero.
             if config["structural_solver"] == "pss":
-                f_residual = f_int + f_ext_flat
-                f_residual_list.append(np.linalg.norm(np.abs(f_residual)))
+                for fix_idx in config["structural_pss"]["fixed_point_indices"]:
+                    f_residual[3 * fix_idx : 3 * fix_idx + 3] = 0.0
+
+            f_residual_list.append(np.linalg.norm(np.abs(f_residual)))
+            if config["structural_solver"] == "pss":
                 logging.debug(
                     f"residual force in y-direction: {np.sum([f_residual[1::3]]):.3f}N"
                 )
-            elif config["structural_solver"] == "kite_fem":
-                f_residual = f_int + f_ext_flat
-                f_residual_list.append(np.linalg.norm(np.abs(f_residual)))
 
             ### TRACKING
             # Update unified tracking dataframe (replaces position update)
@@ -499,10 +560,54 @@ def main(
     ######################################################################
     ## END OF SIMULATION FOR LOOP
     ######################################################################
+
+    # print out the geometric angle of attack of the mid panel
+    panels = body_aero.panels
+
+    # Select middle panel
+    mid_idx = len(panels) // 2
+    panel = panels[mid_idx]
+
+    # Midpoints of leading and trailing edges
+    le_mid = 0.5 * (panel.LE_point_1 + panel.LE_point_2)
+    te_mid = 0.5 * (panel.TE_point_1 + panel.TE_point_2)
+
+    # Chord direction vector
+    vec_chord = te_mid - le_mid
+    vec_chord /= np.linalg.norm(vec_chord)
+
+    # Apparent wind direction (normalize)
+    vec_wind = vel_app / np.linalg.norm(vel_app)
+
+    # Project onto plane of interest (optional: usually x-z plane)
+    # Remove spanwise component if needed
+    vec_chord_2d = np.array([vec_chord[0], vec_chord[2]])
+    vec_wind_2d = np.array([vec_wind[0], vec_wind[2]])
+
+    vec_chord_2d /= np.linalg.norm(vec_chord_2d)
+    vec_wind_2d /= np.linalg.norm(vec_wind_2d)
+
+    # Angle between vectors (signed)
+    dot = np.clip(np.dot(vec_chord_2d, vec_wind_2d), -1.0, 1.0)
+    cross = np.cross(vec_chord_2d, vec_wind_2d)
+
+    angle = np.arctan2(cross, dot)
+
+    print(f"alpha = {np.degrees(angle):.2f}° (va vs mid-span chord)")
+    print(
+        f'alpha = {float(np.rad2deg(results_aero["alpha_at_ac"][mid_idx])):.2f}° (incl. induced velocity, from results_aero["alpha_at_ac"])'
+    )
+    # print(
+    #     f'results_aero["alpha_uncorrected"]: {float(np.rad2deg(results_aero["alpha_uncorrected"][mid_idx])):.2f}°'
+    # )
+    # print(
+    #     f'results_aero["alpha_geometric"]: wrt horizontal {results_aero["alpha_geometric"][mid_idx]:.2f}°'
+    # )
+
     if config["structural_solver"] == "pss":
         rest_lengths = psystem.extract_rest_length
     elif config["structural_solver"] == "kite_fem":
-        rest_lengths = structural_kite_fem.get_rest_lengths(
+        rest_lengths = structural_kite_fem_level_1.get_rest_lengths(
             kite_fem_structure, kite_connectivity_arr
         )
 
@@ -516,6 +621,7 @@ def main(
             title="Initial vs final",
             pulley_line_indices=pulley_line_indices,
             pulley_line_to_other_node_pair_dict=pulley_line_to_other_node_pair_dict,
+            vel_app=vel_app,
         )
     meta = {
         "total_time_s": time.time() - start_time,

@@ -19,12 +19,12 @@ from kitesim.utils import (
     printing_rest_lengths,
 )
 from kitesim import (
-    aero2struc,
+    aero2struc_level_2,
     aerodynamic_vsm,
+    read_struc_geometry_yaml_level_2,
     structural_kite_fem_level_2,
     structural_pss,
     aerostructural_coupled_solver_level_2,
-    read_struc_geometry_level_2_yaml,
 )
 
 
@@ -40,7 +40,7 @@ def main():
         Path(PROJECT_DIR)
         / "data"
         / f"{kite_name}"
-        / "struc_geometry_all_in_surfplan.yaml"
+        / "struc_geometry_level_2_manual.yaml"
     )
     aero_geometry_path = (
         Path(PROJECT_DIR) / "data" / f"{kite_name}" / "aero_geometry.yaml"
@@ -66,8 +66,7 @@ def main():
         "n_aero_panels_per_struc_section"
     ]
     body_aero, vsm_solver, vel_app, initial_polar_data = aerodynamic_vsm.initialize(
-        kite_name,
-        PROJECT_DIR,
+        aero_geometry_path,
         config,
         n_panels_aero,
     )
@@ -98,7 +97,7 @@ def main():
         linktype_arr,
         pulley_line_indices,
         pulley_line_to_other_node_pair_dict,
-    ) = read_struc_geometry_level_2_yaml.main(struc_geometry)
+    ) = read_struc_geometry_yaml_level_2.main(struc_geometry)
 
     # logging initial conditions
     logging.info(f"\n\nINITIAL CONDITIONS, NODES \n")
@@ -177,7 +176,7 @@ def main():
     ##################
     ### AERO2STRUC ###
     ##################
-    aero2struc_mapping = aero2struc.initialize_mapping(
+    aero2struc_mapping = aero2struc_level_2.initialize_mapping(
         body_aero.panels,
         struc_nodes,
         struc_node_le_indices,
@@ -259,6 +258,8 @@ def main():
         ### STRUC
         psystem=psystem,
         kite_fem_structure=kite_fem_structure,
+        canopy_sections=canopy_sections,
+        strut_sections=strut_sections,
     )
 
     # Save results

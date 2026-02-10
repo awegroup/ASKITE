@@ -17,14 +17,15 @@ from kitesim.utils import (
     load_sim_output,
     save_results,
     printing_rest_lengths,
+    rotate_geometry,
 )
 from kitesim import (
-    aero2struc,
+    aero2struc_level_1,
     aerodynamic_vsm,
-    structural_kite_fem,
+    aerostructural_coupled_solver_level_1,
+    read_struc_geometry_yaml_level_1,
+    structural_kite_fem_level_1,
     structural_pss,
-    aerostructural_coupled_solver,
-    read_struc_geometry_yaml,
 )
 
 
@@ -66,8 +67,7 @@ def main():
         "n_aero_panels_per_struc_section"
     ]
     body_aero, vsm_solver, vel_app, initial_polar_data = aerodynamic_vsm.initialize(
-        kite_name,
-        PROJECT_DIR,
+        aero_geometry_path,
         config,
         n_panels_aero,
     )
@@ -94,7 +94,16 @@ def main():
         linktype_arr,
         pulley_line_indices,
         pulley_line_to_other_node_pair_dict,
-    ) = read_struc_geometry_yaml.main(struc_geometry)
+    ) = read_struc_geometry_yaml_level_1.main(struc_geometry)
+
+    #####################################################
+    ### rotating the initial geometry by some angle,
+    ### to enable the wind to be horizontal
+    #####################################################
+    struc_nodes = rotate_geometry(
+        struc_nodes,
+        config["initial_geometry_rotation_deg"],
+    )
 
     # logging initial conditions
     logging.info(f"\n\nINITIAL CONDITIONS, NODES \n")
@@ -150,7 +159,7 @@ def main():
             kite_fem_pulley_matrix,
             kite_fem_spring_matrix,
             struc_nodes_initial,
-        ) = structural_kite_fem.instantiate(
+        ) = structural_kite_fem_level_1.instantiate(
             config,
             struc_geometry,
             struc_nodes,
@@ -171,7 +180,7 @@ def main():
     ##################
     ### AERO2STRUC ###
     ##################
-    aero2struc_mapping = aero2struc.initialize_mapping(
+    aero2struc_mapping = aero2struc_level_1.initialize_mapping(
         body_aero.panels,
         struc_nodes,
         struc_node_le_indices,
@@ -223,7 +232,7 @@ def main():
     ########################################
     ### AEROSTUCTURAL COUPLED SIMULATION ###
     ########################################
-    tracking_data, meta = aerostructural_coupled_solver.main(
+    tracking_data, meta = aerostructural_coupled_solver_level_1.main(
         m_arr=m_arr,
         struc_nodes=struc_nodes,
         struc_nodes_initial=struc_nodes_initial,

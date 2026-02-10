@@ -213,3 +213,27 @@ def printing_rest_lengths(tracking_data, struc_geometry):
     # print once
     for result in results:
         print(result)
+
+
+def rotate_geometry(struc_nodes, rotation_angle_deg):
+    """
+    Rotate structural nodes around the origin in the XZ plane (about the Y-axis).
+
+    Args:
+        struc_nodes (np.ndarray): Array of structural node positions (n_struc_nodes, 3).
+        rotation_angle_deg (float): Rotation angle in degrees.
+            Positive angles tilt geometry toward +X (right-hand rule around +Y).
+
+    Returns:
+        np.ndarray: Rotated structural node array (n_struc_nodes, 3).
+    """
+    angle_rad = np.radians(rotation_angle_deg)
+    cos_angle = np.cos(angle_rad)
+    sin_angle = np.sin(angle_rad)
+
+    # Rotation matrix around +Y. For z>0 and positive angle, x increases.
+    R = np.array([[cos_angle, 0.0, sin_angle], [0.0, 1.0, 0.0], [-sin_angle, 0.0, cos_angle]])
+
+    rotated_struc_nodes = struc_nodes @ R.T
+
+    return rotated_struc_nodes

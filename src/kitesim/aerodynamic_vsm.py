@@ -8,8 +8,7 @@ from VSM.plot_geometry_matplotlib import plot_geometry
 
 
 def initialize(
-    kite_name,
-    PROJECT_DIR,
+    aero_geometry_path,
     config,
     n_panels_aero: int,
 ) -> BodyAerodynamics:
@@ -27,7 +26,7 @@ def initialize(
     """
     body_aero = BodyAerodynamics.instantiate(
         n_panels=int(n_panels_aero),
-        file_path=(Path(PROJECT_DIR) / "data" / f"{kite_name}" / "aero_geometry.yaml"),
+        file_path=aero_geometry_path,
         spanwise_panel_distribution=config["aerodynamic"][
             "spanwise_panel_distribution"
         ],
