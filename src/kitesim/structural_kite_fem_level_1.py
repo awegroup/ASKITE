@@ -22,7 +22,12 @@ def instantiate(
         raise ValueError("Error: initial point velocity has never been defined")
     vel_ini = np.zeros((len(struc_nodes), 3))
 
-    fixed_set = set(int(i) for i in struc_geometry.get("fixed_point_indices", []))
+    # Use config fixed nodes as single source of truth (fallback keeps backward compatibility).
+    fixed_point_indices = config.get("structural_pss", {}).get(
+        "fixed_point_indices",
+        struc_geometry.get("fixed_point_indices", []),
+    )
+    fixed_set = set(int(i) for i in fixed_point_indices)
     for i in range(len(struc_nodes)):
         fixed = i in fixed_set
         initial_conditions.append([struc_nodes[i], vel_ini[i], m_arr[i], fixed])
@@ -157,6 +162,8 @@ def run_kite_fem(
         relax_update=config_structural_kite_fem["relax_update"],
         k_update=config_structural_kite_fem["k_update"],
         I_stiffness=config_structural_kite_fem["I_stiffness"],
+        pseudo_dt=config_structural_kite_fem.get("pseudo_dt", None),
+        k_reg_min=config_structural_kite_fem.get("k_reg_min", 0.0),
         print_info=config_structural_kite_fem["print_info"],
     )
 

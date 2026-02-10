@@ -24,7 +24,12 @@ def instantiate(
         raise ValueError("Error: initial point velocity has never been defined")
     vel_ini = np.zeros((len(struc_nodes), 3))
 
-    fixed_set = set(int(i) for i in struc_geometry.get("fixed_point_indices", []))
+    # Use config fixed nodes as single source of truth (fallback keeps backward compatibility).
+    fixed_point_indices = config.get("structural_pss", {}).get(
+        "fixed_point_indices",
+        struc_geometry.get("fixed_point_indices", []),
+    )
+    fixed_set = set(int(i) for i in fixed_point_indices)
     for i in range(len(struc_nodes)):
         fixed = i in fixed_set
         initial_conditions.append([struc_nodes[i], vel_ini[i], m_arr[i], fixed])

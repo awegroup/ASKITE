@@ -71,14 +71,14 @@ def instantiate(
             logging.debug(f"--- pulley!: ci: {ci}, cj: {cj}, ck: {ck}")
 
             l0_this_piece = l0_len_ci_cj
-            delta = curr_set_rest_length - l0_this_piece
+            delta = l0_this_piece - curr_set_rest_length  # was opposite
             logging.debug(
                 f"curr_set_rest_length: {curr_set_rest_length}, l0_this_piece: {l0_this_piece}, delta: {delta}"
             )
         else:
             l0_this_piece = l0_arr[idx]
 
-        delta = curr_set_rest_length - l0_this_piece
+        delta = l0_this_piece - curr_set_rest_length  # was opposite
         psystem.update_rest_length(idx, delta)
 
     # struc_nodes_initial

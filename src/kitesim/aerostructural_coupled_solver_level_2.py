@@ -90,10 +90,57 @@ def forcing_symmetry(struc_nodes, symmetry_mapping):
     return struc_nodes
 
 
+def _compute_power_tape_increment(
+    delta_power_tape,
+    power_tape_final_extension,
+    power_tape_extension_step,
+    tol=1e-9,
+):
+    """
+    Compute the signed rest-length increment needed to move toward the target extension.
+
+    Returns:
+        tuple: (increment, should_update)
+    """
+    remaining = power_tape_final_extension - delta_power_tape
+    if np.abs(remaining) <= tol:
+        return 0.0, False
+    if np.abs(power_tape_extension_step) <= tol:
+        return 0.0, False
+
+    # Always move toward target and clamp to avoid overshoot.
+    increment = np.sign(remaining) * min(np.abs(power_tape_extension_step), np.abs(remaining))
+    return increment, True
+
+
+def _find_kite_fem_spring_id_from_connectivity(
+    kite_fem_structure,
+    kite_connectivity_arr,
+    connectivity_idx,
+):
+    """
+    Map ASKITE connectivity index to the matching kite_fem spring element index.
+    """
+    ci, cj = [int(v) for v in kite_connectivity_arr[connectivity_idx]]
+    target_key = (min(ci, cj), max(ci, cj))
+
+    for spring_id, spring_element in enumerate(kite_fem_structure.spring_elements):
+        n1 = int(spring_element.spring.n1)
+        n2 = int(spring_element.spring.n2)
+        if (min(n1, n2), max(n1, n2)) == target_key:
+            return spring_id
+
+    raise ValueError(
+        f"Could not map power_tape connectivity index {connectivity_idx} "
+        f"with nodes ({ci}, {cj}) to a kite_fem spring element."
+    )
+
+
 def update_power_tape_actuation(
     config,
     psystem,
     kite_fem_structure,
+    kite_connectivity_arr,
     power_tape_index,
     power_tape_extension_step,
     initial_length_power_tape,
@@ -109,6 +156,7 @@ def update_power_tape_actuation(
         config: Configuration dictionary
         psystem: Particle system (for PSS solver)
         kite_fem_structure: FEM structure (for kite_fem solver)
+        kite_connectivity_arr: ASKITE connectivity array
         power_tape_index: Index of power tape in connectivity array
         power_tape_extension_step: Increment for power tape extension
         initial_length_power_tape: Initial length of power tape
@@ -126,30 +174,55 @@ def update_power_tape_actuation(
 
     ## Calculate delta tape lengths based on structural solver
     if config["structural_solver"] == "pss":
-        delta_power_tape = (
-            psystem.extract_rest_length[power_tape_index] - initial_length_power_tape
-        )
+        current_length = float(psystem.extract_rest_length[power_tape_index])
+        delta_power_tape = current_length - initial_length_power_tape
 
-        # Check if we need to extend the power tape
-        if is_residual_below_tol and delta_power_tape <= power_tape_final_extension:
-            psystem.update_rest_length(power_tape_index, power_tape_extension_step)
-            delta_power_tape = (
-                psystem.extract_rest_length[power_tape_index]
-                - initial_length_power_tape
+        if is_residual_below_tol:
+            increment, should_update = _compute_power_tape_increment(
+                delta_power_tape=delta_power_tape,
+                power_tape_final_extension=power_tape_final_extension,
+                power_tape_extension_step=power_tape_extension_step,
             )
-            logging.info(
-                f"||--- delta l_d: {delta_power_tape:.3f}m | new l_d: {psystem.extract_rest_length[power_tape_index]:.3f}m | Steps required: {n_power_tape_steps}"
-            )
-            is_actuation_finalized = False
+            if should_update:
+                psystem.update_rest_length(power_tape_index, increment)
+                current_length = float(psystem.extract_rest_length[power_tape_index])
+                delta_power_tape = current_length - initial_length_power_tape
+                logging.info(
+                    f"||--- delta l_d: {delta_power_tape:.3f}m | new l_d: {current_length:.3f}m | Steps required: {n_power_tape_steps}"
+                )
+                is_actuation_finalized = False
 
     elif config["structural_solver"] == "kite_fem":
-        # TODO: get power tape actuation working again for kite_fem
-        delta_power_tape = rest_lengths[power_tape_index] + power_tape_extension_step
-        rest_lengths = kite_fem_structure.modify_get_spring_rest_length(
-            spring_ids=[power_tape_index], new_l0s=[delta_power_tape]
+        if kite_connectivity_arr is None:
+            raise ValueError(
+                "kite_connectivity_arr is required for kite_fem power tape actuation."
+            )
+
+        spring_id = _find_kite_fem_spring_id_from_connectivity(
+            kite_fem_structure=kite_fem_structure,
+            kite_connectivity_arr=kite_connectivity_arr,
+            connectivity_idx=power_tape_index,
         )
-        delta_power_tape = 0
-        logging.warning("NOT IMPLEMENTED: delta_power_tape for kite_fem")
+        current_length = float(kite_fem_structure.spring_elements[spring_id].l0)
+        delta_power_tape = current_length - initial_length_power_tape
+
+        if is_residual_below_tol:
+            increment, should_update = _compute_power_tape_increment(
+                delta_power_tape=delta_power_tape,
+                power_tape_final_extension=power_tape_final_extension,
+                power_tape_extension_step=power_tape_extension_step,
+            )
+            if should_update:
+                new_length = current_length + increment
+                kite_fem_structure.modify_get_spring_rest_length(
+                    spring_ids=[spring_id],
+                    new_l0s=[new_length],
+                )
+                delta_power_tape = new_length - initial_length_power_tape
+                logging.info(
+                    f"||--- delta l_d: {delta_power_tape:.3f}m | new l_d: {new_length:.3f}m | Steps required: {n_power_tape_steps}"
+                )
+                is_actuation_finalized = False
 
     return delta_power_tape, is_actuation_finalized
 
@@ -570,6 +643,7 @@ def main(
                     config=config,
                     psystem=psystem,
                     kite_fem_structure=kite_fem_structure,
+                    kite_connectivity_arr=kite_connectivity_arr,
                     power_tape_index=power_tape_index,
                     power_tape_extension_step=power_tape_extension_step,
                     initial_length_power_tape=initial_length_power_tape,

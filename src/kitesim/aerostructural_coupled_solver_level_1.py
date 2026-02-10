@@ -52,10 +52,59 @@ def forcing_symmetry(struc_nodes):
     return struc_nodes
 
 
+def _compute_power_tape_increment(
+    delta_power_tape,
+    power_tape_final_extension,
+    power_tape_extension_step,
+    tol=1e-9,
+):
+    """
+    Compute the signed rest-length increment needed to move toward the target extension.
+
+    Returns:
+        tuple: (increment, should_update)
+    """
+    remaining = power_tape_final_extension - delta_power_tape
+    if np.abs(remaining) <= tol:
+        return 0.0, False
+    if np.abs(power_tape_extension_step) <= tol:
+        return 0.0, False
+
+    # Always move toward target and clamp to avoid overshoot.
+    increment = np.sign(remaining) * min(
+        np.abs(power_tape_extension_step), np.abs(remaining)
+    )
+    return increment, True
+
+
+def _find_kite_fem_spring_id_from_connectivity(
+    kite_fem_structure,
+    kite_connectivity_arr,
+    connectivity_idx,
+):
+    """
+    Map ASKITE connectivity index to the matching kite_fem spring element index.
+    """
+    ci, cj = [int(v) for v in kite_connectivity_arr[connectivity_idx]]
+    target_key = (min(ci, cj), max(ci, cj))
+
+    for spring_id, spring_element in enumerate(kite_fem_structure.spring_elements):
+        n1 = int(spring_element.spring.n1)
+        n2 = int(spring_element.spring.n2)
+        if (min(n1, n2), max(n1, n2)) == target_key:
+            return spring_id
+
+    raise ValueError(
+        f"Could not map power_tape connectivity index {connectivity_idx} "
+        f"with nodes ({ci}, {cj}) to a kite_fem spring element."
+    )
+
+
 def update_power_tape_actuation(
     config,
     psystem,
     kite_fem_structure,
+    kite_connectivity_arr,
     power_tape_index,
     power_tape_extension_step,
     initial_length_power_tape,
@@ -71,6 +120,7 @@ def update_power_tape_actuation(
         config: Configuration dictionary
         psystem: Particle system (for PSS solver)
         kite_fem_structure: FEM structure (for kite_fem solver)
+        kite_connectivity_arr: ASKITE connectivity array
         power_tape_index: Index of power tape in connectivity array
         power_tape_extension_step: Increment for power tape extension
         initial_length_power_tape: Initial length of power tape
@@ -88,30 +138,55 @@ def update_power_tape_actuation(
 
     ## Calculate delta tape lengths based on structural solver
     if config["structural_solver"] == "pss":
-        delta_power_tape = (
-            psystem.extract_rest_length[power_tape_index] - initial_length_power_tape
-        )
+        current_length = float(psystem.extract_rest_length[power_tape_index])
+        delta_power_tape = current_length - initial_length_power_tape
 
-        # Check if we need to extend the power tape
-        if is_residual_below_tol and delta_power_tape <= power_tape_final_extension:
-            psystem.update_rest_length(power_tape_index, power_tape_extension_step)
-            delta_power_tape = (
-                psystem.extract_rest_length[power_tape_index]
-                - initial_length_power_tape
+        if is_residual_below_tol:
+            increment, should_update = _compute_power_tape_increment(
+                delta_power_tape=delta_power_tape,
+                power_tape_final_extension=power_tape_final_extension,
+                power_tape_extension_step=power_tape_extension_step,
             )
-            logging.info(
-                f"||--- delta l_d: {delta_power_tape:.3f}m | new l_d: {psystem.extract_rest_length[power_tape_index]:.3f}m | Steps required: {n_power_tape_steps}"
-            )
-            is_actuation_finalized = False
+            if should_update:
+                psystem.update_rest_length(power_tape_index, increment)
+                current_length = float(psystem.extract_rest_length[power_tape_index])
+                delta_power_tape = current_length - initial_length_power_tape
+                logging.info(
+                    f"||--- delta l_d: {delta_power_tape:.3f}m | new l_d: {current_length:.3f}m | Steps required: {n_power_tape_steps}"
+                )
+                is_actuation_finalized = False
 
     elif config["structural_solver"] == "kite_fem":
-        # TODO: get power tape actuation working again for kite_fem
-        delta_power_tape = rest_lengths[power_tape_index] + power_tape_extension_step
-        rest_lengths = kite_fem_structure.modify_get_spring_rest_length(
-            spring_ids=[power_tape_index], new_l0s=[delta_power_tape]
+        if kite_connectivity_arr is None:
+            raise ValueError(
+                "kite_connectivity_arr is required for kite_fem power tape actuation."
+            )
+
+        spring_id = _find_kite_fem_spring_id_from_connectivity(
+            kite_fem_structure=kite_fem_structure,
+            kite_connectivity_arr=kite_connectivity_arr,
+            connectivity_idx=power_tape_index,
         )
-        delta_power_tape = 0
-        logging.warning("NOT IMPLEMENTED: delta_power_tape for kite_fem")
+        current_length = float(kite_fem_structure.spring_elements[spring_id].l0)
+        delta_power_tape = current_length - initial_length_power_tape
+
+        if is_residual_below_tol:
+            increment, should_update = _compute_power_tape_increment(
+                delta_power_tape=delta_power_tape,
+                power_tape_final_extension=power_tape_final_extension,
+                power_tape_extension_step=power_tape_extension_step,
+            )
+            if should_update:
+                new_length = current_length + increment
+                kite_fem_structure.modify_get_spring_rest_length(
+                    spring_ids=[spring_id],
+                    new_l0s=[new_length],
+                )
+                delta_power_tape = new_length - initial_length_power_tape
+                logging.info(
+                    f"||--- delta l_d: {delta_power_tape:.3f}m | new l_d: {new_length:.3f}m | Steps required: {n_power_tape_steps}"
+                )
+                is_actuation_finalized = False
 
     return delta_power_tape, is_actuation_finalized
 
@@ -123,6 +198,7 @@ def check_convergence(
     f_residual_list,
     f_aero_wing_vsm_format,
     config,
+    stagnation_check_start=0,
 ):
     """
     Check convergence conditions for the aero-structural solver.
@@ -133,14 +209,22 @@ def check_convergence(
         f_residual_list: List of residual force norms from all iterations
         f_aero_wing_vsm_format: Aerodynamic forces in VSM format
         config: Configuration dictionary
+        stagnation_check_start: Iteration index from which to check stagnation
+            (reset when switching regularization phase)
 
     Returns:
-        tuple: (is_convergence, should_break)
+        tuple: (is_convergence, should_break, is_stagnated)
             - is_convergence: True if converged, False otherwise
             - should_break: True if loop should break, False to continue
+            - is_stagnated: True if residual has stagnated (no longer changing)
     """
     is_convergence = False
     should_break = False
+    is_stagnated = False
+
+    n_stag = config["aero_structural_solver"]["n_max_constant_residual_force"]
+    # Number of iterations since the stagnation check window started
+    iters_since_start = i - stagnation_check_start
 
     ### All the convergence checks, are be done in if-elif because only 1 should hold at once
     # if convergence (residual below set tolerance)
@@ -155,27 +239,14 @@ def check_convergence(
 
     # if residual forces are not changing anymore
     elif (
-        i > config["aero_structural_solver"]["n_max_constant_residual_force"]
+        iters_since_start > n_stag
         and np.abs(
-            np.mean(
-                f_residual_list[
-                    i
-                    - config["aero_structural_solver"]["n_max_constant_residual_force"]
-                ]
-            )
-            - f_residual_list[
-                i
-                - (
-                    config["aero_structural_solver"]["n_max_constant_residual_force"]
-                    - 5
-                )
-            ]
+            np.mean(f_residual_list[i - n_stag]) - f_residual_list[i - (n_stag - 5)]
         )
         < 1
     ):
         is_convergence = False
-        logging.info("Classic PS non-converging - residual no longer changes")
-        should_break = True
+        is_stagnated = True
 
     # if too many iterations are needed
     elif i > config["aero_structural_solver"]["max_iter"]:
@@ -195,7 +266,7 @@ def check_convergence(
         logging.info("Classic PS non-converging - aero forces are NaN")
         should_break = True
 
-    return is_convergence, should_break
+    return is_convergence, should_break, is_stagnated
 
 
 def main(
@@ -268,6 +339,10 @@ def main(
     start_time = time.time()
     plotting.set_plot_style()
 
+    # Two-phase regularization: phase 1 = with pseudo_dt, phase 2 = without
+    reg_phase = 1  # 1 = regularized, 2 = unregularized (polish)
+    stagnation_check_start = 0  # iteration at which current phase started
+
     # Aitken relaxation state
     omega_relaxation = config["aero_structural_solver"].get("relaxation_factor", 0.3)
     r_prev_flat = None
@@ -317,6 +392,14 @@ def main(
         aero2struc_mapping,
         config["is_with_coupling_plot_per_iteration"],
         config["aero2struc"],
+    )
+
+    # Check moment preservation of aero→struc mapping (pre-loop)
+    aero2struc_level_1.check_moment_preservation(
+        f_aero_panel=f_aero_wing_vsm_format,
+        panel_cps=np.array(results_aero["panel_cp_locations"]),
+        f_aero_mapped=f_aero_wing,
+        struc_nodes=struc_nodes,
     )
 
     ### BRIDLE AERO
@@ -392,6 +475,21 @@ def main(
                     for idx, particle in enumerate(psystem.particles):
                         particle.update_pos(struc_nodes[idx])
                         particle.update_vel(np.zeros(3))
+                elif config["structural_solver"] == "kite_fem":
+                    # Update kite_fem so the next solve() starts from the
+                    # Aitken-relaxed geometry instead of the original construction
+                    # geometry.  coords_rotations_init is the reference that
+                    # solve() adds displacements to, so moving it here makes the
+                    # Newton-Raphson start near the current state.
+                    flat_xyz = struc_nodes.flatten()
+                    kite_fem_structure.coords_current = flat_xyz.copy()
+                    # Build the 6-DOF vector [x,y,z, 0,0,0] per node
+                    n_nodes = len(struc_nodes)
+                    coords_rot = np.zeros(n_nodes * 6)
+                    for ni in range(n_nodes):
+                        coords_rot[6 * ni : 6 * ni + 3] = struc_nodes[ni]
+                    kite_fem_structure.coords_rotations_init = coords_rot.copy()
+                    kite_fem_structure.coords_rotations_current = coords_rot.copy()
 
             ### PLOT per iteration
             if config["is_with_struc_plot_per_iteration"]:
@@ -454,6 +552,15 @@ def main(
                 config["is_with_coupling_plot_per_iteration"],
                 config["aero2struc"],
             )
+
+            # Check moment preservation (only first coupling iteration to limit log spam)
+            if i == 1:
+                aero2struc_level_1.check_moment_preservation(
+                    f_aero_panel=f_aero_wing_vsm_format,
+                    panel_cps=np.array(results_aero["panel_cp_locations"]),
+                    f_aero_mapped=f_aero_wing,
+                    struc_nodes=struc_nodes,
+                )
 
             ### BRIDLE AERO
             if config["is_with_aero_bridle"]:
@@ -519,13 +626,31 @@ def main(
             pbar.update(1)
 
             ### CHECK CONVERGENCE
-            is_convergence, should_break = check_convergence(
+            is_convergence, should_break, is_stagnated = check_convergence(
                 i=i,
                 f_residual=f_residual,
                 f_residual_list=f_residual_list,
                 f_aero_wing_vsm_format=f_aero_wing_vsm_format,
                 config=config,
+                stagnation_check_start=stagnation_check_start,
             )
+
+            # Two-phase regularization: on stagnation in phase 1, disable
+            # pseudo_dt and continue to let the solver polish to true equilibrium.
+            if is_stagnated:
+                if reg_phase == 1 and config["structural_solver"] == "kite_fem":
+                    reg_phase = 2
+                    stagnation_check_start = i  # reset stagnation window
+                    config["structural_kite_fem"]["pseudo_dt"] = None
+                    logging.info(
+                        f"Phase 1 stagnated at iter {i} (res={np.linalg.norm(f_residual):.1f}N). "
+                        f"Switching to phase 2: pseudo_dt=None (no regularization)."
+                    )
+                else:
+                    logging.info(
+                        "Classic PS non-converging - residual no longer changes"
+                    )
+                    should_break = True
 
             ### ACTUATION (only when converged)
             if is_convergence:
@@ -536,6 +661,7 @@ def main(
                     config=config,
                     psystem=psystem,
                     kite_fem_structure=kite_fem_structure,
+                    kite_connectivity_arr=kite_connectivity_arr,
                     power_tape_index=power_tape_index,
                     power_tape_extension_step=power_tape_extension_step,
                     initial_length_power_tape=initial_length_power_tape,
