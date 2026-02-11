@@ -92,6 +92,96 @@ def instantiate(
     )
 
 
+def _diagnose_node_force_balance(psystem, f_ext, node_idx=34):
+    """Print per-spring force contributions at a given node for diagnostics."""
+    n3 = node_idx * 3
+    f_ext_node = f_ext[n3 : n3 + 3]
+
+    # Recompute per-spring forces the same way PSS does
+    x_current = np.array([p.x for p in psystem.particles]).flatten()
+    connectivity = psystem._ParticleSystem__connectivity_matrix
+    springs = psystem.springdampers
+    pulley_dict = psystem._ParticleSystem__pulley_other_line_pair
+
+    f_int_node = np.zeros(3)
+    print(f"\n{'='*80}")
+    print(f"FORCE BALANCE DIAGNOSTIC — Node {node_idx}")
+    print(f"  Position: {x_current[n3:n3+3]}")
+    print(f"  f_ext:    {f_ext_node}  (|f_ext| = {np.linalg.norm(f_ext_node):.4f} N)")
+    print(f"{'='*80}")
+
+    for idx, link in enumerate(springs):
+        ci, cj = int(connectivity[idx][0]), int(connectivity[idx][1])
+        if ci != node_idx and cj != node_idx:
+            continue
+
+        # Compute spring force
+        p1 = x_current[ci * 3 : ci * 3 + 3]
+        p2 = x_current[cj * 3 : cj * 3 + 3]
+        rel = p1 - p2
+        norm_pos = np.linalg.norm(rel)
+        l0 = link.l0
+        k = link._SpringDamper__k
+
+        if norm_pos > 0:
+            unit = rel / norm_pos
+        else:
+            unit = np.zeros(3)
+
+        # Pulley coupling delta
+        delta_pulley = 0.0
+        if str(link.linktype).lower() == "pulley" and str(idx) in pulley_dict:
+            idx_p3, idx_p4, rest_len_other = pulley_dict[str(idx)]
+            p3 = x_current[int(idx_p3) * 3 : int(idx_p3) * 3 + 3]
+            p4 = x_current[int(idx_p4) * 3 : int(idx_p4) * 3 + 3]
+            norm_other = np.linalg.norm(p3 - p4)
+            delta_pulley = norm_other - rest_len_other
+
+        # Check noncompressive cutoff
+        is_zero = False
+        if str(link.linktype).lower() == "noncompressive" and norm_pos <= l0:
+            is_zero = True
+
+        if is_zero:
+            f_spring = np.zeros(3)
+        else:
+            f_spring = -k * (norm_pos - l0 + delta_pulley) * unit
+
+        # Sign: f_spring is force on ci from cj.  ci gets +f_spring, cj gets -f_spring
+        if ci == node_idx:
+            contrib = f_spring
+        else:
+            contrib = -f_spring
+
+        f_int_node += contrib
+
+        strain = (norm_pos - l0) / l0 if l0 > 0 else 0
+        sign_str = "+" if ci == node_idx else "-"
+        pulley_str = f", delta_pulley={delta_pulley:.6f}" if delta_pulley != 0 else ""
+        slack_str = " [SLACK]" if is_zero else ""
+        print(
+            f"  SD {idx:3d} [{ci:2d}→{cj:2d}] {str(link.linktype):16s} "
+            f"l={norm_pos:.6f} l0={l0:.6f} strain={strain:+.6f} k={k:.1f} "
+            f"|F|={np.linalg.norm(f_spring):.4f}N ({sign_str}){pulley_str}{slack_str}"
+        )
+        print(
+            f"         F_contrib = [{contrib[0]:+.4f}, {contrib[1]:+.4f}, {contrib[2]:+.4f}]"
+        )
+
+    f_residual_node = f_int_node + f_ext_node
+    print(f"{'─'*80}")
+    print(
+        f"  SUM f_int:      [{f_int_node[0]:+.4f}, {f_int_node[1]:+.4f}, {f_int_node[2]:+.4f}]  |f_int| = {np.linalg.norm(f_int_node):.4f} N"
+    )
+    print(
+        f"  f_ext:          [{f_ext_node[0]:+.4f}, {f_ext_node[1]:+.4f}, {f_ext_node[2]:+.4f}]  |f_ext| = {np.linalg.norm(f_ext_node):.4f} N"
+    )
+    print(
+        f"  f_residual:     [{f_residual_node[0]:+.4f}, {f_residual_node[1]:+.4f}, {f_residual_node[2]:+.4f}]  |f_res| = {np.linalg.norm(f_residual_node):.4f} N"
+    )
+    print(f"{'='*80}\n")
+
+
 def run_pss(psystem, f_ext, config_structural_pss):
     """
     Run the particle system simulation with kinetic damping until convergence.
@@ -139,6 +229,11 @@ def run_pss(psystem, f_ext, config_structural_pss):
     struc_nodes = np.array([particle.x for particle in psystem.particles])
     # Extracting internal force
     f_int = psystem.f_int
+
+    ## DIAGNOSTIC: Force balance at configurable node
+    if config_structural_pss.get("is_with_diagnostics", False):
+        node_idx = config_structural_pss.get("num_node_diagnostics", 34)
+        _diagnose_node_force_balance(psystem, f_ext, node_idx=node_idx)
 
     return psystem, is_structural_converged, struc_nodes, f_int
 

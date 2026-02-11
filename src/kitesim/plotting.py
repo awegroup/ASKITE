@@ -339,7 +339,7 @@ def main(
         # Scale all vectors so the longest has length chord_length/5 (larger arrows)
         norms = np.linalg.norm(arr, axis=1)
         max_norm = np.max(norms) if np.max(norms) > 0 else 1.0
-        scale = (chord_length / 2) / max_norm
+        scale = (chord_length) / max_norm
         arr_scaled = arr * scale
         ax.quiver(
             struc_nodes[:, 0],

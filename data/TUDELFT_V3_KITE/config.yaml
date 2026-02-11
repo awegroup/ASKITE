@@ -4,14 +4,15 @@ vel_kite: !!seq [0, 0, 0]
 acc_kite: !!seq [0, 0, 0]
 
 ## case settings
-structural_solver: !!str "pss" #"kite_fem" or "pss"
+structural_solver: !!str "kite_fem" #"kite_fem" or "pss"
+starting_from_sim_of_date: !!str "2026_02_11_1729h"
 is_with_gravity: !!bool true
 is_with_aero_bridle: !!bool true
 is_with_aero_tether: !!bool false
 is_run_only_1_time_step: !!bool false
 is_with_initial_point_velocity: !!bool false
 is_with_forcing_symmetry: !!bool true
-initial_geometry_rotation_deg: !!float 8.0
+initial_geometry_rotation_deg: !!float 10.0
 
 ## actuation settings
 power_tape_extension_step: !!float 0 #0.02 #0.01
@@ -48,20 +49,24 @@ structural_pss:
   rel_tol: !!float 1.0e-5
   max_iter: !!int 500
   fixed_point_indices: [0] #this is the bridle point / KCU
+  is_with_diagnostics: !!bool false
+  num_node_diagnostics: !!int 34
 
 ## structural kite_fem
 structural_kite_fem:
-  max_iterations: !!int 1000 #used to be 2000
+  max_iterations: !!int 2000 #used to be 2000
   tolerance: !!float 0.01 
   step_limit: !!float 0.1
   relax_init: !!float 0.1
   relax_update: !!float 0.99
   k_update: !!int 1
   I_stiffness: !!int 15 #V3 kite: 25
+  is_with_diagnostics: !!bool false
+  num_node_diagnostics: !!int 34
   # Regularizes K for Newton-Raphson stability. Does NOT affect
   # the equilibrium (fe=fi is independent of I_stiffness).
   # if pseudo_dt != 0 it overrides I_stiffness when set.
-  pseudo_dt: !!float 0.05 # pseudo-transient timestep [s] for mass-proportional regularization. 
+  pseudo_dt: !!float 0.02 #0.05 # pseudo-transient timestep [s] for mass-proportional regularization. 
   k_reg_min: !!float 200.0 # minimum regularization stiffness [N/m] floor for light bridle/steering nodes
   print_info: !!bool false
   
@@ -79,6 +84,7 @@ aero_structural_solver:
   is_with_aitken_relaxation: !!bool true
   relaxation_factor: !!float 0.3 #0.05-0.3
   n_max_constant_residual_force: !!int 50
+  stagnation_tol: !!float 0.5 # N, tolerance for stagnation detection
 
 ## Physical constants
 grav_constant: !!seq [0, 0, -9.81]

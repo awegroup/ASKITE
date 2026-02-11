@@ -3,6 +3,34 @@ from kite_fem.FEMStructure import FEM_structure
 from kite_fem.Functions import adapt_stiffnesses, relaxbridles
 
 
+def _get_wing_node_indices(struc_geometry):
+    """Return structural node indices that belong to the wing only."""
+    return sorted(int(row[0]) for row in struc_geometry["wing_particles"]["data"])
+
+
+def _recenter_structure_node_to_origin(kite_fem_structure, node_idx=0):
+    """
+    Translate the full structure so node_idx is exactly at [0, 0, 0].
+    Rebuilds FEM_structure so all internal arrays remain consistent.
+    """
+    coords = kite_fem_structure.coords_init.reshape(-1, 3).copy()
+    translation = -coords[node_idx]
+    coords += translation
+
+    initial_conditions_new = []
+    for i, (_, vel, mass, fixed) in enumerate(kite_fem_structure.initial_conditions):
+        initial_conditions_new.append(
+            [coords[i], np.array(vel, copy=True), mass, fixed]
+        )
+
+    return FEM_structure(
+        initial_conditions=initial_conditions_new,
+        spring_matrix=kite_fem_structure.spring_matrix,
+        pulley_matrix=kite_fem_structure.pulley_matrix,
+        beam_matrix=kite_fem_structure.beam_matrix,
+    )
+
+
 def instantiate(
     config,
     struc_geometry,
@@ -34,7 +62,6 @@ def instantiate(
 
     pulley_matrix = []
     spring_matrix = []
-    canopy_nodes = []
     # Deduplicate pulleys: remember which (ci,cj,ck) we’ve emitted already
     seen_pulley_triplets = set()
 
@@ -83,10 +110,6 @@ def instantiate(
         else:
             # Regular spring: [ci, cj, k, c, l0, springtype]
             spring_matrix.append([ci, cj, float(k), float(c), float(l0), lt])
-            if ci not in canopy_nodes:
-                canopy_nodes.append(ci)
-            if cj not in canopy_nodes:
-                canopy_nodes.append(cj)
     # initial_conditions = initial_conditions  # [[x,y,z,vel_x,vel_y,vel_z,m,fixed]]
     # pulley_matrix = pulley_matrix  # [[ci, cj, ck, k_eff, c_eff, l0_total], ...]
     # spring_matrix = spring_matrix  # [[ci, cj, k, c, l0, springtype], ...]
@@ -97,7 +120,17 @@ def instantiate(
         pulley_matrix=pulley_matrix,
     )
 
-    # kite_fem_structure = relaxbridles(kite_fem_structure,canopy_nodes,[0])
+    # ONLY if not starting from a previous sim
+    # Relax only against the wing skeleton: keep wing nodes fixed, let bridles move.
+    if config["starting_from_sim_of_date"] == "":
+        wing_node_indices = _get_wing_node_indices(struc_geometry)
+        kite_fem_structure = relaxbridles(kite_fem_structure, wing_node_indices, [0])
+
+        # Keep the KCU/origin node anchored at [0, 0, 0] after relaxation.
+        kite_fem_structure = _recenter_structure_node_to_origin(
+            kite_fem_structure, node_idx=0
+        )
+
     struc_nodes_initial = kite_fem_structure.coords_init.reshape(-1, 3)
     return (
         kite_fem_structure,
@@ -106,6 +139,80 @@ def instantiate(
         spring_matrix,
         struc_nodes_initial,
     )
+
+
+def _diagnose_node_force_balance_fem(kite_fem_structure, f_ext_flat, node_idx=34):
+    """Print per-spring force contributions at a given node for kite_fem diagnostics."""
+    n3 = node_idx * 3
+    f_ext_node = f_ext_flat[n3 : n3 + 3]
+    coords = kite_fem_structure.coords_current  # flat, length = 3 * num_nodes
+
+    f_int_node = np.zeros(3)
+    print(f"\n{'='*80}")
+    print(f"FORCE BALANCE DIAGNOSTIC (kite_fem) — Node {node_idx}")
+    print(f"  Position: {coords[n3:n3+3]}")
+    print(f"  f_ext:    {f_ext_node}  (|f_ext| = {np.linalg.norm(f_ext_node):.4f} N)")
+    print(f"{'='*80}")
+
+    for se_idx, se in enumerate(kite_fem_structure.spring_elements):
+        n1 = se.spring.n1
+        n2 = se.spring.n2
+        if n1 != node_idx and n2 != node_idx:
+            continue
+
+        # Compute current length and unit vector
+        unit, l_current = se.unit_vector(coords)
+
+        # Handle pulley coupling
+        l_other_pulley = 0.0
+        if se.springtype == "pulley":
+            other = kite_fem_structure.spring_elements[se.i_other_pulley]
+            _, l_other = other.unit_vector(coords)
+            l_other_pulley = l_other
+
+        # Get spring force via the element's own method
+        fi_elem = se.spring_internal_forces(coords, l_other_pulley)
+        fi_3d = fi_elem[:3]  # [fx, fy, fz] — force from n1 toward n2
+
+        # Convention: fi is subtracted at n1, added at n2
+        if n1 == node_idx:
+            contrib = -fi_3d
+        else:
+            contrib = fi_3d
+
+        f_int_node += contrib
+
+        l0 = se.l0
+        k = se.k
+        strain = (l_current - l0) / l0 if l0 > 0 else 0
+        sign_str = "+" if n2 == node_idx else "-"
+        slack_str = " [SLACK]" if se.slack else ""
+        pulley_str = (
+            f", l_other={l_other_pulley:.6f}" if se.springtype == "pulley" else ""
+        )
+        f_mag = np.linalg.norm(fi_3d)
+
+        print(
+            f"  SE {se_idx:3d} [{n1:2d}→{n2:2d}] {se.springtype:16s} "
+            f"l={l_current:.6f} l0={l0:.6f} strain={strain:+.6f} k={k:.1f} "
+            f"|F|={f_mag:.4f}N ({sign_str}){pulley_str}{slack_str}"
+        )
+        print(
+            f"         F_contrib = [{contrib[0]:+.4f}, {contrib[1]:+.4f}, {contrib[2]:+.4f}]"
+        )
+
+    f_residual_node = f_int_node + f_ext_node
+    print(f"{'─'*80}")
+    print(
+        f"  SUM f_int:      [{f_int_node[0]:+.4f}, {f_int_node[1]:+.4f}, {f_int_node[2]:+.4f}]  |f_int| = {np.linalg.norm(f_int_node):.4f} N"
+    )
+    print(
+        f"  f_ext:          [{f_ext_node[0]:+.4f}, {f_ext_node[1]:+.4f}, {f_ext_node[2]:+.4f}]  |f_ext| = {np.linalg.norm(f_ext_node):.4f} N"
+    )
+    print(
+        f"  f_residual:     [{f_residual_node[0]:+.4f}, {f_residual_node[1]:+.4f}, {f_residual_node[2]:+.4f}]  |f_res| = {np.linalg.norm(f_residual_node):.4f} N"
+    )
+    print(f"{'='*80}\n")
 
 
 def get_rest_lengths(kite_fem_structure, kite_connectivity_arr):
@@ -177,4 +284,11 @@ def run_kite_fem(
     f_int = np.where(kite_fem_structure.bc == True, f_int, -fe_6d)
     # remove moments
     f_int = f_int.reshape(-1, 6)[:, :3].flatten()
+
+    if config_structural_kite_fem.get("is_with_diagnostics", False):
+        node_idx = config_structural_kite_fem.get("num_node_diagnostics", 34)
+        _diagnose_node_force_balance_fem(
+            kite_fem_structure, f_ext_flat, node_idx=node_idx
+        )
+
     return kite_fem_structure, is_structural_converged, struc_nodes, f_int

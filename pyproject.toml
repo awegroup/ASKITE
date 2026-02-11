@@ -24,10 +24,10 @@ dependencies = [
     "pydantic",
     "h5py",
     "tqdm",
-    "PSS @ git+https://github.com/awegroup/Particle_System_Simulator.git@v1.0.0",
-    "VSM @ git+https://github.com/awegroup/Vortex-Step-Method.git@v2.0.3",
+    "PSS @ git+https://github.com/awegroup/Particle_System_Simulator.git@v1.0.1",
+    "VSM @ git+https://github.com/awegroup/Vortex-Step-Method.git@v2.1.0",
     "pathlib",
-    "kite_fem @ git+https://github.com/awegroup/kite_fem.git@main"
+    "kite_fem @ git+https://github.com/awegroup/kite_fem.git@mass_proportional_regularisation"
 ]
 requires-python = ">=3.8"
 authors = [

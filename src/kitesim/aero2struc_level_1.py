@@ -97,15 +97,31 @@ def aero2struc_NN_vsm(
     is_with_coupling_plot: bool = False,
 ):
     """
-    Distribute each panel's resultant force (at its CoP) onto the four
-    structural corner nodes given in panel_corner_map using inverse-distance weighting.
+    Distribute each panel's resultant force (at its CP) onto the four
+    structural corner nodes using bilinear interpolation.
+
+    For each panel with corners [le_lo, le_hi, te_lo, te_hi]:
+      1. Spanwise: eta from LE y-coordinates
+         eta = (y_cp - y_le_lo) / (y_le_hi - y_le_lo), clamped to [0, 1].
+      2. Chordwise: project CP onto the LE→TE segment for each span side
+         xi_lo = dot(cp - le_lo, te_lo - le_lo) / |te_lo - le_lo|²
+         xi_hi = dot(cp - le_hi, te_hi - le_hi) / |te_hi - le_hi|²
+      3. Bilinear weights:
+         w_le_lo = (1 - eta) * (1 - xi_lo)
+         w_te_lo = (1 - eta) * xi_lo
+         w_le_hi = eta * (1 - xi_hi)
+         w_te_hi = eta * xi_hi
+
+    Force is exactly preserved (weights sum to 1).
+    Moment error is proportional to the out-of-plane offset between the
+    CP and the bilinear surface of the 4 corner nodes (typically very small).
 
     Args:
         f_aero_wing_vsm_format (np.ndarray): Aerodynamic forces per panel (n_panels,3).
         struc_nodes (np.ndarray): Structural node positions (n_struc,3).
         panel_cps (np.ndarray): Panel control points (n_panels,3).
         panel_corner_map (np.ndarray): Mapping from panels to 4 node indices (n_panels,4).
-        p (float): Power for inverse-distance weighting.
+        power_for_inverse_weighting (float): Unused, kept for API compatibility.
         eps (float): Small value to avoid division by zero.
         is_with_coupling_plot (bool): If True, plot the mapping.
 
@@ -117,19 +133,51 @@ def aero2struc_NN_vsm(
     f_aero_wing = np.zeros((n_struc, 3), dtype=float)
 
     for i, (cp, frc) in enumerate(zip(panel_cps, f_aero_wing_vsm_format)):
-        sel_idx = panel_corner_map[i]  # [le_lo, le_hi, te_lo, te_hi]
-        sel_coords = struc_nodes[sel_idx]  # (4,3)
+        le_lo, le_hi, te_lo, te_hi = panel_corner_map[i]
 
-        # true inverse-distance weighting across the 4 nodes
-        d = np.linalg.norm(sel_coords - cp[None, :], axis=1)
-        w = 1.0 / (d**power_for_inverse_weighting + eps)
-        w /= np.sum(w)
+        r_le_lo = struc_nodes[le_lo]
+        r_le_hi = struc_nodes[le_hi]
+        r_te_lo = struc_nodes[te_lo]
+        r_te_hi = struc_nodes[te_hi]
 
-        f_vals = w[:, None] * frc[None, :]  # (4,3)
+        # --- spanwise weight eta (from LE y-coordinates) ---
+        dy_le = r_le_hi[1] - r_le_lo[1]
+        if abs(dy_le) < eps:
+            eta = 0.5
+        else:
+            eta = (cp[1] - r_le_lo[1]) / dy_le
+        eta = np.clip(eta, 0.0, 1.0)
+
+        # --- chordwise weight xi: project CP onto LE→TE for each span side ---
+        # Low-span side (le_lo → te_lo)
+        chord_lo = r_te_lo - r_le_lo
+        chord_lo_sq = np.dot(chord_lo, chord_lo)
+        if chord_lo_sq < eps * eps:
+            xi_lo = 0.0
+        else:
+            xi_lo = np.dot(cp - r_le_lo, chord_lo) / chord_lo_sq
+        xi_lo = np.clip(xi_lo, 0.0, 1.0)
+
+        # High-span side (le_hi → te_hi)
+        chord_hi = r_te_hi - r_le_hi
+        chord_hi_sq = np.dot(chord_hi, chord_hi)
+        if chord_hi_sq < eps * eps:
+            xi_hi = 0.0
+        else:
+            xi_hi = np.dot(cp - r_le_hi, chord_hi) / chord_hi_sq
+        xi_hi = np.clip(xi_hi, 0.0, 1.0)
+
+        # --- bilinear weights (sum to 1 by construction) ---
+        w_le_lo = (1.0 - eta) * (1.0 - xi_lo)
+        w_te_lo = (1.0 - eta) * xi_lo
+        w_le_hi = eta * (1.0 - xi_hi)
+        w_te_hi = eta * xi_hi
 
         # accumulate
-        for local_j, glob_j in enumerate(sel_idx):
-            f_aero_wing[glob_j] += f_vals[local_j]
+        f_aero_wing[le_lo] += w_le_lo * frc
+        f_aero_wing[le_hi] += w_le_hi * frc
+        f_aero_wing[te_lo] += w_te_lo * frc
+        f_aero_wing[te_hi] += w_te_hi * frc
 
     if is_with_coupling_plot:
         plot_aerodynamic_forces_chordwise_distributed(

@@ -12,7 +12,10 @@ kcu_mass: !!float 8.4 #[kg]
 dyneema:
   # (M.B. Ruppert) [Pa]
   density: 724 #[kg/m^3] -> m = density * A * l0
-  youngs_modulus: 550000000 #[Pa] -> k = E A / l0
+  # 0.55 GPa is M.B. Ruppert 
+  # SK75 dyneema has 109-132GPa, but that's for a single fiber, not braided rope.
+  # Braided Dyneema rope: typically 20–60 GPa effective
+  youngs_modulus: 2000000000 # 400MPa #3000000000 # 30GPa #550000000 #E:[Pa] -> k = E *A / l0
   damping_per_stiffness: 0.0 # [/s] -> c = damping_per_stiffness * k
 
 fixed_point_indices: !!seq [0] # node indices that are fixed in space (0-based)
@@ -120,41 +123,41 @@ wing_elements:
   data:
   # leading-edge tube (LE[i] -- LE[i+1])
   #TODO: stiffness Julia = 1e6
-  - [le_1, 0.984642, 1e4, 0, 1, "default"] 
-  - [le_2, 1.327663, 1e4, 0, 1, "default"]
-  - [le_3, 1.326240, 1e4, 0, 1, "default"]
-  - [le_4, 1.323655, 1e4, 0, 1, "default"]
-  - [le_5, 1.347595, 1e4, 0, 1, "default"]
+  - [le_1, 0.984642, 1e5, 0, 1, "default"] 
+  - [le_2, 1.327663, 1e5, 0, 1, "default"]
+  - [le_3, 1.326240, 1e5, 0, 1, "default"]
+  - [le_4, 1.323655, 1e5, 0, 1, "default"]
+  - [le_5, 1.347595, 1e5, 0, 1, "default"]
 
   # struts (chords)
   #TODO: stiffness Julia = 1e6
-  - [strut_1, 1.074728, 2e3, 0, 1, "default"]
-  - [strut_2, 1.511911, 2e3, 0, 1, "default"]
-  - [strut_3, 1.960560, 2e3, 0, 1, "default"]
-  - [strut_4, 2.154185, 2e3, 0, 1, "default"]
-  - [strut_5, 2.265501, 2e3, 0, 1, "default"]
+  - [strut_1, 1.074728, 1e5, 0, 1, "default"]
+  - [strut_2, 1.511911, 1e5, 0, 1, "default"]
+  - [strut_3, 1.960560, 1e5, 0, 1, "default"]
+  - [strut_4, 2.154185, 1e5, 0, 1, "default"]
+  - [strut_5, 2.265501, 1e5, 0, 1, "default"]
 
   # SCALED BY 95% FOLLOWING PIM'S MEASUREMENTS
   # trailing-edge wire (TE[i] -- TE[i+1])
   #TODO: stiffness Julia = 5e5
-  - [te_1, 0.858705, 1e3, 0, 0.2, "default"] 
-  - [te_2, 1.283545, 1e3, 0, 0.2, "default"]
-  - [te_3, 1.28307, 1e3, 0, 0.2, "default"]
-  - [te_4, 1.283, 1e3, 0, 0.2, "default"]
-  - [te_5, 1.254045, 1e3, 0, 0.2, "default"]
+  - [te_1, 0.858705 , 1e4, 0, 0.2, "default"] 
+  - [te_2, 1.283545 , 1e4, 0, 0.2, "default"]
+  - [te_3, 1.28307  , 1e4, 0, 0.2, "default"]
+  - [te_4, 1.283    , 1e4, 0, 0.2, "default"]
+  - [te_5, 1.254045 , 1e4, 0, 0.2, "default"]
 
   # diagonal springs (both directions per panel)
   #TODO: stiffness Julia = 5e5
-  - [dia_1a, 1.360356, 1e3, 0, 0.1, "default"]
-  - [dia_1b, 1.780032, 1e3, 0, 0.1, "default"]
-  - [dia_2a, 2.108078, 1e3, 0, 0.1, "default"]
-  - [dia_2b, 2.251513, 1e3, 0, 0.1, "default"]
-  - [dia_3a, 2.449188, 1e3, 0, 0.1, "default"]
-  - [dia_3b, 2.455523, 1e3, 0, 0.1, "default"]
-  - [dia_4a, 2.601005, 1e3, 0, 0.1, "default"]
-  - [dia_4b, 2.563136, 1e3, 0, 0.1, "default"]
-  - [dia_5a, 2.629214, 1e3, 0, 0.1, "default"]
-  - [dia_5b, 2.629214, 1e3, 0, 0.1, "default"]
+  - [dia_1a, 1.360356, 2e3, 0, 0.1, "default"]
+  - [dia_1b, 1.780032, 2e3, 0, 0.1, "default"]
+  - [dia_2a, 2.108078, 2e3, 0, 0.1, "default"]
+  - [dia_2b, 2.251513, 2e3, 0, 0.1, "default"]
+  - [dia_3a, 2.449188, 2e3, 0, 0.1, "default"]
+  - [dia_3b, 2.455523, 2e3, 0, 0.1, "default"]
+  - [dia_4a, 2.601005, 2e3, 0, 0.1, "default"]
+  - [dia_4b, 2.563136, 2e3, 0, 0.1, "default"]
+  - [dia_5a, 2.629214, 2e3, 0, 0.1, "default"]
+  - [dia_5b, 2.629214, 2e3, 0, 0.1, "default"]
 
 
 #############################
@@ -234,12 +237,12 @@ bridle_elements:
   data:
   # front lines
   - [a6, 11.928, 0.002, dyneema, "pulley"]
-  - [A5, 2.987, 0.002, dyneema, "noncompressive"]
-  - [A3, 3.61454, 0.002, dyneema, "noncompressive"]
-  - [A2, 3.6452, 0.002, dyneema, "noncompressive"]
-  - [A1, 3.78594, 0.002, dyneema, "noncompressive"]
-  - [AII, 3.36, 0.005, dyneema, "noncompressive"]
-  - [AI, 3.67, 0.005, dyneema, "noncompressive"]
+  - [A5, 2.987, 0.003, dyneema, "noncompressive"]
+  - [A3, 3.61454, 0.003, dyneema, "noncompressive"]
+  - [A2, 3.6452, 0.003, dyneema, "noncompressive"]
+  - [A1, 3.78594, 0.003, dyneema, "noncompressive"]
+  - [AII, 3.36, 0.004, dyneema, "noncompressive"]
+  - [AI, 3.67, 0.004, dyneema, "noncompressive"]
   - [amain, 3.903, 0.005, dyneema, "noncompressive"]
   # rear lines
   - [br1, 4.407, 0.002, dyneema, "noncompressive"]
@@ -247,12 +250,12 @@ bridle_elements:
   - [br3, 4.094, 0.002, dyneema, "noncompressive"]
   - [br5, 3.550, 0.002, dyneema, "noncompressive"]
   - [br6, 13.818, 0.002, dyneema, "pulley"]
-  - [BRI, 2.333, 0.002, dyneema, "noncompressive"]
-  - [BRII, 2.045, 0.002, dyneema, "noncompressive"]
-  - [BR-main-1, 0.61, 0.002, dyneema, "noncompressive"]
-  - [M-line, 4.998, 0.002, dyneema, "pulley"]
-  - [Steering Tape, 1.6, 0.002, dyneema, "noncompressive"]
-  - [Power Tape, 2.2, 0.002, dyneema, "noncompressive"]
+  - [BRI, 2.333, 0.003, dyneema, "noncompressive"]
+  - [BRII, 2.045, 0.003, dyneema, "noncompressive"]
+  - [BR-main-1, 0.61, 0.004, dyneema, "noncompressive"]
+  - [M-line, 4.998, 0.004, dyneema, "pulley"]
+  - [Steering Tape, 1.6, 0.004, dyneema, "noncompressive"]
+  - [Power Tape, 2.2, 0.004, dyneema, "noncompressive"]
 
 
 

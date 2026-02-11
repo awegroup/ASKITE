@@ -29,6 +29,58 @@ from kitesim import (
 )
 
 
+def _resolve_starting_struc_nodes(
+    config,
+    project_dir,
+    kite_name,
+    struc_nodes_default,
+):
+    """
+    Optionally override start nodes from a previous simulation result folder.
+
+    If config["starting_from_sim_of_date"] is empty, return struc_nodes_default.
+    Otherwise load results/<kite_name>/<date>/sim_output.h5 and return the final
+    node positions from tracking["positions"][-1].
+    """
+    sim_date = str(config.get("starting_from_sim_of_date", "")).strip()
+    if sim_date == "":
+        return struc_nodes_default
+
+    start_dir = Path(project_dir) / "results" / kite_name / sim_date
+    if not start_dir.exists() or not start_dir.is_dir():
+        raise FileNotFoundError(
+            f"Configured starting simulation directory does not exist: {start_dir}"
+        )
+
+    h5_path = start_dir / "sim_output.h5"
+    if not h5_path.exists():
+        raise FileNotFoundError(
+            f"Configured starting simulation has no sim_output.h5: {h5_path}"
+        )
+
+    _, tracking_data = load_sim_output(h5_path)
+    if "positions" not in tracking_data:
+        raise KeyError(f"Expected 'positions' dataset in: {h5_path}")
+
+    positions = np.asarray(tracking_data["positions"])
+    if positions.ndim != 3 or positions.shape[2] != 3:
+        raise ValueError(
+            f"Invalid positions shape in {h5_path}: {positions.shape}. Expected (nt, n_nodes, 3)."
+        )
+
+    struc_nodes_loaded = np.array(positions[-1], dtype=float)
+    if struc_nodes_loaded.shape != np.asarray(struc_nodes_default).shape:
+        raise ValueError(
+            "Loaded node shape does not match current geometry. "
+            f"loaded={struc_nodes_loaded.shape}, current={np.asarray(struc_nodes_default).shape}"
+        )
+
+    logging.info(
+        f"Starting from previous simulation final nodes: {start_dir} (n_nodes={len(struc_nodes_loaded)})"
+    )
+    return struc_nodes_loaded
+
+
 # Import modules
 def main():
     """Main function"""
@@ -105,6 +157,12 @@ def main():
         struc_nodes,
         config["initial_geometry_rotation_deg"],
     )
+    struc_nodes = _resolve_starting_struc_nodes(
+        config=config,
+        project_dir=PROJECT_DIR,
+        kite_name=kite_name,
+        struc_nodes_default=struc_nodes,
+    )
 
     # logging initial conditions
     logging.info(f"\n\nINITIAL CONDITIONS, NODES \n")
@@ -172,6 +230,8 @@ def main():
             linktype_arr,
             pulley_line_to_other_node_pair_dict,
         )
+        # Use relaxed/recentered kite_fem geometry as the coupled-solver initial state.
+        struc_nodes = struc_nodes_initial.copy()
         # setting psm related output to None
         psystem = None
 

@@ -237,13 +237,11 @@ def check_convergence(
         logging.info("Classic PS diverged - residual force is NaN")
         should_break = True
 
-    # if residual forces are not changing anymore
+    # if residual forces are not changing anymore (compare start of window vs current)
     elif (
         iters_since_start > n_stag
-        and np.abs(
-            np.mean(f_residual_list[i - n_stag]) - f_residual_list[i - (n_stag - 5)]
-        )
-        < 1
+        and np.abs(f_residual_list[i - n_stag] - f_residual_list[i])
+        < config["aero_structural_solver"]["stagnation_tol"]
     ):
         is_convergence = False
         is_stagnated = True
@@ -325,11 +323,9 @@ def main(
     if config["structural_solver"] == "kite_fem":
         rest_lengths = kite_fem_structure.modify_get_spring_rest_length()
 
-    t_vector = np.linspace(
-        1,
-        config["aero_structural_solver"]["max_iter"],
-        config["aero_structural_solver"]["max_iter"],
-    )
+    max_iter = config["aero_structural_solver"]["max_iter"]
+    # Keep index 0 for the pre-loop initial state and reserve max_iter loop slots.
+    t_vector = np.linspace(0, max_iter, max_iter + 1)
     tracking_data = tracking.setup_tracking_arrays(len(struc_nodes), t_vector)
     is_convergence = False
     f_residual_list = []
@@ -422,8 +418,8 @@ def main(
     # SIMULATION LOOP
     ######################################################################
     ## propagating the simulation for each timestep and saving results
-    with tqdm(total=len(t_vector), desc="Simulating", leave=True) as pbar:
-        for i, step in enumerate(t_vector):
+    with tqdm(total=max_iter, desc="Simulating", leave=True) as pbar:
+        for i in range(max_iter):
             if i > 0:
                 struc_nodes_prev = struc_nodes.copy()
 
@@ -607,9 +603,11 @@ def main(
 
             ### TRACKING
             # Update unified tracking dataframe (replaces position update)
+            # Use i+1 so that positions[0] retains the true initial geometry
+            # stored in the pre-loop call.
             tracking.update_tracking_arrays(
                 tracking_data,
-                i,
+                i + 1,
                 struc_nodes,
                 f_ext_flat,
                 f_residual,
@@ -751,7 +749,7 @@ def main(
         )
     meta = {
         "total_time_s": time.time() - start_time,
-        "n_iter": i + 1,
+        "n_iter": i + 2,  # +2: 1 for pre-loop initial state + (i+1) loop entries
         "converged": is_convergence,
         "rest_lengths": rest_lengths,  # ensure numeric array
         # Convert kite_connectivity to a numeric array for HDF5 compatibility
