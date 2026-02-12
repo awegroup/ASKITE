@@ -45,8 +45,15 @@ def instantiate(
         else:
             pss_initial_conditions.append([struc_nodes[i], vel_ini[i], m_arr[i], False])
 
+    # PSS expects only 3 values per pulley entry: [idx_p3, idx_p4, rest_length_p3p4]
+    # ASKITE stores 5: [cj, ck, l0_len_cj_ck, l0_len_ci_cj, ci]
+    # Trim to first 3 for PSS compatibility
+    pss_pulley_dict = {
+        key: val[:3] for key, val in pulley_line_to_other_node_pair_dict.items()
+    }
+
     pss_params = {
-        "pulley_other_line_pair": pulley_line_to_other_node_pair_dict,
+        "pulley_other_line_pair": pss_pulley_dict,
         "dt": config["structural_pss"]["dt"],
         "t_steps": config["structural_pss"]["n_internal_time_steps"],
         "abs_tol": config["structural_pss"]["abs_tol"],

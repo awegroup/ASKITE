@@ -5,7 +5,7 @@ acc_kite: !!seq [0, 0, 0]
 
 ## case settings
 structural_solver: !!str "kite_fem" #"kite_fem" or "pss"
-starting_from_sim_of_date: !!str "2026_02_11_1729h"
+starting_from_sim_of_date: !!str "2026_02_12_1025h_pss" #"2026_02_12_0848h_fem_udp_03" #"2026_02_11_1729h"
 is_with_gravity: !!bool true
 is_with_aero_bridle: !!bool true
 is_with_aero_tether: !!bool false
@@ -66,7 +66,7 @@ structural_kite_fem:
   # Regularizes K for Newton-Raphson stability. Does NOT affect
   # the equilibrium (fe=fi is independent of I_stiffness).
   # if pseudo_dt != 0 it overrides I_stiffness when set.
-  pseudo_dt: !!float 0.02 #0.05 # pseudo-transient timestep [s] for mass-proportional regularization. 
+  pseudo_dt: !!float 0.1 #0.05 # pseudo-transient timestep [s] for mass-proportional regularization. 
   k_reg_min: !!float 200.0 # minimum regularization stiffness [N/m] floor for light bridle/steering nodes
   print_info: !!bool false
   
@@ -80,11 +80,11 @@ aero2struc:
 aero_structural_solver:
   max_iter: !!int 250
   it_check: !!int 5
-  tol: !!float 5 #N
+  tol: !!float 2 #N
   is_with_aitken_relaxation: !!bool true
   relaxation_factor: !!float 0.3 #0.05-0.3
   n_max_constant_residual_force: !!int 50
-  stagnation_tol: !!float 0.5 # N, tolerance for stagnation detection
+  stagnation_tol: !!float 0.1 # N, tolerance for stagnation detection
 
 ## Physical constants
 grav_constant: !!seq [0, 0, -9.81]

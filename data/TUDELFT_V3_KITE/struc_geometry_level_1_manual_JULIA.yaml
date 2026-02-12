@@ -254,8 +254,9 @@ bridle_elements:
   - [BRII, 2.045, 0.003, dyneema, "noncompressive"]
   - [BR-main-1, 0.61, 0.004, dyneema, "noncompressive"]
   - [M-line, 4.998, 0.004, dyneema, "pulley"]
-  - [Steering Tape, 1.6, 0.004, dyneema, "noncompressive"]
-  - [Power Tape, 2.2, 0.004, dyneema, "noncompressive"]
+  - [Steering Tape, 1.6, 0.004, dyneema, "noncompressive"] 
+  # l_d = 0.2 + u_dp*5 = 0.2 + 0.3*5 = 1.7m
+  - [Power Tape, 1.7, 0.004, dyneema, "noncompressive"] 
 
 
 
