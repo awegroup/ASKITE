@@ -19,11 +19,11 @@ from kitesim.utils import (
     printing_rest_lengths,
 )
 from kitesim import (
-    aero2struc_level_2_new,
+    aero2struc_level_2,
     aerodynamic_vsm,
-    structural_kite_fem_level_2_new,
+    aerostructural_coupled_solver_level_2,
+    structural_kite_fem_level_2,
     structural_pss,
-    aerostructural_coupled_solver_level_2_new,
     read_struc_geometry_yaml_level_2,
 )
 
@@ -40,8 +40,7 @@ def main():
         Path(PROJECT_DIR)
         / "data"
         / f"{kite_name}"
-        / "struc_geometry_all_in_surfplan.yaml"
-        # / "struc_geometry_level_2_manual.yaml"
+        / "struc_geometry_level_2_manual.yaml"
     )
     aero_geometry_path = (
         Path(PROJECT_DIR) / "data" / f"{kite_name}" / "aero_geometry.yaml"
@@ -154,7 +153,7 @@ def main():
             kite_fem_pulley_matrix,
             kite_fem_spring_matrix,
             struc_nodes_initial,
-        ) = structural_kite_fem_level_2_new.instantiate(
+        ) = structural_kite_fem_level_2.instantiate(
             config,
             struc_geometry,
             struc_nodes,
@@ -177,7 +176,7 @@ def main():
     ##################
     ### AERO2STRUC ###
     ##################
-    aero2struc_mapping = aero2struc_level_2_new.initialize_mapping(
+    aero2struc_mapping = aero2struc_level_2.initialize_mapping(
         body_aero.panels,
         struc_nodes,
         struc_node_le_indices,
@@ -229,7 +228,7 @@ def main():
     ########################################
     ### AEROSTUCTURAL COUPLED SIMULATION ###
     ########################################
-    tracking_data, meta = aerostructural_coupled_solver_level_2_new.main(
+    tracking_data, meta = aerostructural_coupled_solver_level_2.main(
         m_arr=m_arr,
         struc_nodes=struc_nodes,
         struc_nodes_initial=struc_nodes_initial,
