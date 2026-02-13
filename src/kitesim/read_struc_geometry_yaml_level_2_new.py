@@ -71,6 +71,22 @@ def initialize_particles(struc_geometry, struc_nodes, m_arr):
     # TODO: Add extra nodes along chord here, make input through configuration file?
     nodes_per_strut += 1
 
+    # Handle strut node indices that reference non-existent particles
+    # (e.g., le_tip_start references nodes 132, 134 which don't exist in wing/bridle data)
+    for indices in strut_indices:
+        for j in range(1, len(indices) - 1):  # Only check intermediate nodes
+            idx = indices[j]
+            if idx >= len(struc_nodes):
+                # Interpolate position from strut endpoints
+                start = struc_nodes[indices[0]]
+                end = struc_nodes[indices[-1]]
+                ratio = j / (len(indices) - 1)
+                new_pos = start + ratio * (end - start)
+                new_list_idx = len(struc_nodes)
+                struc_nodes.append(new_pos)
+                m_arr.append(0)
+                indices[j] = new_list_idx  # Remap to valid list index
+
     # add extra nodes along struts such that the amount per strut is the same
     for i, indices in enumerate(strut_indices):
         nodes = len(indices)
@@ -84,8 +100,8 @@ def initialize_particles(struc_geometry, struc_nodes, m_arr):
             z = coords_front[2] + ratio * (coords_back[2] - coords_front[2])
             struc_nodes.append(np.array([x, y, z]))
             m_arr.append(0)
-            node_idx += 1
-            indices.insert(-2, node_idx)
+            new_idx = len(struc_nodes) - 1
+            indices.insert(-2, new_idx)
 
     simplified_bridle_points = []
     for i, indices in enumerate(strut_indices):
@@ -210,8 +226,8 @@ def initialize_particles(struc_geometry, struc_nodes, m_arr):
             )
             struc_nodes.append(coordinates)
             m_arr.append(0)
-            node_idx += 1
-            canopy_section_indices.append(node_idx)
+            new_idx = len(struc_nodes) - 1
+            canopy_section_indices.append(new_idx)
         canopy_section_indices.append(n2)
         canopy_sections.append(canopy_section_indices)
     strut_sections = strut_indices
@@ -562,8 +578,8 @@ def initialize_bridle_line_system(
                 i = np.where(simplified_bridle_points[:, 0] == ck)[0][0]
                 original_pos = simplified_bridle_points[i, 1]
                 projected_pos = simplified_bridle_points[i, 2]
-                original_lenth = np.linalg.norm(original_pos - struc_nodes[ck])
-                new_length = np.linalg.norm(projected_pos - struc_nodes[ck])
+                original_lenth = np.linalg.norm(original_pos - struc_nodes[ci])
+                new_length = np.linalg.norm(projected_pos - struc_nodes[ci])
                 delta = original_lenth - new_length
                 l0 -= delta
 
@@ -706,7 +722,61 @@ def initialize_bridle_line_system(
     )
 
 
+def _remap_yaml_node_ids(struc_geometry):
+    """Build a YAML-ID → sequential-list-index mapping and remap all node
+    references in *struc_geometry* **in-place**.
+
+    The YAML file may contain non-contiguous node IDs (e.g. wing 1-72,
+    bridle 75-125 with a gap at 73-74).  The reader appends nodes
+    sequentially to *struc_nodes*, so every downstream reference must use
+    the list index, not the original YAML ID.
+    """
+    yaml_id_to_index = {0: 0}  # bridle_point_node is always index 0
+    next_index = 1
+    for row in struc_geometry["wing_particles"]["data"]:
+        yaml_id_to_index[int(row[0])] = next_index
+        next_index += 1
+    for row in struc_geometry["bridle_particles"]["data"]:
+        yaml_id_to_index[int(row[0])] = next_index
+        next_index += 1
+
+    def _remap(node_id):
+        """Return list index for *node_id*, or keep it unchanged if unknown
+        (e.g. placeholder IDs like 132 that will be created later)."""
+        return yaml_id_to_index.get(int(node_id), int(node_id))
+
+    # --- remap particle IDs ---
+    for row in struc_geometry["wing_particles"]["data"]:
+        row[0] = _remap(row[0])
+    for row in struc_geometry["bridle_particles"]["data"]:
+        row[0] = _remap(row[0])
+
+    # --- remap strut_tubes ci, cj and node_indices ---
+    for strut_row in struc_geometry["strut_tubes"]["data"]:
+        strut_row[1] = _remap(strut_row[1])  # ci
+        strut_row[2] = _remap(strut_row[2])  # cj
+        node_indices = strut_row[6]
+        for k, idx in enumerate(node_indices):
+            node_indices[k] = _remap(idx)
+
+    # --- remap bridle_connections ci, cj (, ck) ---
+    for conn_row in struc_geometry["bridle_connections"]["data"]:
+        for k in range(1, len(conn_row)):  # skip name at [0]
+            conn_row[k] = _remap(conn_row[k])
+
+    logging.info(
+        f"Remapped YAML node IDs → list indices  "
+        f"({len(yaml_id_to_index)} mapped, "
+        f"max YAML ID {max(yaml_id_to_index.keys())}, "
+        f"max list index {max(yaml_id_to_index.values())})"
+    )
+    return yaml_id_to_index
+
+
 def main(struc_geometry):
+
+    # Remap non-contiguous YAML node IDs to sequential list indices
+    yaml_id_to_index = _remap_yaml_node_ids(struc_geometry)
 
     ### First append the bridle_point_node, as this node (KCU) should have index 0
     struc_nodes = []

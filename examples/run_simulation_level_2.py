@@ -19,12 +19,12 @@ from kitesim.utils import (
     printing_rest_lengths,
 )
 from kitesim import (
-    aero2struc_level_2,
+    aero2struc_level_2_new,
     aerodynamic_vsm,
-    read_struc_geometry_yaml_level_2,
-    structural_kite_fem_level_2,
+    structural_kite_fem_level_2_new,
     structural_pss,
-    aerostructural_coupled_solver_level_2,
+    aerostructural_coupled_solver_level_2_new,
+    read_struc_geometry_yaml_level_2,
 )
 
 
@@ -40,7 +40,8 @@ def main():
         Path(PROJECT_DIR)
         / "data"
         / f"{kite_name}"
-        / "struc_geometry_level_2_manual.yaml"
+        / "struc_geometry_all_in_surfplan.yaml"
+        # / "struc_geometry_level_2_manual.yaml"
     )
     aero_geometry_path = (
         Path(PROJECT_DIR) / "data" / f"{kite_name}" / "aero_geometry.yaml"
@@ -111,9 +112,40 @@ def main():
         )
 
     if config["structural_solver"] == "pss":
-        raise NotImplementedError(
-            "PSS structural solver is not implemented for level 2, set structural_solver to kite_fem."
+        ## pss -- https://github.com/awegroup/Particle_System_Simulator
+        ##TODO: Fix the comment below, it SHOULD read l0
+        # Note: ParticleSystem doesn’t read l0_arr. SpringDamper sets l0
+        # from the initial particle positions.
+        # So l0_arr is a bookkeeping array for you, not used at instantiation.
+        (psystem, pss_initial_conditions, pss_params, struc_nodes_initial) = (
+            structural_pss.instantiate(
+                # yaml files
+                config,
+                # node level
+                struc_nodes,
+                m_arr,
+                # element_level
+                kite_connectivity_arr,
+                l0_arr,
+                k_arr,
+                c_arr,
+                linktype_arr,
+                pulley_line_to_other_node_pair_dict,
+            )
         )
+        if config["is_with_initial_structure_plot"]:
+            structural_pss.plot_3d_kite_structure(
+                struc_nodes,
+                kite_connectivity_arr,
+                power_tape_index,
+                k_arr=k_arr,
+                c_arr=c_arr,
+                linktype_arr=linktype_arr,
+                pulley_nodes=pulley_node_indices,
+            )
+        # setting kite_fem related output to None
+        kite_fem_structure = None
+
     elif config["structural_solver"] == "kite_fem":
         ### kite_fem -- https://github.com/awegroup/kite_fem
         (
@@ -122,7 +154,7 @@ def main():
             kite_fem_pulley_matrix,
             kite_fem_spring_matrix,
             struc_nodes_initial,
-        ) = structural_kite_fem_level_2.instantiate(
+        ) = structural_kite_fem_level_2_new.instantiate(
             config,
             struc_geometry,
             struc_nodes,
@@ -145,7 +177,7 @@ def main():
     ##################
     ### AERO2STRUC ###
     ##################
-    aero2struc_mapping = aero2struc_level_2.initialize_mapping(
+    aero2struc_mapping = aero2struc_level_2_new.initialize_mapping(
         body_aero.panels,
         struc_nodes,
         struc_node_le_indices,
@@ -197,7 +229,7 @@ def main():
     ########################################
     ### AEROSTUCTURAL COUPLED SIMULATION ###
     ########################################
-    tracking_data, meta = aerostructural_coupled_solver_level_2.main(
+    tracking_data, meta = aerostructural_coupled_solver_level_2_new.main(
         m_arr=m_arr,
         struc_nodes=struc_nodes,
         struc_nodes_initial=struc_nodes_initial,
@@ -227,6 +259,7 @@ def main():
         ### STRUC
         psystem=psystem,
         kite_fem_structure=kite_fem_structure,
+        #### TODO: add these back when you switch to better aero2struc coupling
         canopy_sections=canopy_sections,
         strut_sections=strut_sections,
     )

@@ -4,8 +4,8 @@ vel_kite: !!seq [0, 0, 0]
 acc_kite: !!seq [0, 0, 0]
 
 ## case settings
-structural_solver: !!str "pss" #"kite_fem" or "pss"
-starting_from_sim_of_date: !!str "2026_02_12_1025h_pss" #"2026_02_12_0848h_fem_udp_03" #"2026_02_11_1729h"
+structural_solver: !!str "kite_fem" #"kite_fem" or "pss"
+starting_from_sim_of_date: !!str "" #2026_02_12_1025h_pss" #"2026_02_12_0848h_fem_udp_03" #"2026_02_11_1729h"
 is_with_gravity: !!bool true
 is_with_aero_bridle: !!bool true
 is_with_aero_tether: !!bool false
@@ -22,8 +22,8 @@ steering_tape_final_extension: !!float 0.0
 
 ## output settings
 is_with_initial_structure_plot: !!bool true
-is_with_coupling_plot_per_iteration: !!bool false
-is_with_struc_plot_per_iteration: !!bool false
+is_with_coupling_plot_per_iteration: !!bool true
+is_with_struc_plot_per_iteration: !!bool true
 is_with_aero_plot_per_iteration: !!bool false
 is_with_final_plot: !!bool true
 
