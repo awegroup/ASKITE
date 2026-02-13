@@ -584,7 +584,7 @@ def main(
                     rest_lengths = structural_kite_fem_level_2.get_rest_lengths(
                         kite_fem_structure, kite_connectivity_arr
                     )
-                    kite_fem_structure.plot_convergence()
+                    # kite_fem_structure.plot_convergence()  # not available in kite_fem
 
                 plotting.main(
                     struc_nodes,

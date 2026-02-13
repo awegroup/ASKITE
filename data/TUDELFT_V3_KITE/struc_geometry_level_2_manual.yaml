@@ -1,4 +1,5 @@
 bridle_point_node: [0, 0, 0]
+fixed_point_indices: [0]  # node indices fixed in space (0-based)
 pulley_mass: 0.1
 kcu_mass: 8.4
 pressure: 0.3      #[bar]

@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from kite_fem.FEMStructure import FEM_structure
-from kite_fem.Functions import relaxbridles
+from kite_fem.Functions import relaxbridles, adapt_stiffnesses
 from kite_fem.Plotting import plot_structure
 
 
@@ -49,12 +49,7 @@ def instantiate(
         raise ValueError("Error: initial point velocity has never been defined")
     vel_ini = np.zeros((len(struc_nodes), 3))
 
-    # Use config fixed nodes as single source of truth (fallback keeps backward compatibility).
-    fixed_point_indices = config.get("structural_pss", {}).get(
-        "fixed_point_indices",
-        struc_geometry.get("fixed_point_indices", []),
-    )
-    fixed_set = set(int(i) for i in fixed_point_indices)
+    fixed_set = set(int(i) for i in struc_geometry.get("fixed_point_indices", []))
     for i in range(len(struc_nodes)):
         fixed = i in fixed_set
         initial_conditions.append([struc_nodes[i], vel_ini[i], m_arr[i], fixed])
@@ -130,19 +125,12 @@ def instantiate(
         set([node for section in canopy_sections + strut_sections for node in section])
     )
     kite_fem_structure = relaxbridles(kite_fem_structure, canopy_nodes, [0])
-
-    # Keep the KCU/origin node anchored at [0, 0, 0] after relaxation.
-    kite_fem_structure = _recenter_structure_node_to_origin(
-        kite_fem_structure, node_idx=0
-    )
-
     struc_nodes_initial = kite_fem_structure.coords_init.reshape(-1, 3)
 
     if config.get("is_with_initial_structure_plot", False):
         ax, fig = plot_structure(kite_fem_structure, plot_node_numbers=True)
         ax.set_title("Initial structure")
         plt.show()
-        breakpoint()
 
     return (
         kite_fem_structure,
@@ -211,7 +199,7 @@ def run_kite_fem(
         print_info=config_structural_kite_fem["print_info"],
     )
 
-    # adapt_stiffnesses(kite_fem_structure)  # disabled: doubles k every iter for >1% strain springs
+    adapt_stiffnesses(kite_fem_structure)
 
     struc_nodes = kite_fem_structure.coords_current
     # reshape from flat to (n_nodes, 3)
