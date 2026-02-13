@@ -1,12 +1,3 @@
-"""
-### Info
-
-Author: Jelle Poland \
-Citing: https://doi.org/10.3390/en16145264 \
-License: ... \
-Github: ...
-"""
-
 import numpy as np
 from pathlib import Path
 from kitesim.logging_config import *

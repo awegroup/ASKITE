@@ -461,6 +461,8 @@ def main(
     section_ids=None,
     cp_distribution_path=None,
     is_with_delta_cp_and_weights_plot=False,
+    is_with_conservation_check=False,
+    return_distributed_aero=False,
 ):
     """
     Main interface for mapping aerodynamic panel forces to structural nodes.
@@ -476,9 +478,15 @@ def main(
         eps (float): Small value to avoid division by zero.
         cp_distribution_path (str or Path, optional): Path to Cp distribution file
             used for chordwise weighting. Defaults to cp_AOA_8.dat in the data folder.
+        is_with_conservation_check (bool): If True, print force/moment conservation
+            check for this mapping call.
+        return_distributed_aero (bool): If True, also return the chordwise-
+            distributed aero points/forces used by the mapping.
 
     Returns:
-        np.ndarray: Forces on structural nodes (n_struc,3).
+        np.ndarray or tuple[np.ndarray, dict]: Mapped forces on structural nodes
+            (n_struc,3), and optionally a dict with keys "points" and "forces"
+            containing the distributed aero loads used for mapping.
     """
     # Displacing the single spanwise aero force over 10 chordwise nodes
     n_chordwise_nodes = 10
@@ -537,12 +545,13 @@ def main(
         sections=active_sections,
     )
 
-    verify_force_moment_conservation(
-        aero_points=vsm_wing_nodes_distributed_chordwise,
-        aero_forces=vsm_wing_forces_distributed_chordwise,
-        struc_nodes=struc_nodes,
-        nodal_forces=f_aero_wing,
-    )
+    if is_with_conservation_check:
+        verify_force_moment_conservation(
+            aero_points=vsm_wing_nodes_distributed_chordwise,
+            aero_forces=vsm_wing_forces_distributed_chordwise,
+            struc_nodes=struc_nodes,
+            nodal_forces=f_aero_wing,
+        )
     if is_with_coupling_plot:
         plot_aerodynamic_forces_chordwise_distributed(
             panel_cps=panel_cp_locations,
@@ -552,6 +561,11 @@ def main(
             nodes_struc=struc_nodes,
             force_struc=f_aero_wing,
         )
+    if return_distributed_aero:
+        return f_aero_wing, {
+            "points": vsm_wing_nodes_distributed_chordwise,
+            "forces": vsm_wing_forces_distributed_chordwise,
+        }
     return f_aero_wing
 
 

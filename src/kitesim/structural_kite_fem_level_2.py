@@ -1,8 +1,66 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from kite_fem.FEMStructure import FEM_structure
-from kite_fem.Functions import relaxbridles, adapt_stiffnesses
+from kite_fem.Functions import adapt_stiffnesses
 from kite_fem.Plotting import plot_structure
+
+
+def fix_nodes(kite: FEM_structure, indices):
+    """Fix all 6 DOFs for a list of node indices."""
+    for node_id in indices:
+        kite.bc[6 * node_id : 6 * node_id + 6] = False
+        kite.fixed[6 * node_id : 6 * node_id + 6] = True
+    return kite
+
+
+# TODO: should go back to kite_fem
+def relaxbridles(
+    kite: FEM_structure,
+    canopy_nodes,
+    origin,
+    pull_down_force_z=-1500.0,
+    settle_force_z=-1500.0,
+):
+    """
+    Relax bridles by fixing canopy nodes and applying a vertical force on origin nodes.
+
+    Args:
+        kite: FEM structure instance.
+        canopy_nodes: Node ids fixed during relaxation.
+        origin: Node ids that get the vertical pull force.
+        pull_down_force_z: Main Z-force used to pull origin node(s).
+        settle_force_z: Smaller Z-force used in a second settle solve.
+    """
+    kite = fix_nodes(kite, canopy_nodes)
+    initial_conditions = kite.initial_conditions
+    pulley_matrix = kite.pulley_matrix
+    spring_matrix = kite.spring_matrix
+    beam_matrix = kite.beam_matrix
+    fe = np.zeros(kite.N)
+
+    for node_id in origin:
+        kite.bc[6 * node_id + 2] = True
+        kite.fixed[6 * node_id + 2] = False
+        fe[6 * node_id + 2] = float(pull_down_force_z)
+
+    kite.solve(fe, max_iterations=300, tolerance=0.01, print_info=False)
+    for node_id in origin:
+        fe[6 * node_id + 2] = float(settle_force_z)
+    kite.solve(fe, max_iterations=300, tolerance=0.01, print_info=False)
+
+    newcoords = np.reshape(kite.coords_current, (-1, 3))
+
+    initial_conditions_new = []
+    for node_id, (_, vel, mass, fixed) in enumerate(initial_conditions):
+        posnew = np.array(newcoords[node_id], copy=True)
+        initial_conditions_new.append([posnew, vel, mass, fixed])
+
+    kite_relaxed = FEM_structure(
+        initial_conditions_new, spring_matrix, pulley_matrix, beam_matrix
+    )
+
+    # Ensure node 0 (or provided origin node) ends exactly at [0, 0, 0].
+    return _recenter_structure_node_to_origin(kite_relaxed, node_idx=origin[0])
 
 
 def _recenter_structure_node_to_origin(kite_fem_structure, node_idx=0):
@@ -124,7 +182,19 @@ def instantiate(
     canopy_nodes = list(
         set([node for section in canopy_sections + strut_sections for node in section])
     )
-    kite_fem_structure = relaxbridles(kite_fem_structure, canopy_nodes, [0])
+    pull_down_force_z = config.get("structural_kite_fem", {}).get(
+        "relaxbridles_pull_down_force_z", -100.0
+    )
+    settle_force_z = config.get("structural_kite_fem", {}).get(
+        "relaxbridles_settle_force_z", -1.0
+    )
+    kite_fem_structure = relaxbridles(
+        kite_fem_structure,
+        canopy_nodes,
+        [0],
+        pull_down_force_z=pull_down_force_z,
+        settle_force_z=settle_force_z,
+    )
     struc_nodes_initial = kite_fem_structure.coords_init.reshape(-1, 3)
 
     if config.get("is_with_initial_structure_plot", False):

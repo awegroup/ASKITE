@@ -21,8 +21,8 @@ steering_tape_extension_step: !!float 0
 steering_tape_final_extension: !!float 0.0
 
 ## output settings
-is_with_initial_structure_plot: !!bool true
-is_with_coupling_plot_per_iteration: !!bool true
+is_with_initial_structure_plot: !!bool false
+is_with_coupling_plot_per_iteration: !!bool false
 is_with_struc_plot_per_iteration: !!bool false
 is_with_aero_plot_per_iteration: !!bool false
 is_with_final_plot: !!bool true
@@ -52,7 +52,7 @@ structural_pss:
 
 ## structural kite_fem
 structural_kite_fem:
-  max_iterations: !!int 10
+  max_iterations: !!int 500
   tolerance: !!float 0.01 
   step_limit: !!float 0.1
   relax_init: !!float 0.1
@@ -62,8 +62,12 @@ structural_kite_fem:
   # Regularizes K for Newton-Raphson stability. Does NOT affect
   # the equilibrium (fe=fi is independent of I_stiffness).
   # if pseudo_dt != 0 it overrides I_stiffness when set.
-  pseudo_dt: !!float 0.1 #0.05 # pseudo-transient timestep [s] for mass-proportional regularization.
+  pseudo_dt: !!float 0.2 #0.05 # pseudo-transient timestep [s] for mass-proportional regularization.
   k_reg_min: !!float 200.0 # minimum regularization stiffness [N/m] floor for light bridle/steering nodes
+  # Bridle relaxation preload on origin node(s), typically node 0 (KCU), in +z/-z solver coordinates.
+  # Keep negative here to pull down in the current setup.
+  relaxbridles_pull_down_force_z: !!float -1600.0 #roughly the aero dynamic loading at 12m/s
+  relaxbridles_settle_force_z: !!float -500.0
   print_info: !!bool false
   
 ## aero2struc
@@ -74,7 +78,7 @@ aero2struc:
 
 ## coupled
 aero_structural_solver:
-  max_iter: !!int 1
+  max_iter: !!int 10
   it_check: !!int 5
   tol: !!float 10
   is_with_aitken_relaxation: !!bool true

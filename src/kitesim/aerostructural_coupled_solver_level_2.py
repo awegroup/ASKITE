@@ -466,7 +466,7 @@ def main(
     #     )
 
     ### AERO --> STRUC
-    f_aero_wing = aero2struc_level_2.main(
+    f_aero_wing, aero_mapping_debug = aero2struc_level_2.main(
         config["aero2struc"]["coupling_method"],
         f_aero_wing_vsm_format,
         struc_nodes,
@@ -477,12 +477,14 @@ def main(
         canopy_sections,
         strut_sections,
         body_aero.panels,
+        is_with_conservation_check=False,
+        return_distributed_aero=True,
     )
 
     # Check moment preservation of aero→struc mapping (pre-loop)
     aero2struc_level_2.check_moment_preservation(
-        f_aero_panel=f_aero_wing_vsm_format,
-        panel_cps=np.array(results_aero["panel_cp_locations"]),
+        f_aero_panel=aero_mapping_debug["forces"],
+        panel_cps=aero_mapping_debug["points"],
         f_aero_mapped=f_aero_wing,
         struc_nodes=struc_nodes,
     )
@@ -626,7 +628,7 @@ def main(
                 f"Aero symmetry check, f_aero_y: {np.sum([force[1] for force in f_aero_wing_vsm_format])}"
             )
             ### AERO --> STRUC
-            f_aero_wing = aero2struc_level_2.main(
+            f_aero_wing, aero_mapping_debug = aero2struc_level_2.main(
                 config["aero2struc"]["coupling_method"],
                 f_aero_wing_vsm_format,
                 struc_nodes,
@@ -637,13 +639,15 @@ def main(
                 canopy_sections,
                 strut_sections,
                 body_aero.panels,
+                is_with_conservation_check=(i == 0),
+                return_distributed_aero=True,
             )
 
             # Check moment preservation (only first coupling iteration to limit log spam)
             if i == 1:
                 aero2struc_level_2.check_moment_preservation(
-                    f_aero_panel=f_aero_wing_vsm_format,
-                    panel_cps=np.array(results_aero["panel_cp_locations"]),
+                    f_aero_panel=aero_mapping_debug["forces"],
+                    panel_cps=aero_mapping_debug["points"],
                     f_aero_mapped=f_aero_wing,
                     struc_nodes=struc_nodes,
                 )
@@ -832,7 +836,10 @@ def main(
         )
     meta = {
         "total_time_s": time.time() - start_time,
-        "n_iter": i + 1,
+        # +1 for the pre-loop initial state at tracking index 0.
+        # Each loop iteration appends one entry, so total stored frames are:
+        # initial + number of completed loop iterations.
+        "n_iter": len(f_residual_list) + 1,
         "converged": is_convergence,
         "rest_lengths": rest_lengths,  # ensure numeric array
         # Convert kite_connectivity to a numeric array for HDF5 compatibility

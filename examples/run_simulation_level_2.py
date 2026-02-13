@@ -1,12 +1,3 @@
-"""
-### Info
-
-Author: Jelle Poland \
-Citing: https://doi.org/10.3390/en16145264 \
-License: ... \
-Github: ...
-"""
-
 import numpy as np
 from pathlib import Path
 from kitesim.logging_config import *
@@ -121,39 +112,7 @@ def main():
         )
 
     if config["structural_solver"] == "pss":
-        ## pss -- https://github.com/awegroup/Particle_System_Simulator
-        ##TODO: Fix the comment below, it SHOULD read l0
-        # Note: ParticleSystem doesn’t read l0_arr. SpringDamper sets l0
-        # from the initial particle positions.
-        # So l0_arr is a bookkeeping array for you, not used at instantiation.
-        (psystem, pss_initial_conditions, pss_params, struc_nodes_initial) = (
-            structural_pss.instantiate(
-                # yaml files
-                config,
-                # node level
-                struc_nodes,
-                m_arr,
-                # element_level
-                kite_connectivity_arr,
-                l0_arr,
-                k_arr,
-                c_arr,
-                linktype_arr,
-                pulley_line_to_other_node_pair_dict,
-            )
-        )
-        if config["is_with_initial_structure_plot"]:
-            structural_pss.plot_3d_kite_structure(
-                struc_nodes,
-                kite_connectivity_arr,
-                power_tape_index,
-                k_arr=k_arr,
-                c_arr=c_arr,
-                linktype_arr=linktype_arr,
-                pulley_nodes=pulley_node_indices,
-            )
-        # setting kite_fem related output to None
-        kite_fem_structure = None
+        raise NotImplementedError("PSS solver is not implemented for level 2")
 
     elif config["structural_solver"] == "kite_fem":
         ### kite_fem -- https://github.com/awegroup/kite_fem
@@ -179,6 +138,8 @@ def main():
         )
         # setting psm related output to None
         psystem = None
+        # resetting struc_nodes, to the relaxed geometry
+        struc_nodes = np.array(struc_nodes_initial, copy=True)
 
     else:
         raise ValueError("Invalid structural solver specified, either pss or pyfe3d")
