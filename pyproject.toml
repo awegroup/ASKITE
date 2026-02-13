@@ -1,11 +1,41 @@
-
-[build-system]
-requires = ["setuptools >= 61.0"]
-build-backend = "setuptools.build_meta"
-
 [project]
-name = "kitesim"
-version = "0.1.0"
+name = "ASKITE"
+dynamic = ["version"]
+description = "A Python package for aero-structural coupled simulations of kites (ASKITE)."
+readme = "README.md"
+requires-python = ">=3.8"
+license = {file = "LICENSE"}
+keywords = ["aerodynamics", "wind-energy", "simulation", "vortex-method", "fluid-dynamics", "kite", "paraglider", "airfoil", "python", "numerical-methods", "Airborne Wind Energy", "Kites", "Simulation", "Fluid-Structure Interaction", "Kite Design", "regression", "panel-method", "wake", "stability", "foil", "engineering", "renewable-energy", "modeling", "data-analysis"]
+authors = [
+  {name = "Jelle, Poland", email = "jellepoland@gmail.com"}
+]
+maintainers = [
+  {name = "Jelle, Poland", email = "jellepoland@gmail.com"}
+]
+classifiers = [
+  # Indicate the development status of your project (maturity). Commonly, this is
+  #   3 - Alpha
+  #   4 - Beta
+  #   5 - Stable
+  #.  6 - Mature
+  "Development Status :: 4 - Beta",
+
+  # Target audience
+  "Intended Audience :: Developers",
+  "Topic :: Scientific/Engineering",
+
+  # License type
+  "License :: OSI Approved :: MIT License",
+
+  # Python versions your software supports. This is not checked by pip install, and is different from "requires-python".
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3 :: Only",
+]
 dependencies = [
     "numpy",
     "matplotlib",
@@ -23,41 +53,37 @@ dependencies = [
     "ipywidgets",
     "pydantic",
     "h5py",
-    "tables",
     "tqdm",
-    "PSS @ git+https://github.com/awegroup/Particle_System_Simulator.git@v1.0.0",
-    "VSM @ git+https://github.com/awegroup/Vortex-Step-Method.git@v2.0.0",
+    "PSS @ git+https://github.com/awegroup/Particle_System_Simulator.git@v1.0.2",
+    "VSM @ git+https://github.com/awegroup/Vortex-Step-Method.git@v2.1.2",
     "pathlib",
-    "kite_fem @ git+https://github.com/awegroup/kite_fem.git@main"
+    "kite_fem @ git+https://github.com/awegroup/kite_fem.git@mass_proportional_regularisation"
 ]
-requires-python = ">=3.8"
-authors = [
-  {name = "Jelle Poland"}
-]
-maintainers = [
-  {name = "Jelle Poland"}
-]
-description = "A package for simulating kites in the atmosphere"
-readme = "README.md"
-keywords = ["Airborne Wind Energy", "Kites", "Simulation", "Fluid-Structure Interaction", "Kite Design"]
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Programming Language :: Python",
-    "Intended Audience :: Kite Designers, Developers",
-]
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pytest-cov",
+  "black",
+  ]
+
+# List of relevant URLs for your project. These are displayed on the left sidebar of your PyPI page.
+# This can include links to the homepage, source code, changelog, funding, etc.
+[project.urls]
+"Homepage" = "https://github.com/awegroup/ASKITE"
+"Source" = "https://github.com/awegroup/ASKITE"
+"Documentation" = "https://github.com/awegroup/ASKITE#readme"
+#"Changelog" = "https://github.com/awegroup/ASKITE/releases"
+#"Funding" = "https://github.com/awegroup/ASKITE#funding"
+"Bug Tracker" = "https://github.com/awegroup/ASKITE/issues"
+"Download" = "https://github.com/awegroup/ASKITE/releases"
+# To grab all the files from the src folders of installed packages, not only the .py files
 [tool.setuptools.packages.find]
 where = ["src"]
 
-[tool.pytest.ini_options]
-addopts = "--cov=kitesim"
+[build-system]
+requires = ["setuptools>=61", "wheel", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
 
-[project.optional-dependencies]
-dev = [
-    "pytest",
-    "black",
-    "flake8",
-    "pytest-cov"
-    ]
-
-[project.urls]
-Repository = "https://github.com/jellepoland/kitesim.git"
+[tool.setuptools_scm]
+version_scheme = "release-branch-semver"
+local_scheme = "no-local-version"

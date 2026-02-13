@@ -129,8 +129,10 @@ def calculate_projected_area(points):
 
 def printing_rest_lengths(tracking_data, struc_geometry):
     """
-    Print the current and initial rest lengths of all bridle lines defined in bridle_elements by
-    averaging the lengths of all their segments in bridle_connections.
+    Print current and initial lengths of bridle lines by averaging the lengths
+    of their segments in bridle_connections.
+
+    Supports both legacy `bridle_elements` and newer `bridle_lines` YAML schemas.
 
     For each connection:
     - if 3 nodes, sum ci-cj and cj-ck
@@ -140,15 +142,21 @@ def printing_rest_lengths(tracking_data, struc_geometry):
     struc_nodes = positions[-1]  # current positions
     initial_struc_nodes = positions[0]  # initial positions
 
-    bridle_elements_data = struc_geometry["bridle_elements"]["data"]
-    bridle_line_names = [row[0] for row in bridle_elements_data]
+    if "bridle_elements" in struc_geometry:
+        bridle_defs_data = struc_geometry["bridle_elements"]["data"]
+    elif "bridle_lines" in struc_geometry:
+        bridle_defs_data = struc_geometry["bridle_lines"]["data"]
+    else:
+        raise KeyError("Expected 'bridle_elements' or 'bridle_lines' in struc_geometry")
+
+    bridle_line_names = [row[0] for row in bridle_defs_data]
     bridle_connections_data = struc_geometry["bridle_connections"]["data"]
 
     # YAML l0 lookup dictionary
-    bridle_elements_yaml = {row[0]: row[1] for row in bridle_elements_data}
+    bridle_elements_yaml = {row[0]: row[1] for row in bridle_defs_data}
 
-    print("\nCurrent bridle line lengths:")
-    results = []
+    # Collect data rows: (line_name, curr_length, yaml_l0, delta_pct, initial_nodal_dist)
+    rows = []
     for line_name in bridle_line_names:
         total_length = 0.0
         initial_total_length = 0.0
@@ -181,35 +189,64 @@ def printing_rest_lengths(tracking_data, struc_geometry):
                     count += 1
 
         if count > 0:
-            avg_length = total_length / count
-            initial_avg_length = initial_total_length / count
-            delta_pct = (
-                100.0 * (avg_length - initial_avg_length) / initial_avg_length
-                if initial_avg_length != 0
-                else 0.0
-            )
+            curr_l = total_length / count
+            init_nodal_dist = initial_total_length / count
 
-            # yaml l0 value
             yaml_l0 = bridle_elements_yaml.get(line_name, None)
             try:
                 yaml_l0_val = float(yaml_l0) if yaml_l0 is not None else None
             except Exception:
                 yaml_l0_val = yaml_l0
 
-            delta_yaml_pct = (
-                100.0 * (avg_length - yaml_l0_val) / yaml_l0_val
+            delta_pct = (
+                100.0 * (curr_l - yaml_l0_val) / yaml_l0_val
                 if yaml_l0_val not in (None, 0)
                 else 0.0
             )
 
-            results.append(
-                f"{line_name}: curr: {avg_length:.3f} m, "
-                f"initial: {initial_avg_length:.3f} m, "
-                f"delta: {delta_pct:+.2f} %, "
-                f"yaml: {yaml_l0_val} m, "
-                f"delta_yaml: {delta_yaml_pct:+.2f} %"
-            )
+            rows.append((line_name, curr_l, yaml_l0_val, delta_pct, init_nodal_dist))
 
-    # print once
-    for result in results:
-        print(result)
+    if not rows:
+        print("\nNo bridle lines with matching connections found.")
+        return
+
+    # Determine column widths for aligned output
+    name_w = max(len(r[0]) for r in rows) if rows else 10
+
+    # Print header
+    print(
+        f"\n{'Line':<{name_w}}   {'current_l':>10}   {'initial_l0_yaml':>16}   {'delta':>8}   {'initial_nodal_distance':>23}"
+    )
+    print(f"{'-' * name_w}   {'-' * 10}   {'-' * 16}   {'-' * 8}   {'-' * 23}")
+
+    for name, curr_l, yaml_l0, delta_pct, init_dist in rows:
+        yaml_str = f"{yaml_l0:.3f} m" if yaml_l0 is not None else "N/A"
+        print(
+            f"{name:<{name_w}}   {curr_l:>7.3f} m   {yaml_str:>16}   {delta_pct:>+7.2f}%   ({init_dist:>19.3f} m)"
+        )
+
+
+def rotate_geometry(struc_nodes, rotation_angle_deg):
+    """
+    Rotate structural nodes around the origin in the XZ plane (about the Y-axis).
+
+    Args:
+        struc_nodes (np.ndarray): Array of structural node positions (n_struc_nodes, 3).
+        rotation_angle_deg (float): Rotation angle in degrees.
+            Positive angles tilt geometry toward +X (right-hand rule around +Y).
+
+    Returns:
+        np.ndarray: Rotated structural node array (n_struc_nodes, 3).
+    """
+    angle_rad = np.radians(rotation_angle_deg)
+    cos_angle = np.cos(angle_rad)
+    sin_angle = np.sin(angle_rad)
+
+    # Rotation matrix around +Y. For z>0 and positive angle, x increases.
+    R = np.array(
+        [[cos_angle, 0.0, sin_angle], [0.0, 1.0, 0.0], [-sin_angle, 0.0, cos_angle]]
+    )
+
+    rotated_struc_nodes = struc_nodes @ R.T
+
+    return rotated_struc_nodes

@@ -48,7 +48,12 @@ def set_plot_style():
         {
             "text.usetex": True,
             "font.family": "serif",
-            "font.serif": ["Computer Modern Roman"],
+            "font.serif": [
+                "Computer Modern Roman",
+                "DejaVu Serif",
+                "Times New Roman",
+                "serif",
+            ],
             ## Axes settings
             "axes.titlesize": 15,
             "axes.labelsize": 13,
@@ -257,6 +262,7 @@ def main(
     f_ext=None,
     title="PSM State",
     body_aero=None,
+    vel_app=None,
     ##TODO: V3 chord-length used for scaling vectors -> should not be hardcoded
     chord_length=2.6,
     is_with_node_indices=False,
@@ -333,7 +339,7 @@ def main(
         # Scale all vectors so the longest has length chord_length/5 (larger arrows)
         norms = np.linalg.norm(arr, axis=1)
         max_norm = np.max(norms) if np.max(norms) > 0 else 1.0
-        scale = (chord_length / 2) / max_norm
+        scale = (chord_length) / max_norm
         arr_scaled = arr * scale
         ax.quiver(
             struc_nodes[:, 0],
@@ -369,6 +375,32 @@ def main(
             marker="^",
             s=10,
             label="Aero Mesh",
+        )
+
+    if vel_app is not None:
+        vel_app_scaled = vel_app * (chord_length / 2) / np.linalg.norm(vel_app)
+        ax.quiver(
+            0,
+            0,
+            0,
+            vel_app_scaled[0],
+            vel_app_scaled[1],
+            vel_app_scaled[2],
+            length=1,
+            linewidth=3,
+            arrow_length_ratio=0.3,
+            normalize=False,
+            color="black",
+            label="Apparent Wind",
+        )
+        # add a text label for the apparent wind vector
+        ax.text(
+            vel_app_scaled[0],
+            vel_app_scaled[1],
+            vel_app_scaled[2],
+            r"$V_\mathrm{a}$",
+            color="black",
+            fontsize=10,
         )
 
     # Set aspect ratio to equal
@@ -578,4 +610,127 @@ def interactive_plot(
         fig.canvas.draw_idle()
 
     slider.on_changed(update)
+    plt.show()
+
+
+def plot_aerodynamic_forces_chordwise_distributed(
+    panel_cps,
+    f_aero_chordwise,
+    nodes_struc,
+    force_struc=None,
+    vsm_wing_nodes_distributed_chordwise=None,
+    vsm_wing_forces_distributed_chordwise=None,
+):
+    """
+    Plot aerodynamic forces distributed chordwise and mapped to structural nodes.
+
+    Args:
+        panel_cps (np.ndarray): panel cps (n,3).
+        f_aero_chordwise (np.ndarray): Chordwise aerodynamic forces (n,3).
+        nodes_struc (np.ndarray): Structural node positions (n_nodes,3).
+        force_struc (np.ndarray, optional): Forces on structural nodes (n_nodes,3).
+
+    Returns:
+        None. Displays a 3D plot.
+    """
+
+    # Create a new figure and set up 3D axes
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection="3d")
+
+    # Scatter plot of chordwise points (blue)
+    ax.scatter(
+        panel_cps[:, 0],
+        panel_cps[:, 1],
+        panel_cps[:, 2],
+        color="black",
+        label="Panel center of pressure",
+    )
+
+    # Quiver plot for the forces (red arrows)
+    ax.quiver(
+        panel_cps[:, 0],
+        panel_cps[:, 1],
+        panel_cps[:, 2],
+        f_aero_chordwise[:, 0],
+        f_aero_chordwise[:, 1],
+        f_aero_chordwise[:, 2],
+        # length=1,
+        # normalize=True,
+        length=0.01,
+        color="black",
+        label="Panel force vector",
+    )
+
+    if vsm_wing_nodes_distributed_chordwise is not None:
+        vsm_nodes = np.asarray(vsm_wing_nodes_distributed_chordwise)
+        ax.scatter(
+            vsm_nodes[:, 0],
+            vsm_nodes[:, 1],
+            vsm_nodes[:, 2],
+            color="blue",
+            label="VSM node distributed chordwise",
+        )
+
+        if vsm_wing_forces_distributed_chordwise is not None:
+            vsm_forces = np.asarray(vsm_wing_forces_distributed_chordwise)
+            ax.quiver(
+                vsm_nodes[:, 0],
+                vsm_nodes[:, 1],
+                vsm_nodes[:, 2],
+                vsm_forces[:, 0],
+                vsm_forces[:, 1],
+                vsm_forces[:, 2],
+                length=0.01,
+                color="blue",
+                label="VSM force distributed chordwise",
+            )
+
+    if force_struc is None:
+        # Scatter plot of structural nodes (wing segment corners)
+        ax.scatter(
+            nodes_struc[:, 0],
+            nodes_struc[:, 1],
+            nodes_struc[:, 2],
+            color="black",
+            label="Wing Segment Corners",
+        )
+
+        # Annotate each point with its index
+        for idx, point in enumerate(nodes_struc):
+            ax.text(point[0], point[1], point[2], f"{idx}", color="black")
+    else:
+        # Scatter plot of structural nodes (wing segment corners) (green)
+        ax.scatter(
+            nodes_struc[:, 0],
+            nodes_struc[:, 1],
+            nodes_struc[:, 2],
+            color="red",
+            label="Structural nodes",
+        )
+
+        # Quiver plot for the forces on structural nodes (yellow arrows)
+        ax.quiver(
+            nodes_struc[:, 0],
+            nodes_struc[:, 1],
+            nodes_struc[:, 2],
+            force_struc[:, 0],
+            force_struc[:, 1],
+            force_struc[:, 2],
+            # length=1,
+            length=0.01,
+            # normalize=True,
+            color="red",
+            label="Mapped aerodynamic force vector onto structural nodes",
+        )
+
+    # Set equal scale for all axes
+    points_all = np.concatenate((panel_cps, nodes_struc), axis=0)
+    bb = points_all.max(axis=0) - points_all.min(axis=0)
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Z")
+    ax.set_box_aspect(bb)
+    ax.set_title("Aerodynamic Forces and Structural Nodes")
+    ax.legend()
     plt.show()

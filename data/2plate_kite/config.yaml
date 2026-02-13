@@ -57,6 +57,8 @@ structural_kite_fem:
   relax_update: !!float 0.95
   k_update: !!int 1
   I_stiffness: !!int 25 #V3 kite: 25
+  pseudo_dt: !!float 0.02 # pseudo-transient timestep [s] for mass-proportional regularization. Overrides I_stiffness when set.
+  k_reg_min: !!float 200.0 # minimum regularization stiffness [N/m] floor for light bridle/steering nodes
   print_info: !!bool false
   
 ## aero2struc

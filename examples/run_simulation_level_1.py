@@ -1,12 +1,3 @@
-"""
-### Info
-
-Author: Jelle Poland \
-Citing: https://doi.org/10.3390/en16145264 \
-License: ... \
-Github: ...
-"""
-
 import numpy as np
 from pathlib import Path
 from kitesim.logging_config import *
@@ -17,15 +8,68 @@ from kitesim.utils import (
     load_sim_output,
     save_results,
     printing_rest_lengths,
+    rotate_geometry,
 )
 from kitesim import (
-    aero2struc,
+    aero2struc_level_1,
     aerodynamic_vsm,
-    structural_kite_fem,
+    aerostructural_coupled_solver_level_1,
+    read_struc_geometry_yaml_level_1,
+    structural_kite_fem_level_1,
     structural_pss,
-    aerostructural_coupled_solver,
-    read_struc_geometry_yaml,
 )
+
+
+def _resolve_starting_struc_nodes(
+    config,
+    project_dir,
+    kite_name,
+    struc_nodes_default,
+):
+    """
+    Optionally override start nodes from a previous simulation result folder.
+
+    If config["starting_from_sim_of_date"] is empty, return struc_nodes_default.
+    Otherwise load results/<kite_name>/<date>/sim_output.h5 and return the final
+    node positions from tracking["positions"][-1].
+    """
+    sim_date = str(config.get("starting_from_sim_of_date", "")).strip()
+    if sim_date == "":
+        return struc_nodes_default
+
+    start_dir = Path(project_dir) / "results" / kite_name / sim_date
+    if not start_dir.exists() or not start_dir.is_dir():
+        raise FileNotFoundError(
+            f"Configured starting simulation directory does not exist: {start_dir}"
+        )
+
+    h5_path = start_dir / "sim_output.h5"
+    if not h5_path.exists():
+        raise FileNotFoundError(
+            f"Configured starting simulation has no sim_output.h5: {h5_path}"
+        )
+
+    _, tracking_data = load_sim_output(h5_path)
+    if "positions" not in tracking_data:
+        raise KeyError(f"Expected 'positions' dataset in: {h5_path}")
+
+    positions = np.asarray(tracking_data["positions"])
+    if positions.ndim != 3 or positions.shape[2] != 3:
+        raise ValueError(
+            f"Invalid positions shape in {h5_path}: {positions.shape}. Expected (nt, n_nodes, 3)."
+        )
+
+    struc_nodes_loaded = np.array(positions[-1], dtype=float)
+    if struc_nodes_loaded.shape != np.asarray(struc_nodes_default).shape:
+        raise ValueError(
+            "Loaded node shape does not match current geometry. "
+            f"loaded={struc_nodes_loaded.shape}, current={np.asarray(struc_nodes_default).shape}"
+        )
+
+    logging.info(
+        f"Starting from previous simulation final nodes: {start_dir} (n_nodes={len(struc_nodes_loaded)})"
+    )
+    return struc_nodes_loaded
 
 
 # Import modules
@@ -35,12 +79,13 @@ def main():
     kite_name = "TUDELFT_V3_KITE"  # the dir name with the relevant .yaml files
     # kite_name = "3plate_kite"  # the dir name with the relevant .yaml files
     # load config.yaml & geometry.yaml, save both, and return them as dicts
-    config_path = Path(PROJECT_DIR) / "data" / f"{kite_name}" / "config.yaml"
+    config_path = Path(PROJECT_DIR) / "data" / f"{kite_name}" / "config_level_1.yaml"
     struc_geometry_path = (
         Path(PROJECT_DIR)
         / "data"
         / f"{kite_name}"
-        / "struc_geometry_level_1_manual.yaml"
+        # / "struc_geometry_level_1_manual.yaml"
+        / "struc_geometry_level_1_manual_JULIA.yaml"
     )
     aero_geometry_path = (
         Path(PROJECT_DIR) / "data" / f"{kite_name}" / "aero_geometry.yaml"
@@ -66,8 +111,7 @@ def main():
         "n_aero_panels_per_struc_section"
     ]
     body_aero, vsm_solver, vel_app, initial_polar_data = aerodynamic_vsm.initialize(
-        kite_name,
-        PROJECT_DIR,
+        aero_geometry_path,
         config,
         n_panels_aero,
     )
@@ -94,7 +138,22 @@ def main():
         linktype_arr,
         pulley_line_indices,
         pulley_line_to_other_node_pair_dict,
-    ) = read_struc_geometry_yaml.main(struc_geometry)
+    ) = read_struc_geometry_yaml_level_1.main(struc_geometry)
+
+    #####################################################
+    ### rotating the initial geometry by some angle,
+    ### to enable the wind to be horizontal
+    #####################################################
+    struc_nodes = rotate_geometry(
+        struc_nodes,
+        config["initial_geometry_rotation_deg"],
+    )
+    struc_nodes = _resolve_starting_struc_nodes(
+        config=config,
+        project_dir=PROJECT_DIR,
+        kite_name=kite_name,
+        struc_nodes_default=struc_nodes,
+    )
 
     # logging initial conditions
     logging.info(f"\n\nINITIAL CONDITIONS, NODES \n")
@@ -150,7 +209,7 @@ def main():
             kite_fem_pulley_matrix,
             kite_fem_spring_matrix,
             struc_nodes_initial,
-        ) = structural_kite_fem.instantiate(
+        ) = structural_kite_fem_level_1.instantiate(
             config,
             struc_geometry,
             struc_nodes,
@@ -162,6 +221,8 @@ def main():
             linktype_arr,
             pulley_line_to_other_node_pair_dict,
         )
+        # Use relaxed/recentered kite_fem geometry as the coupled-solver initial state.
+        struc_nodes = struc_nodes_initial.copy()
         # setting psm related output to None
         psystem = None
 
@@ -171,7 +232,7 @@ def main():
     ##################
     ### AERO2STRUC ###
     ##################
-    aero2struc_mapping = aero2struc.initialize_mapping(
+    aero2struc_mapping = aero2struc_level_1.initialize_mapping(
         body_aero.panels,
         struc_nodes,
         struc_node_le_indices,
@@ -223,7 +284,7 @@ def main():
     ########################################
     ### AEROSTUCTURAL COUPLED SIMULATION ###
     ########################################
-    tracking_data, meta = aerostructural_coupled_solver.main(
+    tracking_data, meta = aerostructural_coupled_solver_level_1.main(
         m_arr=m_arr,
         struc_nodes=struc_nodes,
         struc_nodes_initial=struc_nodes_initial,

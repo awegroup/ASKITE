@@ -1,12 +1,3 @@
-"""
-### Info
-
-Author: Jelle Poland \
-Citing: https://doi.org/10.3390/en16145264 \
-License: ... \
-Github: ...
-"""
-
 import numpy as np
 from pathlib import Path
 from kitesim.logging_config import *
@@ -17,14 +8,15 @@ from kitesim.utils import (
     load_sim_output,
     save_results,
     printing_rest_lengths,
+    rotate_geometry,
 )
 from kitesim import (
-    aero2struc,
+    aero2struc_level_2,
     aerodynamic_vsm,
+    aerostructural_coupled_solver_level_2,
     structural_kite_fem_level_2,
     structural_pss,
-    aerostructural_coupled_solver_level_2,
-    read_struc_geometry_level_2_yaml,
+    read_struc_geometry_yaml_level_2,
 )
 
 
@@ -35,12 +27,12 @@ def main():
     kite_name = "TUDELFT_V3_KITE"  # the dir name with the relevant .yaml files
     # kite_name = "3plate_kite"  # the dir name with the relevant .yaml files
     # load config.yaml & geometry.yaml, save both, and return them as dicts
-    config_path = Path(PROJECT_DIR) / "data" / f"{kite_name}" / "config.yaml"
+    config_path = Path(PROJECT_DIR) / "data" / f"{kite_name}" / "config_level_2.yaml"
     struc_geometry_path = (
         Path(PROJECT_DIR)
         / "data"
         / f"{kite_name}"
-        / "struc_geometry_all_in_surfplan.yaml"
+        / "struc_geometry_level_2_manual.yaml"
     )
     aero_geometry_path = (
         Path(PROJECT_DIR) / "data" / f"{kite_name}" / "aero_geometry.yaml"
@@ -66,8 +58,7 @@ def main():
         "n_aero_panels_per_struc_section"
     ]
     body_aero, vsm_solver, vel_app, initial_polar_data = aerodynamic_vsm.initialize(
-        kite_name,
-        PROJECT_DIR,
+        aero_geometry_path,
         config,
         n_panels_aero,
     )
@@ -98,7 +89,16 @@ def main():
         linktype_arr,
         pulley_line_indices,
         pulley_line_to_other_node_pair_dict,
-    ) = read_struc_geometry_level_2_yaml.main(struc_geometry)
+    ) = read_struc_geometry_yaml_level_2.main(struc_geometry)
+
+    #####################################################
+    ### rotating the initial geometry by some angle,
+    ### to enable the wind to be horizontal
+    #####################################################
+    struc_nodes = rotate_geometry(
+        struc_nodes,
+        config.get("initial_geometry_rotation_deg", 0.0),
+    )
 
     # logging initial conditions
     logging.info(f"\n\nINITIAL CONDITIONS, NODES \n")
@@ -112,39 +112,7 @@ def main():
         )
 
     if config["structural_solver"] == "pss":
-        ## pss -- https://github.com/awegroup/Particle_System_Simulator
-        ##TODO: Fix the comment below, it SHOULD read l0
-        # Note: ParticleSystem doesn’t read l0_arr. SpringDamper sets l0
-        # from the initial particle positions.
-        # So l0_arr is a bookkeeping array for you, not used at instantiation.
-        (psystem, pss_initial_conditions, pss_params, struc_nodes_initial) = (
-            structural_pss.instantiate(
-                # yaml files
-                config,
-                # node level
-                struc_nodes,
-                m_arr,
-                # element_level
-                kite_connectivity_arr,
-                l0_arr,
-                k_arr,
-                c_arr,
-                linktype_arr,
-                pulley_line_to_other_node_pair_dict,
-            )
-        )
-        if config["is_with_initial_structure_plot"]:
-            structural_pss.plot_3d_kite_structure(
-                struc_nodes,
-                kite_connectivity_arr,
-                power_tape_index,
-                k_arr=k_arr,
-                c_arr=c_arr,
-                linktype_arr=linktype_arr,
-                pulley_nodes=pulley_node_indices,
-            )
-        # setting kite_fem related output to None
-        kite_fem_structure = None
+        raise NotImplementedError("PSS solver is not implemented for level 2")
 
     elif config["structural_solver"] == "kite_fem":
         ### kite_fem -- https://github.com/awegroup/kite_fem
@@ -170,6 +138,8 @@ def main():
         )
         # setting psm related output to None
         psystem = None
+        # resetting struc_nodes, to the relaxed geometry
+        struc_nodes = np.array(struc_nodes_initial, copy=True)
 
     else:
         raise ValueError("Invalid structural solver specified, either pss or pyfe3d")
@@ -177,7 +147,7 @@ def main():
     ##################
     ### AERO2STRUC ###
     ##################
-    aero2struc_mapping = aero2struc.initialize_mapping(
+    aero2struc_mapping = aero2struc_level_2.initialize_mapping(
         body_aero.panels,
         struc_nodes,
         struc_node_le_indices,
@@ -259,6 +229,9 @@ def main():
         ### STRUC
         psystem=psystem,
         kite_fem_structure=kite_fem_structure,
+        #### TODO: add these back when you switch to better aero2struc coupling
+        canopy_sections=canopy_sections,
+        strut_sections=strut_sections,
     )
 
     # Save results
