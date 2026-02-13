@@ -17,6 +17,7 @@ from kitesim.utils import (
     load_sim_output,
     save_results,
     printing_rest_lengths,
+    rotate_geometry,
 )
 from kitesim import (
     aero2struc_level_2,
@@ -98,6 +99,15 @@ def main():
         pulley_line_indices,
         pulley_line_to_other_node_pair_dict,
     ) = read_struc_geometry_yaml_level_2.main(struc_geometry)
+
+    #####################################################
+    ### rotating the initial geometry by some angle,
+    ### to enable the wind to be horizontal
+    #####################################################
+    struc_nodes = rotate_geometry(
+        struc_nodes,
+        config.get("initial_geometry_rotation_deg", 0.0),
+    )
 
     # logging initial conditions
     logging.info(f"\n\nINITIAL CONDITIONS, NODES \n")
