@@ -35,7 +35,7 @@ def main():
     kite_name = "TUDELFT_V3_KITE"  # the dir name with the relevant .yaml files
     # kite_name = "3plate_kite"  # the dir name with the relevant .yaml files
     # load config.yaml & geometry.yaml, save both, and return them as dicts
-    config_path = Path(PROJECT_DIR) / "data" / f"{kite_name}" / "config.yaml"
+    config_path = Path(PROJECT_DIR) / "data" / f"{kite_name}" / "config_level_2.yaml"
     struc_geometry_path = (
         Path(PROJECT_DIR)
         / "data"
@@ -111,40 +111,9 @@ def main():
         )
 
     if config["structural_solver"] == "pss":
-        ## pss -- https://github.com/awegroup/Particle_System_Simulator
-        ##TODO: Fix the comment below, it SHOULD read l0
-        # Note: ParticleSystem doesn’t read l0_arr. SpringDamper sets l0
-        # from the initial particle positions.
-        # So l0_arr is a bookkeeping array for you, not used at instantiation.
-        (psystem, pss_initial_conditions, pss_params, struc_nodes_initial) = (
-            structural_pss.instantiate(
-                # yaml files
-                config,
-                # node level
-                struc_nodes,
-                m_arr,
-                # element_level
-                kite_connectivity_arr,
-                l0_arr,
-                k_arr,
-                c_arr,
-                linktype_arr,
-                pulley_line_to_other_node_pair_dict,
-            )
+        raise NotImplementedError(
+            "PSS structural solver is not implemented for level 2, set structural_solver to kite_fem."
         )
-        if config["is_with_initial_structure_plot"]:
-            structural_pss.plot_3d_kite_structure(
-                struc_nodes,
-                kite_connectivity_arr,
-                power_tape_index,
-                k_arr=k_arr,
-                c_arr=c_arr,
-                linktype_arr=linktype_arr,
-                pulley_nodes=pulley_node_indices,
-            )
-        # setting kite_fem related output to None
-        kite_fem_structure = None
-
     elif config["structural_solver"] == "kite_fem":
         ### kite_fem -- https://github.com/awegroup/kite_fem
         (

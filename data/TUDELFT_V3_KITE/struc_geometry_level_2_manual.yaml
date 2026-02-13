@@ -1,6 +1,9 @@
 bridle_point_node: [0, 0, 0]
 pulley_mass: 0.1
 kcu_mass: 8.4
+pressure: 0.3      #[bar]
+canopy_density: 170   #[g/m^2]
+mass_without_bridles: 11  #[kg]
 dyneema:
   density: 724
   youngs_modulus: 550000000
@@ -361,7 +364,7 @@ bridle_connections:
   - [Power Tape,123,0]
   - [Steering Tape,125,0]
 bridle_lines:
-  headers: [name, rest_length, diameter, material, density]
+  headers: [name, rest_length, diameter, material, linktype]
   data:
   - [a1, 0.214896, 0.002, dyneema, "noncompressive"]
   - [a2, 0.207939, 0.002, dyneema, "noncompressive"]

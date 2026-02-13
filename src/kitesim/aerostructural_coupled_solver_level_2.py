@@ -109,7 +109,9 @@ def _compute_power_tape_increment(
         return 0.0, False
 
     # Always move toward target and clamp to avoid overshoot.
-    increment = np.sign(remaining) * min(np.abs(power_tape_extension_step), np.abs(remaining))
+    increment = np.sign(remaining) * min(
+        np.abs(power_tape_extension_step), np.abs(remaining)
+    )
     return increment, True
 
 
@@ -234,6 +236,7 @@ def check_convergence(
     f_residual_list,
     f_aero_wing_vsm_format,
     config,
+    stagnation_check_start=0,
 ):
     """
     Check convergence conditions for the aero-structural solver.
@@ -244,14 +247,22 @@ def check_convergence(
         f_residual_list: List of residual force norms from all iterations
         f_aero_wing_vsm_format: Aerodynamic forces in VSM format
         config: Configuration dictionary
+        stagnation_check_start: Iteration index from which to check stagnation
+            (reset when switching regularization phase)
 
     Returns:
-        tuple: (is_convergence, should_break)
+        tuple: (is_convergence, should_break, is_stagnated)
             - is_convergence: True if converged, False otherwise
             - should_break: True if loop should break, False to continue
+            - is_stagnated: True if residual has stagnated (no longer changing)
     """
     is_convergence = False
     should_break = False
+    is_stagnated = False
+
+    n_stag = config["aero_structural_solver"].get("n_max_constant_residual_force", 15)
+    # Number of iterations since the stagnation check window started
+    iters_since_start = i - stagnation_check_start
 
     ### All the convergence checks, are be done in if-elif because only 1 should hold at once
     # if convergence (residual below set tolerance)
@@ -264,14 +275,12 @@ def check_convergence(
         logging.info("Classic PS diverged - residual force is NaN")
         should_break = True
 
-    # if residual forces are not changing anymore
-    elif (
-        i > 15
-        and np.abs(np.mean(f_residual_list[i - 15]) - f_residual_list[i - 10]) < 1
-    ):
+    # if residual forces are not changing anymore (compare start of window vs current)
+    elif iters_since_start > n_stag and np.abs(
+        f_residual_list[i - n_stag] - f_residual_list[i]
+    ) < config["aero_structural_solver"].get("stagnation_tol", 1.0):
         is_convergence = False
-        logging.info("Classic PS non-converging - residual no longer changes")
-        should_break = True
+        is_stagnated = True
 
     # if too many iterations are needed
     elif i > config["aero_structural_solver"]["max_iter"]:
@@ -291,7 +300,7 @@ def check_convergence(
         logging.info("Classic PS non-converging - aero forces are NaN")
         should_break = True
 
-    return is_convergence, should_break
+    return is_convergence, should_break, is_stagnated
 
 
 def main(
@@ -340,6 +349,8 @@ def main(
         meta (dict): Dictionary with meta information about the simulation (timing, convergence, etc).
     """
 
+    print(f'--> Running structural_solver: {config["structural_solver"]}')
+
     ## PRELOOP
     if config["is_with_gravity"]:
         f_ext_gravity = np.array(
@@ -351,11 +362,9 @@ def main(
     if config["structural_solver"] == "kite_fem":
         rest_lengths = kite_fem_structure.modify_get_spring_rest_length()
 
-    t_vector = np.linspace(
-        1,
-        config["aero_structural_solver"]["max_iter"],
-        config["aero_structural_solver"]["max_iter"],
-    )
+    max_iter = config["aero_structural_solver"]["max_iter"]
+    # Keep index 0 for the pre-loop initial state and reserve max_iter loop slots.
+    t_vector = np.linspace(0, max_iter, max_iter + 1)
     tracking_data = tracking.setup_tracking_arrays(len(struc_nodes), t_vector)
     is_convergence = False
     f_residual_list = []
@@ -364,6 +373,14 @@ def main(
     struc_nodes_prev = None  # Initialize previous points for tracking
     start_time = time.time()
     plotting.set_plot_style()
+
+    # Two-phase regularization: phase 1 = with pseudo_dt, phase 2 = without
+    reg_phase = 1  # 1 = regularized, 2 = unregularized (polish)
+    stagnation_check_start = 0  # iteration at which current phase started
+
+    # Aitken relaxation state
+    omega_relaxation = config["aero_structural_solver"].get("relaxation_factor", 0.3)
+    r_prev_flat = None
 
     # Build symmetry mapping once from initial (undeformed) geometry
     if config["is_with_forcing_symmetry"]:
@@ -462,6 +479,14 @@ def main(
         body_aero.panels,
     )
 
+    # Check moment preservation of aero→struc mapping (pre-loop)
+    aero2struc_level_2.check_moment_preservation(
+        f_aero_panel=f_aero_wing_vsm_format,
+        panel_cps=np.array(results_aero["panel_cp_locations"]),
+        f_aero_mapped=f_aero_wing,
+        struc_nodes=struc_nodes,
+    )
+
     ### BRIDLE AERO
     f_aero_bridle = aerodynamic_bridle_line_drag.main(
         struc_nodes,
@@ -482,13 +507,14 @@ def main(
     # SIMULATION LOOP
     ######################################################################
     ## propagating the simulation for each timestep and saving results
-    with tqdm(total=len(t_vector), desc="Simulating", leave=True) as pbar:
-        for i, step in enumerate(t_vector):
+    with tqdm(total=max_iter, desc="Simulating", leave=True) as pbar:
+        for i in range(max_iter):
             if i > 0:
                 struc_nodes_prev = struc_nodes.copy()
 
-            ### STRUC
-            end_time_f_ext = time.time()
+            ########################################################
+            ############## INTERNAL FORCE CALCULATION ##############
+            ########################################################
             begin_time_f_int = time.time()
             if config["structural_solver"] == "pss":
                 psystem, is_structural_converged, struc_nodes, f_int = (
@@ -505,6 +531,50 @@ def main(
                     )
                 )
             end_time_f_int = time.time()
+
+            ### Aitken relaxation of structural nodes
+            if struc_nodes_prev is not None:
+                r_k = struc_nodes - struc_nodes_prev
+                r_k_flat = r_k.flatten()
+
+                if (
+                    config["aero_structural_solver"].get(
+                        "is_with_aitken_relaxation", True
+                    )
+                    and r_prev_flat is not None
+                ):
+                    delta_r = r_k_flat - r_prev_flat
+                    denom = np.dot(delta_r, delta_r)
+                    if denom > 1e-30:
+                        omega_relaxation = -omega_relaxation * (
+                            np.dot(r_prev_flat, delta_r) / denom
+                        )
+                        omega_relaxation = np.clip(omega_relaxation, 0.05, 1.0)
+
+                struc_nodes = struc_nodes_prev + omega_relaxation * r_k
+                r_prev_flat = r_k_flat.copy()
+                logging.debug(f"Aitken relaxation omega: {omega_relaxation:.4f}")
+
+                # Sync relaxed positions back to structural solver state
+                if config["structural_solver"] == "pss":
+                    for idx, particle in enumerate(psystem.particles):
+                        particle.update_pos(struc_nodes[idx])
+                        particle.update_vel(np.zeros(3))
+                elif config["structural_solver"] == "kite_fem":
+                    # Update kite_fem so the next solve() starts from the
+                    # Aitken-relaxed geometry instead of the original construction
+                    # geometry.  coords_rotations_init is the reference that
+                    # solve() adds displacements to, so moving it here makes the
+                    # Newton-Raphson start near the current state.
+                    flat_xyz = struc_nodes.flatten()
+                    kite_fem_structure.coords_current = flat_xyz.copy()
+                    # Build the 6-DOF vector [x,y,z, 0,0,0] per node
+                    n_nodes = len(struc_nodes)
+                    coords_rot = np.zeros(n_nodes * 6)
+                    for ni in range(n_nodes):
+                        coords_rot[6 * ni : 6 * ni + 3] = struc_nodes[ni]
+                    kite_fem_structure.coords_rotations_init = coords_rot.copy()
+                    kite_fem_structure.coords_rotations_current = coords_rot.copy()
 
             ### PLOT per iteration
             if config["is_with_struc_plot_per_iteration"]:
@@ -569,6 +639,15 @@ def main(
                 body_aero.panels,
             )
 
+            # Check moment preservation (only first coupling iteration to limit log spam)
+            if i == 1:
+                aero2struc_level_2.check_moment_preservation(
+                    f_aero_panel=f_aero_wing_vsm_format,
+                    panel_cps=np.array(results_aero["panel_cp_locations"]),
+                    f_aero_mapped=f_aero_wing,
+                    struc_nodes=struc_nodes,
+                )
+
             ### BRIDLE AERO
             if config["is_with_aero_bridle"]:
                 f_aero_bridle = aerodynamic_bridle_line_drag.main(
@@ -588,6 +667,7 @@ def main(
             f_ext = f_aero + f_ext_gravity
             f_ext = np.round(f_ext, 5)
             f_ext_flat = f_ext.flatten()
+            end_time_f_ext = time.time()
 
             ### FORCING SYMMETRY
             if config["is_with_forcing_symmetry"]:
@@ -595,21 +675,29 @@ def main(
                 struc_nodes = forcing_symmetry(struc_nodes, symmetry_mapping)
 
             ### RESIDUAL
+            f_residual = f_int + f_ext_flat
+
+            # Zero out residual at fixed (constrained) nodes — their imbalance
+            # is carried by the constraint reaction force, not by f_int.
+            # Without this, the residual includes e.g. the weight of node 0
+            # (~92 N) which can never converge to zero.
             if config["structural_solver"] == "pss":
-                f_residual = f_int + f_ext_flat
-                f_residual_list.append(np.linalg.norm(np.abs(f_residual)))
+                for fix_idx in config["structural_pss"]["fixed_point_indices"]:
+                    f_residual[3 * fix_idx : 3 * fix_idx + 3] = 0.0
+
+            f_residual_list.append(np.linalg.norm(np.abs(f_residual)))
+            if config["structural_solver"] == "pss":
                 logging.debug(
                     f"residual force in y-direction: {np.sum([f_residual[1::3]]):.3f}N"
                 )
-            elif config["structural_solver"] == "kite_fem":
-                f_residual = f_int + f_ext_flat
-                f_residual_list.append(np.linalg.norm(np.abs(f_residual)))
 
             ### TRACKING
             # Update unified tracking dataframe (replaces position update)
+            # Use i+1 so that positions[0] retains the true initial geometry
+            # stored in the pre-loop call.
             tracking.update_tracking_arrays(
                 tracking_data,
-                i,
+                i + 1,
                 struc_nodes,
                 f_ext_flat,
                 f_residual,
@@ -626,13 +714,32 @@ def main(
             pbar.update(1)
 
             ### CHECK CONVERGENCE
-            is_convergence, should_break = check_convergence(
+            is_convergence, should_break, is_stagnated = check_convergence(
                 i=i,
                 f_residual=f_residual,
                 f_residual_list=f_residual_list,
                 f_aero_wing_vsm_format=f_aero_wing_vsm_format,
                 config=config,
+                stagnation_check_start=stagnation_check_start,
             )
+
+            # Two-phase regularization: on stagnation in phase 1, disable
+            # pseudo_dt and continue to let the solver polish to true equilibrium.
+            if is_stagnated:
+                if reg_phase == 1 and config["structural_solver"] == "kite_fem":
+                    reg_phase = 2
+                    stagnation_check_start = i  # reset stagnation window
+                    config["structural_kite_fem"]["pseudo_dt"] = None
+                    logging.info(
+                        f"Phase 1 stagnated at iter {i} "
+                        f"(res={np.linalg.norm(f_residual):.1f}N). "
+                        f"Switching to phase 2: pseudo_dt=None (no regularization)."
+                    )
+                else:
+                    logging.info(
+                        "Classic PS non-converging - residual no longer changes"
+                    )
+                    should_break = True
 
             ### ACTUATION (only when converged)
             if is_convergence:

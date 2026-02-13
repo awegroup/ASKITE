@@ -1,24 +1,21 @@
 import numpy as np
 import logging
 
-def initialize_particles(
-    struc_geometry,
-    struc_nodes,
-    m_arr
-):
+
+def initialize_particles(struc_geometry, struc_nodes, m_arr):
     """
     Initialize particles for the kite structure.
-    
+
     This function adds wing and bridle particles to the structural nodes list
     and initializes their masses to zero. It also identifies leading edge and
     trailing edge node indices based on even/odd node indexing, and generates
     additional canopy section nodes between struts.
-    
+
     Args:
         struc_geometry (dict): Dictionary containing structural geometry data
         struc_nodes (list): List to append particle positions to
         m_arr (list): List to append particle masses to
-    
+
     Returns:
         tuple: (struc_nodes, m_arr, struc_node_le_indices, struc_node_te_indices,
                 strut_node_le_indices, strut_node_te_indices, canopy_sections)
@@ -30,7 +27,7 @@ def initialize_particles(
     struc_node_te_indices = []
 
     for node_idx, x, y, z in struc_geometry["wing_particles"]["data"]:
-    # node_indices.append(node_idx)
+        # node_indices.append(node_idx)
         struc_nodes.append(np.array([x, y, z]))
         m_arr.append(0)
         # if uneven --> this is a leading-edge node
@@ -40,46 +37,71 @@ def initialize_particles(
             struc_node_te_indices.append(node_idx)
 
     for node_idx, x, y, z in struc_geometry["bridle_particles"]["data"]:
-    # node_indices.append(node_idx)
+        # node_indices.append(node_idx)
         struc_nodes.append(np.array([x, y, z]))
         m_arr.append(0)
 
-
-
-    
-    #add extra nodes for canopy
+    # add extra nodes for canopy
     strut_node_le_indices = []
     strut_node_te_indices = []
     strut_indices = []
     nodes_per_strut = int(0)
-    for name, ci, cj, strut_diam_le, strut_diam_te, le_diameter, node_indices in struc_geometry["strut_tubes"]["data"]:
+    for (
+        name,
+        ci,
+        cj,
+        strut_diam_le,
+        strut_diam_te,
+        le_diameter,
+        node_indices,
+    ) in struc_geometry["strut_tubes"]["data"]:
         strut_node_le_indices.append(ci)
         strut_node_te_indices.append(cj)
-        nodes_per_strut = max(len(node_indices),nodes_per_strut)
+        nodes_per_strut = max(len(node_indices), nodes_per_strut)
         strut_indices.append(node_indices)
 
-    canopy_section_le_indices = [idx for idx in struc_node_le_indices if idx not in strut_node_le_indices]
-    canopy_section_te_indices = [idx for idx in struc_node_te_indices if idx not in strut_node_te_indices]
+    canopy_section_le_indices = [
+        idx for idx in struc_node_le_indices if idx not in strut_node_le_indices
+    ]
+    canopy_section_te_indices = [
+        idx for idx in struc_node_te_indices if idx not in strut_node_te_indices
+    ]
     canopy_sections = []
 
-    #TODO: Add extra nodes along chord here, make input through configuration file?
+    # TODO: Add extra nodes along chord here, make input through configuration file?
     nodes_per_strut += 1
 
+    # Handle strut node indices that reference non-existent particles
+    # (e.g., le_tip_start references nodes 132, 134 which don't exist in wing/bridle data)
+    for indices in strut_indices:
+        for j in range(1, len(indices) - 1):  # Only check intermediate nodes
+            idx = indices[j]
+            if idx >= len(struc_nodes):
+                # Interpolate position from strut endpoints
+                start = struc_nodes[indices[0]]
+                end = struc_nodes[indices[-1]]
+                ratio = j / (len(indices) - 1)
+                new_pos = start + ratio * (end - start)
+                new_list_idx = len(struc_nodes)
+                struc_nodes.append(new_pos)
+                m_arr.append(0)
+                indices[j] = new_list_idx  # Remap to valid list index
+
     # add extra nodes along struts such that the amount per strut is the same
-    for i,indices in enumerate(strut_indices):
+    for i, indices in enumerate(strut_indices):
         nodes = len(indices)
-        missing_nodes = nodes_per_strut-nodes
+        missing_nodes = nodes_per_strut - nodes
         for i in range(missing_nodes):
             coords_front = struc_nodes[indices[-3]]
             coords_back = struc_nodes[indices[-2]]
-            ratio = (i+1)/(missing_nodes+1)
+            ratio = (i + 1) / (missing_nodes + 1)
             x = coords_front[0] + ratio * (coords_back[0] - coords_front[0])
             y = coords_front[1] + ratio * (coords_back[1] - coords_front[1])
             z = coords_front[2] + ratio * (coords_back[2] - coords_front[2])
             struc_nodes.append(np.array([x, y, z]))
             m_arr.append(0)
             node_idx += 1
-            indices.insert(-2,node_idx)
+            indices.insert(-2, node_idx)
 
     simplified_bridle_points = []
     for i, indices in enumerate(strut_indices):
@@ -91,51 +113,117 @@ def initialize_particles(
             idx = indices[j]
             current_pos = struc_nodes[idx]
             # Project current node onto the line between start and end
-            projection_scalar = np.dot(current_pos - start_pos, line_vector) / np.dot(line_vector, line_vector)
+            projection_scalar = np.dot(current_pos - start_pos, line_vector) / np.dot(
+                line_vector, line_vector
+            )
             projected_pos = start_pos + projection_scalar * line_vector
             struc_nodes[idx] = projected_pos
-            simplified_bridle_points.append([idx,current_pos,projected_pos])
+            simplified_bridle_points.append([idx, current_pos, projected_pos])
     simplified_bridle_points = np.array(simplified_bridle_points, dtype=object)
 
-
-    for n1,n2 in zip(canopy_section_le_indices,canopy_section_te_indices):
+    for n1, n2 in zip(canopy_section_le_indices, canopy_section_te_indices):
         # Find closest indices to n1 in strut_node_le_indices
         neg_distances = [(idx - n1) for idx in strut_node_le_indices if idx < n1]
-        strut_right_le = strut_node_le_indices[strut_node_le_indices.index(min(neg_distances, key=abs, default=n1) + n1)] if neg_distances else n1
+        strut_right_le = (
+            strut_node_le_indices[
+                strut_node_le_indices.index(
+                    min(neg_distances, key=abs, default=n1) + n1
+                )
+            ]
+            if neg_distances
+            else n1
+        )
         # Find closest index with positive offset
         pos_distances = [(idx - n1) for idx in strut_node_le_indices if idx > n1]
-        strut_left_le = strut_node_le_indices[strut_node_le_indices.index(min(pos_distances, key=abs, default=n1) + n1)] if pos_distances else n1
+        strut_left_le = (
+            strut_node_le_indices[
+                strut_node_le_indices.index(
+                    min(pos_distances, key=abs, default=n1) + n1
+                )
+            ]
+            if pos_distances
+            else n1
+        )
         # Find closest indices to n2 in strut_node_te_indices
         neg_distances = [(idx - n1) for idx in strut_node_te_indices if idx < n1]
-        strut_right_te = strut_node_te_indices[strut_node_te_indices.index(min(neg_distances, key=abs, default=n1) + n1)] if neg_distances else n1
+        strut_right_te = (
+            strut_node_te_indices[
+                strut_node_te_indices.index(
+                    min(neg_distances, key=abs, default=n1) + n1
+                )
+            ]
+            if neg_distances
+            else n1
+        )
         # Find closest index with positive offset
         pos_distances = [(idx - n2) for idx in strut_node_te_indices if idx > n2]
-        strut_left_te = strut_node_te_indices[strut_node_te_indices.index(min(pos_distances, key=abs, default=n2) + n2)] if pos_distances else n2
+        strut_left_te = (
+            strut_node_te_indices[
+                strut_node_te_indices.index(
+                    min(pos_distances, key=abs, default=n2) + n2
+                )
+            ]
+            if pos_distances
+            else n2
+        )
 
+        leading_edge_tube_indices = np.arange(strut_right_le, strut_left_le + 2, 2)
+        trailing_edge_tube_indics = np.arange(strut_right_te, strut_left_te + 2, 2)
+        leading_edge_tube_length = sum(
+            np.linalg.norm(
+                struc_nodes[leading_edge_tube_indices[i]]
+                - struc_nodes[leading_edge_tube_indices[i + 1]]
+            )
+            for i in range(len(leading_edge_tube_indices) - 1)
+        )
+        trailing_edge_tube_length = sum(
+            np.linalg.norm(
+                struc_nodes[trailing_edge_tube_indics[i]]
+                - struc_nodes[trailing_edge_tube_indics[i + 1]]
+            )
+            for i in range(len(trailing_edge_tube_indics) - 1)
+        )
+        ratio_le = (
+            np.linalg.norm(struc_nodes[n1] - struc_nodes[strut_right_le])
+            / leading_edge_tube_length
+        )
+        ratio_te = (
+            np.linalg.norm(struc_nodes[n1] - struc_nodes[strut_right_le])
+            / trailing_edge_tube_length
+        )
+        ratio_canopy = (ratio_le + ratio_te) / 2
 
-        leading_edge_tube_indices = np.arange(strut_right_le,strut_left_le+2,2)
-        trailing_edge_tube_indics = np.arange(strut_right_te,strut_left_te+2,2)
-        leading_edge_tube_length = sum(np.linalg.norm(struc_nodes[leading_edge_tube_indices[i]] - struc_nodes[leading_edge_tube_indices[i+1]]) for i in range(len(leading_edge_tube_indices)-1))
-        trailing_edge_tube_length = sum(np.linalg.norm(struc_nodes[trailing_edge_tube_indics[i]] - struc_nodes[trailing_edge_tube_indics[i+1]]) for i in range(len(trailing_edge_tube_indics)-1))
-        ratio_le = np.linalg.norm(struc_nodes[n1]-struc_nodes[strut_right_le])/leading_edge_tube_length
-        ratio_te = np.linalg.norm(struc_nodes[n1]-struc_nodes[strut_right_le])/trailing_edge_tube_length
-        ratio_canopy = (ratio_le+ratio_te)/2
-
-        length_right = np.linalg.norm(struc_nodes[strut_right_le]-struc_nodes[strut_right_te])
-        length_left = np.linalg.norm(struc_nodes[strut_left_le]-struc_nodes[strut_left_te])
+        length_right = np.linalg.norm(
+            struc_nodes[strut_right_le] - struc_nodes[strut_right_te]
+        )
+        length_left = np.linalg.norm(
+            struc_nodes[strut_left_le] - struc_nodes[strut_left_te]
+        )
 
         strut_indices_right = strut_indices[strut_node_le_indices.index(strut_right_le)]
         strut_indices_left = strut_indices[strut_node_le_indices.index(strut_left_le)]
 
-        canopy_section_length = np.linalg.norm(struc_nodes[n1]-struc_nodes[n2])
+        canopy_section_length = np.linalg.norm(struc_nodes[n1] - struc_nodes[n2])
         direction = struc_nodes[n2] - struc_nodes[n1]
         direction_normalized = direction / np.linalg.norm(direction)
         canopy_section_indices = [n1]
-        for n in range(1,nodes_per_strut-1):
-            l_ratio_right = np.linalg.norm(struc_nodes[strut_indices_right[n]]-struc_nodes[strut_right_le])/length_right
-            l_ratio_left = np.linalg.norm(struc_nodes[strut_indices_left[n]]-struc_nodes[strut_left_le])/length_left
-            l_ratio = l_ratio_right*(1-ratio_canopy)+l_ratio_left*ratio_canopy
-            coordinates = struc_nodes[n1] + canopy_section_length*l_ratio  * direction_normalized
+        for n in range(1, nodes_per_strut - 1):
+            l_ratio_right = (
+                np.linalg.norm(
+                    struc_nodes[strut_indices_right[n]] - struc_nodes[strut_right_le]
+                )
+                / length_right
+            )
+            l_ratio_left = (
+                np.linalg.norm(
+                    struc_nodes[strut_indices_left[n]] - struc_nodes[strut_left_le]
+                )
+                / length_left
+            )
+            l_ratio = l_ratio_right * (1 - ratio_canopy) + l_ratio_left * ratio_canopy
+            coordinates = (
+                struc_nodes[n1] + canopy_section_length * l_ratio * direction_normalized
+            )
             struc_nodes.append(coordinates)
             m_arr.append(0)
             node_idx += 1
@@ -152,7 +240,9 @@ def initialize_particles(
         strut_node_te_indices,
         canopy_sections,
         strut_sections,
-        simplified_bridle_points)
+        simplified_bridle_points,
+    )
+
 
 def initialize_wing_structure(
     struc_geometry,
@@ -179,45 +269,55 @@ def initialize_wing_structure(
     """
 
     # Struts
-    for name, ci, cj, strut_diam_le, strut_diam_te, le_diameter, node_indices in struc_geometry["strut_tubes"]["data"]:
+    for (
+        name,
+        ci,
+        cj,
+        strut_diam_le,
+        strut_diam_te,
+        le_diameter,
+        node_indices,
+    ) in struc_geometry["strut_tubes"]["data"]:
         c1s = node_indices[0:-1]
         c2s = node_indices[1:]
-        length = np.linalg.norm(struc_nodes[node_indices[0]]-struc_nodes[node_indices[-1]])
-        for c1,c2 in zip(c1s,c2s):
-            rest_length = np.linalg.norm(struc_nodes[c1]-struc_nodes[c2])
-            #determine diameter of element, scale linearly from le to te
-            l1 = np.linalg.norm(struc_nodes[ci]-struc_nodes[c1])
-            l2 = np.linalg.norm(struc_nodes[ci]-struc_nodes[c2])
-            diameter_n1 =  strut_diam_le - (strut_diam_le-strut_diam_te)/length*l1
-            diameter_n2 =  strut_diam_le - (strut_diam_le-strut_diam_te)/length*l2
-            diameter = (diameter_n1+diameter_n2)/2
-            mass = 2*np.pi*(diameter/2)*rest_length*170/1000
+        length = np.linalg.norm(
+            struc_nodes[node_indices[0]] - struc_nodes[node_indices[-1]]
+        )
+        for c1, c2 in zip(c1s, c2s):
+            rest_length = np.linalg.norm(struc_nodes[c1] - struc_nodes[c2])
+            # determine diameter of element, scale linearly from le to te
+            l1 = np.linalg.norm(struc_nodes[ci] - struc_nodes[c1])
+            l2 = np.linalg.norm(struc_nodes[ci] - struc_nodes[c2])
+            diameter_n1 = strut_diam_le - (strut_diam_le - strut_diam_te) / length * l1
+            diameter_n2 = strut_diam_le - (strut_diam_le - strut_diam_te) / length * l2
+            diameter = (diameter_n1 + diameter_n2) / 2
+            mass = 2 * np.pi * (diameter / 2) * rest_length * 170 / 1000
             # m_arr[c1] += mass/2
             # m_arr[c2] += mass/2
-            kite_connectivity_arr.append([c1,c2])
+            kite_connectivity_arr.append([c1, c2])
             l0_arr.append(rest_length)
-            k_arr.append(diameter) #use k array to store diameter
-            c_arr.append(struc_geometry["pressure"]) #use c array to store pressure
+            k_arr.append(diameter)  # use k array to store diameter
+            c_arr.append(struc_geometry["pressure"])  # use c array to store pressure
             linktype_arr.append("inflatable_beam")
     # for struct_sect in strut_sections:
     #     print(struct_sect)
 
-    #leading edge tube
+    # leading edge tube
     for name, ci, cj, diameter in struc_geometry["leading_edge_tubes"]["data"]:
-        rest_length = np.linalg.norm(struc_nodes[ci]-struc_nodes[cj])
-        mass = 2*np.pi*(diameter/2)*rest_length*170/1000
+        rest_length = np.linalg.norm(struc_nodes[ci] - struc_nodes[cj])
+        mass = 2 * np.pi * (diameter / 2) * rest_length * 170 / 1000
         # m_arr[ci] += mass/2
         # m_arr[cj] += mass/2
-        kite_connectivity_arr.append([ci,cj])
-        l0_arr.append(rest_length)  
-        k_arr.append(diameter) #use k array to store diameter
-        c_arr.append(struc_geometry["pressure"])  #use c array to store pressure
+        kite_connectivity_arr.append([ci, cj])
+        l0_arr.append(rest_length)
+        k_arr.append(diameter)  # use k array to store diameter
+        c_arr.append(struc_geometry["pressure"])  # use c array to store pressure
         linktype_arr.append("inflatable_beam")
 
-    #combine and order canopy_and strut sections by first indices
+    # combine and order canopy_and strut sections by first indices
     all_sections = canopy_sections + strut_sections
     all_sections.sort(key=lambda section: section[0])
-    
+
     # Connect canopy sections along chord
     for canopy_section in canopy_sections:
         c1s = canopy_section[0:-1]
@@ -230,42 +330,47 @@ def initialize_wing_structure(
             c_arr.append(0)
             linktype_arr.append("noncompressive")
 
-
-    #canopy connections (crosses and rectangles)
+    # canopy connections (crosses and rectangles)
     all_sections_1 = all_sections[0:-1]
     all_sections_2 = all_sections[1:]
-    for section1,section2 in zip(all_sections_1,all_sections_2):
+    for section1, section2 in zip(all_sections_1, all_sections_2):
         # Connect corresponding nodes between adjacent struts with squares and diagonals
         # Skip the first connection (section1[0] to section2[0])
         for i in range(1, len(section1)):
             if i < len(section2):
                 # Square connections: section1[i] to section2[i]
-                rest_length = np.linalg.norm(struc_nodes[section1[i]]-struc_nodes[section2[i]])
+                rest_length = np.linalg.norm(
+                    struc_nodes[section1[i]] - struc_nodes[section2[i]]
+                )
                 kite_connectivity_arr.append([section1[i], section2[i]])
                 l0_arr.append(rest_length)
                 k_arr.append(5000)
                 c_arr.append(0)
                 linktype_arr.append("noncompressive")
-                
+
                 # Diagonal connections: section1[i] to section2[i-1] (if i > 0)
                 if i > 0:
-                    rest_length = np.linalg.norm(struc_nodes[section1[i]]-struc_nodes[section2[i-1]])
-                    kite_connectivity_arr.append([section1[i], section2[i-1]])
-                    l0_arr.append(rest_length)
-                    k_arr.append(5000)
-                    c_arr.append(0)
-                    linktype_arr.append("noncompressive")
-                
-                # Diagonal connections: section1[i-1] to section2[i] (if i > 0)
-                if i > 0:
-                    rest_length = np.linalg.norm(struc_nodes[section1[i-1]]-struc_nodes[section2[i]])
-                    kite_connectivity_arr.append([section1[i-1], section2[i]])
+                    rest_length = np.linalg.norm(
+                        struc_nodes[section1[i]] - struc_nodes[section2[i - 1]]
+                    )
+                    kite_connectivity_arr.append([section1[i], section2[i - 1]])
                     l0_arr.append(rest_length)
                     k_arr.append(5000)
                     c_arr.append(0)
                     linktype_arr.append("noncompressive")
 
-    #assign masses canopy
+                # Diagonal connections: section1[i-1] to section2[i] (if i > 0)
+                if i > 0:
+                    rest_length = np.linalg.norm(
+                        struc_nodes[section1[i - 1]] - struc_nodes[section2[i]]
+                    )
+                    kite_connectivity_arr.append([section1[i - 1], section2[i]])
+                    l0_arr.append(rest_length)
+                    k_arr.append(5000)
+                    c_arr.append(0)
+                    linktype_arr.append("noncompressive")
+
+    # assign masses canopy
     def triangle_area(p1, p2, p3):
         # Vectors for two sides of the triangle
         v1 = p2 - p1
@@ -289,48 +394,62 @@ def initialize_wing_structure(
         section_b = canopy_sections[i + 1]
         # Create quads by connecting adjacent nodes in consecutive sections
         for j in range(len(section_a) - 1):
-            quad = [section_a[j], section_a[j+1], section_b[j+1], section_b[j]]
+            quad = [section_a[j], section_a[j + 1], section_b[j + 1], section_b[j]]
             # Get coordinates and calculate area
             corners = [struc_nodes[node] for node in quad]
             area = quad_area(corners[0], corners[1], corners[2], corners[3])
             # Distribute quad mass to its 4 nodes (each gets 1/4 of quad mass)
-            quad_mass = area * struc_geometry["canopy_density"] / 1000  # Convert g/m^2 to kg/m^2
+            quad_mass = (
+                area * struc_geometry["canopy_density"] / 1000
+            )  # Convert g/m^2 to kg/m^2
             for node in quad:
                 m_arr[node] += quad_mass / 4
-    
+
     mass_canopy = np.sum(m_arr)
 
-    le_indices = np.array(all_sections)[:,0]
+    le_indices = np.array(all_sections)[:, 0]
 
     # Calculate total length of inflatable tubes
     total_inflatable_length = 0
 
     # Add up lengths in leading edge
     for i in range(len(le_indices) - 1):
-        total_inflatable_length += np.linalg.norm(struc_nodes[le_indices[i]] - struc_nodes[le_indices[i+1]])
+        total_inflatable_length += np.linalg.norm(
+            struc_nodes[le_indices[i]] - struc_nodes[le_indices[i + 1]]
+        )
 
     # Add up lengths in strut sections
     for section in strut_sections:
         for j in range(len(section) - 1):
-            total_inflatable_length += np.linalg.norm(struc_nodes[section[j]] - struc_nodes[section[j+1]])
+            total_inflatable_length += np.linalg.norm(
+                struc_nodes[section[j]] - struc_nodes[section[j + 1]]
+            )
 
     # Calculate target mass for inflatable tubes
     target_mass_inflatable = struc_geometry["mass_without_bridles"] - mass_canopy
 
     # Distribute mass along leading edge based on segment lengths
     for i in range(len(le_indices) - 1):
-        segment_length = np.linalg.norm(struc_nodes[le_indices[i]] - struc_nodes[le_indices[i+1]])
-        segment_mass = target_mass_inflatable * (segment_length / total_inflatable_length)
+        segment_length = np.linalg.norm(
+            struc_nodes[le_indices[i]] - struc_nodes[le_indices[i + 1]]
+        )
+        segment_mass = target_mass_inflatable * (
+            segment_length / total_inflatable_length
+        )
         m_arr[le_indices[i]] += segment_mass / 2
-        m_arr[le_indices[i+1]] += segment_mass / 2
+        m_arr[le_indices[i + 1]] += segment_mass / 2
 
     # Distribute mass along strut sections based on segment lengths
     for section in strut_sections:
         for j in range(len(section) - 1):
-            segment_length = np.linalg.norm(struc_nodes[section[j]] - struc_nodes[section[j+1]])
-            segment_mass = target_mass_inflatable * (segment_length / total_inflatable_length)
+            segment_length = np.linalg.norm(
+                struc_nodes[section[j]] - struc_nodes[section[j + 1]]
+            )
+            segment_mass = target_mass_inflatable * (
+                segment_length / total_inflatable_length
+            )
             m_arr[section[j]] += segment_mass / 2
-            m_arr[section[j+1]] += segment_mass / 2
+            m_arr[section[j + 1]] += segment_mass / 2
 
     return (
         # node level
@@ -338,9 +457,9 @@ def initialize_wing_structure(
         m_arr,
         # element level
         kite_connectivity_arr,
-        l0_arr, # l
-        k_arr, # d
-        c_arr, # p
+        l0_arr,  # l
+        k_arr,  # d
+        c_arr,  # p
         linktype_arr,
     )
 
@@ -398,7 +517,9 @@ def initialize_bridle_line_system(
         # computing the mass of the bridle line, and adding it 0.5 to each particle using m_arr
         l0 = bridle_lines_dict[conn_name]["rest_length"]
         material = bridle_lines_dict[conn_name]["material"]
-        cross_sectional_area = np.pi * (bridle_lines_dict[conn_name]["diameter"] / 2) ** 2
+        cross_sectional_area = (
+            np.pi * (bridle_lines_dict[conn_name]["diameter"] / 2) ** 2
+        )
         m_line = struc_geometry[material]["density"] * cross_sectional_area * l0
 
         # If there is third connections, this line is a pulley!
@@ -440,29 +561,27 @@ def initialize_bridle_line_system(
                 l0
             )
             c = struc_geometry[material]["damping_per_stiffness"] * k
-            
+
             #######################################
-            #updating l0 to include simplification in bridle attachment point
-            
-            if ci in simplified_bridle_points[:,0]:
-                i = np.where(simplified_bridle_points[:,0] == ci)[0][0]
+            # updating l0 to include simplification in bridle attachment point
+
+            if ci in simplified_bridle_points[:, 0]:
+                i = np.where(simplified_bridle_points[:, 0] == ci)[0][0]
                 original_pos = simplified_bridle_points[i, 1]
                 projected_pos = simplified_bridle_points[i, 2]
-                original_lenth = np.linalg.norm(original_pos-struc_nodes[ck])
-                new_length = np.linalg.norm(projected_pos-struc_nodes[ck])
-                delta = original_lenth-new_length
+                original_lenth = np.linalg.norm(original_pos - struc_nodes[ck])
+                new_length = np.linalg.norm(projected_pos - struc_nodes[ck])
+                delta = original_lenth - new_length
                 l0 -= delta
 
-            if ck in simplified_bridle_points[:,0]:
-                i = np.where(simplified_bridle_points[:,0] == ck)[0][0]
+            if ck in simplified_bridle_points[:, 0]:
+                i = np.where(simplified_bridle_points[:, 0] == ck)[0][0]
                 original_pos = simplified_bridle_points[i, 1]
                 projected_pos = simplified_bridle_points[i, 2]
-                original_lenth = np.linalg.norm(original_pos-struc_nodes[ck])
-                new_length = np.linalg.norm(projected_pos-struc_nodes[ck])
-                delta = original_lenth-new_length
+                original_lenth = np.linalg.norm(original_pos - struc_nodes[ck])
+                new_length = np.linalg.norm(projected_pos - struc_nodes[ck])
+                delta = original_lenth - new_length
                 l0 -= delta
-
-
 
             #######################################
             # Dealing with ci-cj
@@ -504,7 +623,7 @@ def initialize_bridle_line_system(
             k_arr.append(5000)
             c_arr.append(c)
             linktype_arr.append(bridle_lines_dict[conn_name]["linktype"])
-            #add mass
+            # add mass
             m_arr[ci] += m_line / 4
             m_arr[cj] += m_line / 2
             m_arr[ck] += m_line / 4
@@ -538,22 +657,22 @@ def initialize_bridle_line_system(
                 struc_geometry[material]["damping_per_stiffness"] * k
             )  # Rayleigh damping
             #######################################
-            #updating l0 to include simplification in bridle attachment point
-            if ci in simplified_bridle_points[:,0]:
-                i = np.where(simplified_bridle_points[:,0] == ci)[0][0]
+            # updating l0 to include simplification in bridle attachment point
+            if ci in simplified_bridle_points[:, 0]:
+                i = np.where(simplified_bridle_points[:, 0] == ci)[0][0]
                 original_pos = simplified_bridle_points[i, 1]
                 projected_pos = simplified_bridle_points[i, 2]
-                original_lenth = np.linalg.norm(original_pos-struc_nodes[cj])
-                new_length = np.linalg.norm(projected_pos-struc_nodes[cj])
-                delta = original_lenth-new_length
+                original_lenth = np.linalg.norm(original_pos - struc_nodes[cj])
+                new_length = np.linalg.norm(projected_pos - struc_nodes[cj])
+                delta = original_lenth - new_length
                 l0 -= delta
-            elif cj in simplified_bridle_points[:,0]:
-                i = np.where(simplified_bridle_points[:,0] == cj)[0][0]
+            elif cj in simplified_bridle_points[:, 0]:
+                i = np.where(simplified_bridle_points[:, 0] == cj)[0][0]
                 original_pos = simplified_bridle_points[i, 1]
                 projected_pos = simplified_bridle_points[i, 2]
-                original_lenth = np.linalg.norm(original_pos-struc_nodes[ci])
-                new_length = np.linalg.norm(projected_pos-struc_nodes[ci])
-                delta = original_lenth-new_length
+                original_lenth = np.linalg.norm(original_pos - struc_nodes[ci])
+                new_length = np.linalg.norm(projected_pos - struc_nodes[ci])
+                delta = original_lenth - new_length
                 l0 -= delta
 
             m_arr[ci] += m_line / 2
@@ -617,9 +736,10 @@ def main(struc_geometry):
     k_arr = []
     c_arr = []
     linktype_arr = []
-    
-    #initialize particles
-    (   struc_nodes,
+
+    # initialize particles
+    (
+        struc_nodes,
         m_arr,
         struc_node_le_indices,
         struc_node_te_indices,
@@ -627,11 +747,8 @@ def main(struc_geometry):
         strut_node_te_indices,
         canopy_sections,
         strut_sections,
-        simplified_bridle_points
-    ) = initialize_particles(
-          struc_geometry,
-          struc_nodes,
-          m_arr)
+        simplified_bridle_points,
+    ) = initialize_particles(struc_geometry, struc_nodes, m_arr)
 
     ### Analyze Wing Structure
     (
@@ -654,7 +771,7 @@ def main(struc_geometry):
         c_arr,
         linktype_arr,
         canopy_sections,
-        strut_sections
+        strut_sections,
     )
 
     ### Analyze Bridle Structure
@@ -684,9 +801,8 @@ def main(struc_geometry):
         k_arr,
         c_arr,
         linktype_arr,
-        simplified_bridle_points
+        simplified_bridle_points,
     )
-
 
     # explicit numpy arrays
     struc_nodes = np.array(struc_nodes)

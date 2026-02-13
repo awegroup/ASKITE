@@ -1,7 +1,73 @@
+import logging
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
 from kitesim.plotting import plot_aerodynamic_forces_chordwise_distributed
+
+
+def check_moment_preservation(
+    f_aero_panel: np.ndarray,
+    panel_cps: np.ndarray,
+    f_aero_mapped: np.ndarray,
+    struc_nodes: np.ndarray,
+    ref_point: np.ndarray = None,
+) -> dict:
+    """
+    Check whether the aero→struc force mapping preserves total force and moment.
+
+    Args:
+        f_aero_panel:  (n_panels, 3) panel forces at their CPs.
+        panel_cps:     (n_panels, 3) panel control-point locations.
+        f_aero_mapped: (n_struc, 3)  mapped forces on structural nodes.
+        struc_nodes:   (n_struc, 3)  structural node positions.
+        ref_point:     (3,)  reference point for moment calc. Default: origin.
+
+    Returns:
+        dict with force/moment totals, errors, and relative moment error.
+    """
+    if ref_point is None:
+        ref_point = np.zeros(3)
+
+    # --- total force ---
+    F_aero = np.sum(f_aero_panel, axis=0)
+    F_struc = np.sum(f_aero_mapped, axis=0)
+    dF = F_struc - F_aero
+
+    # --- total moment about ref_point ---
+    M_aero = np.zeros(3)
+    for cp, frc in zip(panel_cps, f_aero_panel):
+        M_aero += np.cross(cp - ref_point, frc)
+
+    M_struc = np.zeros(3)
+    for node, frc in zip(struc_nodes, f_aero_mapped):
+        M_struc += np.cross(node - ref_point, frc)
+
+    dM = M_struc - M_aero
+    M_aero_norm = np.linalg.norm(M_aero)
+    dM_rel = np.linalg.norm(dM) / M_aero_norm if M_aero_norm > 1e-12 else 0.0
+
+    result = {
+        "F_aero_total": F_aero,
+        "F_struc_total": F_struc,
+        "dF": dF,
+        "dF_norm": np.linalg.norm(dF),
+        "M_aero": M_aero,
+        "M_struc": M_struc,
+        "dM": dM,
+        "dM_norm": np.linalg.norm(dM),
+        "dM_rel": dM_rel,
+    }
+
+    logging.info(
+        f"Moment preservation check (ref={ref_point}):\n"
+        f"  Force error  ||dF|| = {result['dF_norm']:.6e} N\n"
+        f"  Moment aero  ||M||  = {M_aero_norm:.3f} Nm\n"
+        f"  Moment error ||dM|| = {result['dM_norm']:.6e} Nm  "
+        f"(relative: {result['dM_rel']:.4%})\n"
+        f"  dM components = [{dM[0]:.4f}, {dM[1]:.4f}, {dM[2]:.4f}] Nm"
+    )
+
+    return result
 
 
 def build_ordered_sections(struc_nodes, canopy_sections, strut_sections):
