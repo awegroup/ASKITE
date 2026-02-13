@@ -67,7 +67,7 @@ structural_kite_fem:
   # Bridle relaxation preload on origin node(s), typically node 0 (KCU), in +z/-z solver coordinates.
   # Keep negative here to pull down in the current setup.
   relaxbridles_pull_down_force_z: !!float -1600.0 #roughly the aero dynamic loading at 12m/s
-  relaxbridles_settle_force_z: !!float -500.0
+  relaxbridles_settle_force_z: !!float -10.0
   print_info: !!bool false
   
 ## aero2struc
@@ -78,7 +78,7 @@ aero2struc:
 
 ## coupled
 aero_structural_solver:
-  max_iter: !!int 10
+  max_iter: !!int 6
   it_check: !!int 5
   tol: !!float 10
   is_with_aitken_relaxation: !!bool true
