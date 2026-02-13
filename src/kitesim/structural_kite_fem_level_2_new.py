@@ -142,36 +142,36 @@ def instantiate(
 
 
 def get_rest_lengths(kite_fem_structure, kite_connectivity_arr):
-    # get connectivity data kite_fem and kite_connectivity
-    n1s = []
-    n2s = []
-    n1_conn = []
-    n2_conn = []
-    springtypes = []
-    for spring_element in kite_fem_structure.spring_elements:
-        n1s.append(spring_element.spring.n1)
-        n2s.append(spring_element.spring.n2)
-        springtypes.append(spring_element.springtype)
-    for connectivity in kite_connectivity_arr:
-        n1_conn.append(connectivity[0])
-        n2_conn.append(connectivity[1])
+    # Build lookup of ASKITE connectivity key -> rest length.
+    # Use both spring and beam elements so inflatable_beam entries are covered.
+    l0_map = {}
 
-    # get rest lengths
-    l0s = kite_fem_structure.modify_get_spring_rest_length()
+    # Spring elements (including pulley elements)
+    spring_l0s = kite_fem_structure.modify_get_spring_rest_length()
+    for spring_element, l0 in zip(kite_fem_structure.spring_elements, spring_l0s):
+        n1 = int(spring_element.spring.n1)
+        n2 = int(spring_element.spring.n2)
+        key = (min(n1, n2), max(n1, n2))
+        if spring_element.springtype == "pulley":
+            l0 = l0 / 2
+        l0_map[key] = float(l0)
 
-    for i, springtype in enumerate(springtypes):
-        if springtype == "pulley":
-            l0s[i] /= 2
+    # Beam elements (inflatable beams)
+    for beam_element in kite_fem_structure.beam_elements:
+        n1 = int(beam_element.beam.n1)
+        n2 = int(beam_element.beam.n2)
+        key = (min(n1, n2), max(n1, n2))
+        l0_map[key] = float(beam_element.L)
 
-    # Map l0s from kitefem output to askite input
-    l0_map = {(min(n1, n2), max(n1, n2)): l0 for n1, n2, l0 in zip(n1s, n2s, l0s)}
+    # Map to ASKITE connectivity ordering. Use NaN for unmatched keys to keep
+    # the array numeric and HDF5-compatible.
     mapped_l0s = []
-    for n1c, n2c in zip(n1_conn, n2_conn):
+    for connectivity in kite_connectivity_arr:
+        n1c, n2c = int(connectivity[0]), int(connectivity[1])
         key = (min(n1c, n2c), max(n1c, n2c))
-        l0_val = l0_map.get(key)
-        mapped_l0s.append(l0_val)
-    mapped_l0s = np.array(mapped_l0s)
-    return mapped_l0s
+        mapped_l0s.append(l0_map.get(key, np.nan))
+
+    return np.asarray(mapped_l0s, dtype=np.float64)
 
 
 def run_kite_fem(

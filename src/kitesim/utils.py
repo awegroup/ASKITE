@@ -129,8 +129,10 @@ def calculate_projected_area(points):
 
 def printing_rest_lengths(tracking_data, struc_geometry):
     """
-    Print the current and initial rest lengths of all bridle lines defined in bridle_elements by
-    averaging the lengths of all their segments in bridle_connections.
+    Print current and initial lengths of bridle lines by averaging the lengths
+    of their segments in bridle_connections.
+
+    Supports both legacy `bridle_elements` and newer `bridle_lines` YAML schemas.
 
     For each connection:
     - if 3 nodes, sum ci-cj and cj-ck
@@ -140,12 +142,18 @@ def printing_rest_lengths(tracking_data, struc_geometry):
     struc_nodes = positions[-1]  # current positions
     initial_struc_nodes = positions[0]  # initial positions
 
-    bridle_elements_data = struc_geometry["bridle_elements"]["data"]
-    bridle_line_names = [row[0] for row in bridle_elements_data]
+    if "bridle_elements" in struc_geometry:
+        bridle_defs_data = struc_geometry["bridle_elements"]["data"]
+    elif "bridle_lines" in struc_geometry:
+        bridle_defs_data = struc_geometry["bridle_lines"]["data"]
+    else:
+        raise KeyError("Expected 'bridle_elements' or 'bridle_lines' in struc_geometry")
+
+    bridle_line_names = [row[0] for row in bridle_defs_data]
     bridle_connections_data = struc_geometry["bridle_connections"]["data"]
 
     # YAML l0 lookup dictionary
-    bridle_elements_yaml = {row[0]: row[1] for row in bridle_elements_data}
+    bridle_elements_yaml = {row[0]: row[1] for row in bridle_defs_data}
 
     # Collect data rows: (line_name, curr_length, yaml_l0, delta_pct, initial_nodal_dist)
     rows = []
@@ -197,6 +205,10 @@ def printing_rest_lengths(tracking_data, struc_geometry):
             )
 
             rows.append((line_name, curr_l, yaml_l0_val, delta_pct, init_nodal_dist))
+
+    if not rows:
+        print("\nNo bridle lines with matching connections found.")
+        return
 
     # Determine column widths for aligned output
     name_w = max(len(r[0]) for r in rows) if rows else 10
