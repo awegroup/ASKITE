@@ -69,7 +69,9 @@ structural_kite_fem:
   relaxbridles_pull_down_force_z: !!float -1600.0 #roughly the aero dynamic loading at 12m/s
   relaxbridles_settle_force_z: !!float -10.0
   print_info: !!bool false
-  
+  update_stiffness: !!bool true #Stiffen each spring with elongations higher than 1% on each iteration
+  max_stiffness: !!int 50000 #Maximum value of spring stiffness, when updated using update_stiffness
+
 ## aero2struc
 aero2struc:
   coupling_method: !!str "NN"

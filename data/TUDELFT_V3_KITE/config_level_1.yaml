@@ -69,7 +69,9 @@ structural_kite_fem:
   pseudo_dt: !!float 0.1 #0.05 # pseudo-transient timestep [s] for mass-proportional regularization. 
   k_reg_min: !!float 200.0 # minimum regularization stiffness [N/m] floor for light bridle/steering nodes
   print_info: !!bool false
-  
+  update_stiffness: !!bool true #Stiffen each spring with elongations higher than 1% on each iteration
+  max_stiffness: !!int 50000 #Maximum value of spring stiffness, when updated using update_stiffness
+
 ## aero2struc
 aero2struc:
   coupling_method: !!str "NN"

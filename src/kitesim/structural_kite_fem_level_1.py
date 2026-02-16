@@ -273,8 +273,8 @@ def run_kite_fem(
         k_reg_min=config_structural_kite_fem.get("k_reg_min", 0.0),
         print_info=config_structural_kite_fem["print_info"],
     )
-
-    # adapt_stiffnesses(kite_fem_structure)  # disabled: doubles k every iter for >1% strain springs
+    if config_structural_kite_fem["update_stiffness"]:
+        adapt_stiffnesses(kite_fem_structure,max_stiffness=config_structural_kite_fem["max_stiffness"])  #increases k every iter for >1% strain springs
 
     struc_nodes = kite_fem_structure.coords_current
     # reshape from flat to (n_nodes, 3)
