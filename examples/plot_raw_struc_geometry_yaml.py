@@ -283,4 +283,8 @@ if __name__ == "__main__":
         / "TUDELFT_V3_KITE"
         / "struc_geometry_level_2_manual.yaml"
     )
+    example_yaml_path = (
+        Path(PROJECT_DIR)
+        / "results/TUDELFT_V3_KITE/2026_02_12_1025h_pss/struc_geometry.yaml"
+    )
     plot_struct_geometry_all_in_surfplan_yaml(example_yaml_path)

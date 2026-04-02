@@ -226,17 +226,95 @@ def printing_rest_lengths(tracking_data, struc_geometry):
         )
 
 
+def _axis_to_unit_vector(axis, name="axis"):
+    """
+    Convert an axis definition to a unit 3D vector.
+
+    Accepted forms:
+      - labels: "x", "y", "z"
+      - vectors: array-like with 3 numeric components
+    """
+    if isinstance(axis, str):
+        axis_label = axis.strip().lower()
+        axis_map = {
+            "x": np.array([1.0, 0.0, 0.0]),
+            "y": np.array([0.0, 1.0, 0.0]),
+            "z": np.array([0.0, 0.0, 1.0]),
+        }
+        if axis_label not in axis_map:
+            raise ValueError(
+                f"Invalid {name} label '{axis}'. Allowed labels are 'x', 'y', 'z'."
+            )
+        vec = axis_map[axis_label]
+    else:
+        vec = _to_3_vector(axis, name)
+
+    norm = np.linalg.norm(vec)
+    if norm <= 1e-15:
+        raise ValueError(f"{name} must be non-zero. Got {vec}.")
+    return vec / norm
+
+
+def _normalize_axes(axes):
+    """
+    Normalize a 3-axis sequence into three unit vectors.
+
+    Supported input layouts:
+      - ("x", "y", "z")
+      - ([1,0,0], [0,1,0], [0,0,1])
+      - np.array([[1,0,0],[0,1,0],[0,0,1]])
+    """
+    axes_arr = np.asarray(axes, dtype=object)
+    if axes_arr.ndim == 1:
+        if axes_arr.shape[0] != 3:
+            raise ValueError(
+                f"`axes` must contain exactly 3 axis definitions. Got {axes_arr.shape[0]}."
+            )
+        axis_defs = list(axes_arr)
+    elif axes_arr.ndim == 2 and axes_arr.shape == (3, 3):
+        axis_defs = [axes_arr[i, :] for i in range(3)]
+    else:
+        raise ValueError(
+            "`axes` must be either length-3 labels/vectors or a (3,3) axis matrix."
+        )
+
+    return tuple(
+        _axis_to_unit_vector(axis_defs[i], name=f"axes[{i}]") for i in range(3)
+    )
+
+
 def _rotation_matrix_from_axis(axis, angle_rad):
-    """Return 3x3 right-hand-rule rotation matrix about one Cartesian axis."""
+    """
+    Return a 3x3 right-hand-rule rotation matrix about any 3D axis.
+
+    Args:
+        axis (str or array-like): "x"/"y"/"z" or a 3D axis vector.
+        angle_rad (float): Rotation angle in radians.
+    """
+    ux, uy, uz = _axis_to_unit_vector(axis)
     c = np.cos(angle_rad)
     s = np.sin(angle_rad)
-    if axis == "x":
-        return np.array([[1.0, 0.0, 0.0], [0.0, c, -s], [0.0, s, c]])
-    if axis == "y":
-        return np.array([[c, 0.0, s], [0.0, 1.0, 0.0], [-s, 0.0, c]])
-    if axis == "z":
-        return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
-    raise ValueError(f"Invalid axis '{axis}'. Allowed axis labels are 'x', 'y', 'z'.")
+    one_minus_c = 1.0 - c
+
+    return np.array(
+        [
+            [
+                c + ux * ux * one_minus_c,
+                ux * uy * one_minus_c - uz * s,
+                ux * uz * one_minus_c + uy * s,
+            ],
+            [
+                uy * ux * one_minus_c + uz * s,
+                c + uy * uy * one_minus_c,
+                uy * uz * one_minus_c - ux * s,
+            ],
+            [
+                uz * ux * one_minus_c - uy * s,
+                uz * uy * one_minus_c + ux * s,
+                c + uz * uz * one_minus_c,
+            ],
+        ]
+    )
 
 
 def _to_3_vector(values, name):
@@ -252,7 +330,7 @@ def rotate_geometry(
     angle_deg=None,
     angle_rad=None,
     point=(0.0, 0.0, 0.0),
-    axes=("x", "y", "z"),
+    axes=((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)),
 ):
     """
     Rotate structural nodes with three sequential axis-angle rotations.
@@ -262,8 +340,9 @@ def rotate_geometry(
         angle_deg (array-like, optional): Three angles in degrees.
         angle_rad (array-like, optional): Three angles in radians.
         point (array-like, optional): Pivot point for rotation. Defaults to origin.
-        axes (array-like, optional): Three axis labels (x/y/z) defining order.
-            Defaults to ("x", "y", "z").
+        axes (array-like, optional): Three axis definitions defining order.
+            Each entry can be a label ("x"/"y"/"z") or a 3D axis vector.
+            Defaults to canonical Cartesian vectors (x, y, z).
 
     Notes:
         - Exactly one of `angle_deg` or `angle_rad` must be provided.
@@ -276,26 +355,25 @@ def rotate_geometry(
     # Backward compatibility with previous API that used one Y-axis angle.
     if angle_deg is not None and np.isscalar(angle_deg):
         angle_vec_rad = np.radians(np.array([0.0, float(angle_deg), 0.0]))
-        axes_norm = ("x", "y", "z")
+        axes_norm = (
+            np.array([1.0, 0.0, 0.0]),
+            np.array([0.0, 1.0, 0.0]),
+            np.array([0.0, 0.0, 1.0]),
+        )
     elif angle_rad is not None and np.isscalar(angle_rad):
         angle_vec_rad = np.array([0.0, float(angle_rad), 0.0], dtype=float)
-        axes_norm = ("x", "y", "z")
+        axes_norm = (
+            np.array([1.0, 0.0, 0.0]),
+            np.array([0.0, 1.0, 0.0]),
+            np.array([0.0, 0.0, 1.0]),
+        )
     else:
         if angle_deg is not None:
             angle_vec_rad = np.radians(_to_3_vector(angle_deg, "angle_deg"))
         else:
             angle_vec_rad = _to_3_vector(angle_rad, "angle_rad")
 
-        axes_norm = tuple(str(a).strip().lower() for a in np.asarray(axes).reshape(-1))
-        if len(axes_norm) != 3:
-            raise ValueError(
-                f"`axes` must contain exactly 3 entries. Got {len(axes_norm)}."
-            )
-        for ax in axes_norm:
-            if ax not in {"x", "y", "z"}:
-                raise ValueError(
-                    f"Invalid axis '{ax}' in `axes`. Allowed values: 'x', 'y', 'z'."
-                )
+        axes_norm = _normalize_axes(axes)
 
     pivot = _to_3_vector(point, "point")
     nodes = np.asarray(struc_nodes, dtype=float)
