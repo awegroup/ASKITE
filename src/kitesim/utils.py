@@ -226,27 +226,87 @@ def printing_rest_lengths(tracking_data, struc_geometry):
         )
 
 
-def rotate_geometry(struc_nodes, rotation_angle_deg):
+def _rotation_matrix_from_axis(axis, angle_rad):
+    """Return 3x3 right-hand-rule rotation matrix about one Cartesian axis."""
+    c = np.cos(angle_rad)
+    s = np.sin(angle_rad)
+    if axis == "x":
+        return np.array([[1.0, 0.0, 0.0], [0.0, c, -s], [0.0, s, c]])
+    if axis == "y":
+        return np.array([[c, 0.0, s], [0.0, 1.0, 0.0], [-s, 0.0, c]])
+    if axis == "z":
+        return np.array([[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]])
+    raise ValueError(f"Invalid axis '{axis}'. Allowed axis labels are 'x', 'y', 'z'.")
+
+
+def _to_3_vector(values, name):
+    """Convert input to a strict 3-vector of floats."""
+    arr = np.asarray(values, dtype=float).reshape(-1)
+    if arr.shape != (3,):
+        raise ValueError(f"{name} must contain exactly 3 values. Got shape {arr.shape}.")
+    return arr
+
+
+def rotate_geometry(
+    struc_nodes,
+    angle_deg=None,
+    angle_rad=None,
+    point=(0.0, 0.0, 0.0),
+    axes=("x", "y", "z"),
+):
     """
-    Rotate structural nodes around the origin in the XZ plane (about the Y-axis).
+    Rotate structural nodes with three sequential axis-angle rotations.
 
     Args:
-        struc_nodes (np.ndarray): Array of structural node positions (n_struc_nodes, 3).
-        rotation_angle_deg (float): Rotation angle in degrees.
-            Positive angles tilt geometry toward +X (right-hand rule around +Y).
+        struc_nodes (np.ndarray): Array of node positions (n_nodes, 3).
+        angle_deg (array-like, optional): Three angles in degrees.
+        angle_rad (array-like, optional): Three angles in radians.
+        point (array-like, optional): Pivot point for rotation. Defaults to origin.
+        axes (array-like, optional): Three axis labels (x/y/z) defining order.
+            Defaults to ("x", "y", "z").
 
-    Returns:
-        np.ndarray: Rotated structural node array (n_struc_nodes, 3).
+    Notes:
+        - Exactly one of `angle_deg` or `angle_rad` must be provided.
+        - For backward compatibility, a single scalar angle is still accepted and
+          interpreted as a rotation about +Y only (legacy behavior).
     """
-    angle_rad = np.radians(rotation_angle_deg)
-    cos_angle = np.cos(angle_rad)
-    sin_angle = np.sin(angle_rad)
+    if (angle_deg is None) == (angle_rad is None):
+        raise ValueError("Provide exactly one of `angle_deg` or `angle_rad`.")
 
-    # Rotation matrix around +Y. For z>0 and positive angle, x increases.
-    R = np.array(
-        [[cos_angle, 0.0, sin_angle], [0.0, 1.0, 0.0], [-sin_angle, 0.0, cos_angle]]
-    )
+    # Backward compatibility with previous API that used one Y-axis angle.
+    if angle_deg is not None and np.isscalar(angle_deg):
+        angle_vec_rad = np.radians(np.array([0.0, float(angle_deg), 0.0]))
+        axes_norm = ("x", "y", "z")
+    elif angle_rad is not None and np.isscalar(angle_rad):
+        angle_vec_rad = np.array([0.0, float(angle_rad), 0.0], dtype=float)
+        axes_norm = ("x", "y", "z")
+    else:
+        if angle_deg is not None:
+            angle_vec_rad = np.radians(_to_3_vector(angle_deg, "angle_deg"))
+        else:
+            angle_vec_rad = _to_3_vector(angle_rad, "angle_rad")
 
-    rotated_struc_nodes = struc_nodes @ R.T
+        axes_norm = tuple(str(a).strip().lower() for a in np.asarray(axes).reshape(-1))
+        if len(axes_norm) != 3:
+            raise ValueError(
+                f"`axes` must contain exactly 3 entries. Got {len(axes_norm)}."
+            )
+        for ax in axes_norm:
+            if ax not in {"x", "y", "z"}:
+                raise ValueError(
+                    f"Invalid axis '{ax}' in `axes`. Allowed values: 'x', 'y', 'z'."
+                )
 
-    return rotated_struc_nodes
+    pivot = _to_3_vector(point, "point")
+    nodes = np.asarray(struc_nodes, dtype=float)
+    if nodes.ndim != 2 or nodes.shape[1] != 3:
+        raise ValueError(
+            f"`struc_nodes` must have shape (n_nodes, 3). Got shape {nodes.shape}."
+        )
+
+    rotated = nodes - pivot
+    for ax, ang in zip(axes_norm, angle_vec_rad):
+        R = _rotation_matrix_from_axis(ax, ang)
+        rotated = rotated @ R.T
+
+    return rotated + pivot

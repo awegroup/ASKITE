@@ -72,6 +72,38 @@ def _resolve_starting_struc_nodes(
     return struc_nodes_loaded
 
 
+def _resolve_initial_geometry_rotation_kwargs(config):
+    """
+    Build rotate_geometry kwargs from config while keeping legacy behavior.
+
+    New keys (optional):
+      - initial_geometry_rotation_angles_deg: [ax, ay, az]
+      - initial_geometry_rotation_angles_rad: [ax, ay, az]
+      - initial_geometry_rotation_point: [px, py, pz]
+      - initial_geometry_rotation_axes: [a1, a2, a3]
+
+    Legacy key fallback:
+      - initial_geometry_rotation_deg (single Y-axis angle in degrees)
+    """
+    angle_deg = config.get("initial_geometry_rotation_angles_deg")
+    angle_rad = config.get("initial_geometry_rotation_angles_rad")
+    if angle_deg is not None and angle_rad is not None:
+        raise ValueError(
+            "Provide only one of `initial_geometry_rotation_angles_deg` or "
+            "`initial_geometry_rotation_angles_rad`."
+        )
+
+    if angle_deg is None and angle_rad is None:
+        angle_deg = [0.0, float(config.get("initial_geometry_rotation_deg", 0.0)), 0.0]
+
+    return {
+        "angle_deg": angle_deg,
+        "angle_rad": angle_rad,
+        "point": config.get("initial_geometry_rotation_point", [0.0, 0.0, 0.0]),
+        "axes": config.get("initial_geometry_rotation_axes", ["x", "y", "z"]),
+    }
+
+
 # Import modules
 def main():
     """Main function"""
@@ -146,7 +178,7 @@ def main():
     #####################################################
     struc_nodes = rotate_geometry(
         struc_nodes,
-        config["initial_geometry_rotation_deg"],
+        **_resolve_initial_geometry_rotation_kwargs(config),
     )
     struc_nodes = _resolve_starting_struc_nodes(
         config=config,
