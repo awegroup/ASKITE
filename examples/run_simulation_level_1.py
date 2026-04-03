@@ -84,8 +84,8 @@ def main():
         Path(PROJECT_DIR)
         / "data"
         / f"{kite_name}"
-        # / "struc_geometry_level_1_manual.yaml"
-        / "struc_geometry_level_1_manual_JULIA.yaml"
+        / "struc_geometry_level_1_manual.yaml"
+        # / "struc_geometry_level_1_manual_JULIA.yaml"
     )
     aero_geometry_path = (
         Path(PROJECT_DIR) / "data" / f"{kite_name}" / "aero_geometry.yaml"
@@ -148,12 +148,12 @@ def main():
         struc_nodes,
         config["initial_geometry_rotation_deg"],
     )
-    struc_nodes = _resolve_starting_struc_nodes(
-        config=config,
-        project_dir=PROJECT_DIR,
-        kite_name=kite_name,
-        struc_nodes_default=struc_nodes,
-    )
+    # struc_nodes = _resolve_starting_struc_nodes(
+    #     config=config,
+    #     project_dir=PROJECT_DIR,
+    #     kite_name=kite_name,
+    #     struc_nodes_default=struc_nodes,
+    # )
 
     # logging initial conditions
     logging.info(f"\n\nINITIAL CONDITIONS, NODES \n")
