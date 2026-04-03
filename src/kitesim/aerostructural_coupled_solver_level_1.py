@@ -716,10 +716,11 @@ def main(
     cross = np.cross(vec_chord_2d, vec_wind_2d)
 
     angle = np.arctan2(cross, dot)
+    alpha_at_ac_mid = np.ravel(results_aero["alpha_at_ac"])[mid_idx]
 
     print(f"alpha = {np.degrees(angle):.2f}° (va vs mid-span chord)")
     print(
-        f'alpha = {float(np.rad2deg(results_aero["alpha_at_ac"][mid_idx])):.2f}° (incl. induced velocity, from results_aero["alpha_at_ac"])'
+        f'alpha = {np.rad2deg(alpha_at_ac_mid):.2f}° (incl. induced velocity, from results_aero["alpha_at_ac"])'
     )
     # print(
     #     f'results_aero["alpha_uncorrected"]: {float(np.rad2deg(results_aero["alpha_uncorrected"][mid_idx])):.2f}°'
