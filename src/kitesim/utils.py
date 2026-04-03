@@ -325,6 +325,87 @@ def _to_3_vector(values, name):
     return arr
 
 
+def _validate_struct_nodes_and_masses(struc_nodes, m_arr):
+    """Validate and return structural nodes and nodal masses as numpy arrays."""
+    nodes = np.asarray(struc_nodes, dtype=float)
+    if nodes.ndim != 2 or nodes.shape[1] != 3:
+        raise ValueError(
+            f"`struc_nodes` must have shape (n_nodes, 3). Got shape {nodes.shape}."
+        )
+
+    masses = np.asarray(m_arr, dtype=float).reshape(-1)
+    if masses.shape[0] != nodes.shape[0]:
+        raise ValueError(
+            "`m_arr` length must match number of structural nodes. "
+            f"Got len(m_arr)={masses.shape[0]} and n_nodes={nodes.shape[0]}."
+        )
+
+    return nodes, masses
+
+
+def calculate_cg(
+    struc_nodes,
+    m_arr,
+    axes=((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)),
+):
+    """
+    Compute center of gravity (CG) coordinates in a chosen axis basis.
+
+    Args:
+        struc_nodes (array-like): Structural node positions with shape (n_nodes, 3).
+        m_arr (array-like): Nodal masses with shape (n_nodes,).
+        axes (array-like, optional): Three axis definitions used for output coordinates.
+            Each axis can be "x"/"y"/"z" or a 3D vector.
+
+    Returns:
+        np.ndarray: CG coordinates along the provided axes, shape (3,).
+    """
+    nodes, masses = _validate_struct_nodes_and_masses(struc_nodes, m_arr)
+    axes_norm = _normalize_axes(axes)
+
+    total_mass = np.sum(masses)
+    if abs(total_mass) <= 1e-15:
+        raise ValueError("Total mass must be non-zero to compute center of gravity.")
+
+    cg_xyz = np.sum(nodes * masses[:, None], axis=0) / total_mass
+    return np.array([np.dot(cg_xyz, axis_i) for axis_i in axes_norm], dtype=float)
+
+
+def calculate_moments_of_inertia(
+    struc_nodes,
+    m_arr,
+    point=(0.0, 0.0, 0.0),
+    axes=((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)),
+):
+    """
+    Compute moments of inertia around axes through a reference point.
+
+    Args:
+        struc_nodes (array-like): Structural node positions with shape (n_nodes, 3).
+        m_arr (array-like): Nodal masses with shape (n_nodes,).
+        point (array-like, optional): Reference point on each inertia axis.
+        axes (array-like, optional): Three axis definitions.
+            Each axis can be "x"/"y"/"z" or a 3D vector.
+
+    Returns:
+        np.ndarray: Moments of inertia for the three axes, shape (3,).
+    """
+    nodes, masses = _validate_struct_nodes_and_masses(struc_nodes, m_arr)
+    ref_point = _to_3_vector(point, "point")
+    axes_norm = _normalize_axes(axes)
+
+    rel = nodes - ref_point
+    rel_sq = np.einsum("ij,ij->i", rel, rel)
+
+    inertia_arr = []
+    for axis_i in axes_norm:
+        along_axis = rel @ axis_i
+        perp_dist_sq = np.maximum(0.0, rel_sq - along_axis**2)
+        inertia_arr.append(float(np.sum(masses * perp_dist_sq)))
+
+    return np.array(inertia_arr, dtype=float)
+
+
 def rotate_geometry(
     struc_nodes,
     angle_deg=None,
