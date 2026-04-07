@@ -260,6 +260,8 @@ def main(
     rest_lengths,
     struc_nodes_initial=None,
     f_ext=None,
+    f_bridle=None,
+    f_inertial=None,
     title="PSM State",
     body_aero=None,
     vel_app=None,
@@ -279,6 +281,8 @@ def main(
         kite_connectivity_arr (array-like): List/array of [i, j, ...] giving spring connections.
         struc_nodes_initial (np.ndarray, optional): Initial node positions (n_nodes, 3).
         f_ext (np.ndarray or None): Optional external forces, shape (n_nodes, 3) or flat.
+        f_bridle (np.ndarray or None): Optional bridle-only forces, shape (n_nodes, 3) or flat.
+        f_inertial (np.ndarray or None): Optional inertial-only forces, shape (n_nodes, 3) or flat.
         title (str): Figure title.
         chord_length (float): Maximum length for force vectors (for scaling).
 
@@ -351,6 +355,52 @@ def main(
             length=1,
             normalize=False,
             color=lightred_color,
+        )
+
+    # Optionally overlay bridle-only force vectors for visibility
+    if f_bridle is not None:
+        arr_bridle = np.array(f_bridle)
+        if arr_bridle.ndim == 1:
+            arr_bridle = arr_bridle.reshape(-1, 3)
+        norms_bridle = np.linalg.norm(arr_bridle, axis=1)
+        max_norm_bridle = np.max(norms_bridle) if np.max(norms_bridle) > 0 else 1.0
+        scale_bridle = (chord_length) / max_norm_bridle
+        arr_bridle_scaled = arr_bridle * scale_bridle
+        ax.quiver(
+            struc_nodes[:, 0],
+            struc_nodes[:, 1],
+            struc_nodes[:, 2],
+            arr_bridle_scaled[:, 0],
+            arr_bridle_scaled[:, 1],
+            arr_bridle_scaled[:, 2],
+            length=1,
+            normalize=False,
+            color="tab:green",
+            label="Bridle Aero",
+        )
+
+    # Optionally overlay inertial-only force vectors for visibility
+    if f_inertial is not None:
+        arr_inertial = np.array(f_inertial)
+        if arr_inertial.ndim == 1:
+            arr_inertial = arr_inertial.reshape(-1, 3)
+        norms_inertial = np.linalg.norm(arr_inertial, axis=1)
+        max_norm_inertial = (
+            np.max(norms_inertial) if np.max(norms_inertial) > 0 else 1.0
+        )
+        scale_inertial = (chord_length) / max_norm_inertial
+        arr_inertial_scaled = arr_inertial * scale_inertial
+        ax.quiver(
+            struc_nodes[:, 0],
+            struc_nodes[:, 1],
+            struc_nodes[:, 2],
+            arr_inertial_scaled[:, 0],
+            arr_inertial_scaled[:, 1],
+            arr_inertial_scaled[:, 2],
+            length=1,
+            normalize=False,
+            color="tab:purple",
+            label="Inertial",
         )
 
     if is_with_node_indices:
