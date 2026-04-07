@@ -1,5 +1,8 @@
 import numpy as np
 from pathlib import Path
+import argparse
+import subprocess
+import sys
 from kitesim.logging_config import *
 from datetime import datetime
 from kitesim.utils import (
@@ -20,6 +23,81 @@ from kitesim import (
 from awetrim.system.system_model import SystemModel
 
 
+def _build_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run ASKITE QSM simulation")
+    parser.add_argument(
+        "--steering-final-extension",
+        type=float,
+        default=None,
+        help="Override steering_tape_final_extension [m] for this run.",
+    )
+    parser.add_argument(
+        "--steering-sweep-start",
+        type=float,
+        default=None,
+        help="Sweep start for steering_tape_final_extension [m].",
+    )
+    parser.add_argument(
+        "--steering-sweep-end",
+        type=float,
+        default=None,
+        help="Sweep end for steering_tape_final_extension [m].",
+    )
+    parser.add_argument(
+        "--steering-sweep-step",
+        type=float,
+        default=None,
+        help="Sweep step for steering_tape_final_extension [m].",
+    )
+    return parser
+
+
+def _run_steering_sweep(args):
+    """Launch one process per steering setting to keep runs isolated."""
+    if args.steering_sweep_step is None or args.steering_sweep_step <= 0:
+        raise ValueError("--steering-sweep-step must be > 0")
+    if args.steering_sweep_end < args.steering_sweep_start:
+        raise ValueError("--steering-sweep-end must be >= --steering-sweep-start")
+
+    values = np.arange(
+        args.steering_sweep_start,
+        args.steering_sweep_end + 0.5 * args.steering_sweep_step,
+        args.steering_sweep_step,
+    )
+
+    script_path = Path(__file__).resolve()
+    for idx, value in enumerate(values, start=1):
+        print(
+            f"\n=== Steering sweep {idx}/{len(values)}: steering_tape_final_extension={value:.4f} m ==="
+        )
+        cmd = [
+            sys.executable,
+            str(script_path),
+            "--steering-final-extension",
+            f"{float(value):.10g}",
+        ]
+        completed = subprocess.run(cmd, check=False)
+        if completed.returncode != 0:
+            raise RuntimeError(
+                f"Sweep aborted at steering_tape_final_extension={value:.4f} m "
+                f"(exit code {completed.returncode})."
+            )
+
+
+def _format_length_tag(value_m: float) -> str:
+    """Format a signed length [m] into a filesystem-friendly tag."""
+    sign = "p" if value_m >= 0 else "m"
+    milli = int(round(abs(float(value_m)) * 1000.0))
+    return f"{sign}{milli:04d}mm"
+
+
+def _build_actuation_case_folder(config):
+    """Build case folder name from final depower/steering actuation settings."""
+    depower_tag = _format_length_tag(config.get("power_tape_final_extension", 0.0))
+    steering_tag = _format_length_tag(config.get("steering_tape_final_extension", 0.0))
+    return f"depower_{depower_tag}_steer_{steering_tag}"
+
+
 def _resolve_starting_struc_nodes(
     config,
     project_dir,
@@ -29,21 +107,63 @@ def _resolve_starting_struc_nodes(
     """
     Optionally override start nodes from a previous simulation result folder.
 
-    If config["starting_from_sim_of_date"] is empty, return struc_nodes_default.
-    Otherwise load results/<kite_name>/<date>/sim_output.h5 and return the final
-    node positions from tracking["positions"][-1].
+    Priority:
+      1) config["starting_from_sim_subdir"] (new)
+      2) config["starting_from_sim_of_date"] (legacy)
+
+    The value is treated as a subdir under results/<kite_name>/, e.g.
+    depower_p0100mm_steer_m0020mm/run_003.
+
+    If both keys are empty, return struc_nodes_default.
     """
-    sim_date = str(config.get("starting_from_sim_of_date", "")).strip()
-    if sim_date == "":
+    sim_subdir = str(config.get("starting_from_sim_subdir", "")).strip()
+    if sim_subdir == "":
+        sim_subdir = str(config.get("starting_from_sim_of_date", "")).strip()
+
+    if sim_subdir == "":
         return struc_nodes_default
 
-    start_dir = Path(project_dir) / "results" / kite_name / sim_date
-    if not start_dir.exists() or not start_dir.is_dir():
+    base_results_dir = Path(project_dir) / "results" / kite_name
+
+    # Candidate 1: exact path from config
+    candidates = [base_results_dir / sim_subdir]
+
+    # Candidate 2/3: tolerate zero-sign naming mismatch, e.g. m0000mm vs p0000mm
+    sim_subdir_m_to_p = sim_subdir.replace("m0000mm", "p0000mm")
+    sim_subdir_p_to_m = sim_subdir.replace("p0000mm", "m0000mm")
+    if sim_subdir_m_to_p != sim_subdir:
+        candidates.append(base_results_dir / sim_subdir_m_to_p)
+    if sim_subdir_p_to_m != sim_subdir:
+        candidates.append(base_results_dir / sim_subdir_p_to_m)
+
+    start_dir = None
+    for cand in candidates:
+        if cand.exists() and cand.is_dir():
+            start_dir = cand
+            break
+
+    if start_dir is None:
         raise FileNotFoundError(
-            f"Configured starting simulation directory does not exist: {start_dir}"
+            "Configured starting simulation directory does not exist. "
+            f"Tried: {', '.join(str(c) for c in candidates)}"
         )
 
+    # Preferred: direct case-folder storage (sim_output.h5 inside start_dir).
     h5_path = start_dir / "sim_output.h5"
+    # Backward compatibility: if not found, try legacy run_XXX layout.
+    if not h5_path.exists():
+        run_dirs = [
+            d
+            for d in start_dir.iterdir()
+            if d.is_dir() and d.name.startswith("run_") and d.name[4:].isdigit()
+        ]
+        if len(run_dirs) > 0:
+            start_dir = sorted(run_dirs, key=lambda p: int(p.name[4:]))[-1]
+            logging.info(
+                f"Using latest legacy run folder inside case folder: {start_dir.name}"
+            )
+            h5_path = start_dir / "sim_output.h5"
+
     if not h5_path.exists():
         raise FileNotFoundError(
             f"Configured starting simulation has no sim_output.h5: {h5_path}"
@@ -107,6 +227,25 @@ def _resolve_initial_geometry_rotation_kwargs(config):
 # Import modules
 def main():
     """Main function"""
+    args = _build_arg_parser().parse_args()
+
+    is_sweep_requested = (
+        args.steering_sweep_start is not None
+        or args.steering_sweep_end is not None
+        or args.steering_sweep_step is not None
+    )
+    if is_sweep_requested:
+        if (
+            args.steering_sweep_start is None
+            or args.steering_sweep_end is None
+            or args.steering_sweep_step is None
+        ):
+            raise ValueError(
+                "Provide all sweep args: --steering-sweep-start, --steering-sweep-end, --steering-sweep-step"
+            )
+        _run_steering_sweep(args)
+        return
+
     PROJECT_DIR = Path(__file__).resolve().parents[1]
     kite_name = "TUDELFT_V3_KITE"  # the dir name with the relevant .yaml files
     # kite_name = "3plate_kite"  # the dir name with the relevant .yaml files
@@ -124,15 +263,21 @@ def main():
         Path(PROJECT_DIR) / "data" / f"{kite_name}" / "aero_geometry.yaml"
     )
 
-    results_dir = (
-        Path(PROJECT_DIR)
-        / "results"
-        / f"{kite_name}"
-        / f'{datetime.now().strftime("%Y_%m_%d_%H%M")}h'
-    )
+    config_for_case = load_yaml(config_path)
+    if args.steering_final_extension is not None:
+        config_for_case["steering_tape_final_extension"] = float(
+            args.steering_final_extension
+        )
+
+    case_folder = _build_actuation_case_folder(config=config_for_case)
+    case_dir = Path(PROJECT_DIR) / "results" / f"{kite_name}" / case_folder
+    results_dir = case_dir
     config, struc_geometry, aero_geometry, results_dir = load_and_save_config_files(
         config_path, struc_geometry_path, aero_geometry_path, results_dir
     )
+    if args.steering_final_extension is not None:
+        config["steering_tape_final_extension"] = float(args.steering_final_extension)
+
     logging.info(f"config files saved in {results_dir}\n")
 
     ###################
