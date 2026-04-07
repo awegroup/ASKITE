@@ -20,6 +20,58 @@ from kitesim import (
 from awetrim.system.system_model import SystemModel
 
 
+def _resolve_starting_struc_nodes(
+    config,
+    project_dir,
+    kite_name,
+    struc_nodes_default,
+):
+    """
+    Optionally override start nodes from a previous simulation result folder.
+
+    If config["starting_from_sim_of_date"] is empty, return struc_nodes_default.
+    Otherwise load results/<kite_name>/<date>/sim_output.h5 and return the final
+    node positions from tracking["positions"][-1].
+    """
+    sim_date = str(config.get("starting_from_sim_of_date", "")).strip()
+    if sim_date == "":
+        return struc_nodes_default
+
+    start_dir = Path(project_dir) / "results" / kite_name / sim_date
+    if not start_dir.exists() or not start_dir.is_dir():
+        raise FileNotFoundError(
+            f"Configured starting simulation directory does not exist: {start_dir}"
+        )
+
+    h5_path = start_dir / "sim_output.h5"
+    if not h5_path.exists():
+        raise FileNotFoundError(
+            f"Configured starting simulation has no sim_output.h5: {h5_path}"
+        )
+
+    _, tracking_data = load_sim_output(h5_path)
+    if "positions" not in tracking_data:
+        raise KeyError(f"Expected 'positions' dataset in: {h5_path}")
+
+    positions = np.asarray(tracking_data["positions"])
+    if positions.ndim != 3 or positions.shape[2] != 3:
+        raise ValueError(
+            f"Invalid positions shape in {h5_path}: {positions.shape}. Expected (nt, n_nodes, 3)."
+        )
+
+    struc_nodes_loaded = np.array(positions[-1], dtype=float)
+    if struc_nodes_loaded.shape != np.asarray(struc_nodes_default).shape:
+        raise ValueError(
+            "Loaded node shape does not match current geometry. "
+            f"loaded={struc_nodes_loaded.shape}, current={np.asarray(struc_nodes_default).shape}"
+        )
+
+    logging.info(
+        f"Starting from previous simulation final nodes: {start_dir} (n_nodes={len(struc_nodes_loaded)})"
+    )
+    return struc_nodes_loaded
+
+
 def _resolve_initial_geometry_rotation_kwargs(config):
     """
     Build rotate_geometry kwargs from config while keeping legacy behavior.
@@ -59,7 +111,7 @@ def main():
     kite_name = "TUDELFT_V3_KITE"  # the dir name with the relevant .yaml files
     # kite_name = "3plate_kite"  # the dir name with the relevant .yaml files
     # load config.yaml & geometry.yaml, save both, and return them as dicts
-    config_path = Path(PROJECT_DIR) / "data" / f"{kite_name}" / "config_level_1.yaml"
+    config_path = Path(PROJECT_DIR) / "data" / f"{kite_name}" / "config.yaml"
     struc_geometry_path = (
         Path(PROJECT_DIR)
         / "data"
@@ -91,10 +143,14 @@ def main():
     n_panels_aero = (n_struc_ribs - 1) * config["aerodynamic"][
         "n_aero_panels_per_struc_section"
     ]
+    bridle_path = (
+        struc_geometry_path if config.get("is_with_aero_bridle", False) else None
+    )
     body_aero, vsm_solver, vel_app, initial_polar_data = aerodynamic_vsm.initialize(
         aero_geometry_path,
         config,
         n_panels_aero,
+        bridle_path=bridle_path,
     )
 
     ##################
@@ -128,6 +184,12 @@ def main():
     struc_nodes = rotate_geometry(
         struc_nodes,
         **_resolve_initial_geometry_rotation_kwargs(config),
+    )
+    struc_nodes = _resolve_starting_struc_nodes(
+        config=config,
+        project_dir=PROJECT_DIR,
+        kite_name=kite_name,
+        struc_nodes_default=struc_nodes,
     )
 
     # logging initial conditions
@@ -226,10 +288,13 @@ def main():
     # AWETRIM SYSTEM MODEL
     ########################################
     system_model = SystemModel()
-    system_model.mass_wing = 0  # np.sum(m_arr)
+    system_model.mass_wing = float(np.sum(m_arr))
+    print(
+        f"Total mass of the wing (sum of particle masses): {system_model.mass_wing:.3f} kg"
+    )
     system_model.angle_elevation = np.deg2rad(0)
     system_model.angle_azimuth = np.deg2rad(0)
-    system_model.angle_course = np.deg2rad(0)
+    system_model.angle_course = np.deg2rad(90)
     system_model.speed_radial = 0.0
     system_model.distance_radial = 200
     system_model.wind.speed_wind_ref = 4.0
