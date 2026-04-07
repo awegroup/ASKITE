@@ -5,6 +5,25 @@ from VSM.core.BodyAerodynamics import BodyAerodynamics
 from VSM.core.WingGeometry import Wing
 from VSM.core.Solver import Solver
 from VSM.plot_geometry_matplotlib import plot_geometry
+from VSM.quasi_steady_state import solve_quasi_steady_state
+
+
+# Bounds and defaults (aoa, sideslip, course_rate_body)
+kite_speed_bounds = (2.0, 80.0)  # m/s
+pitch_bounds = (-5, 5)  # deg
+yaw_bounds = (-6, 6)  # deg
+course_rate_bounds = (
+    -3,
+    3,
+)  # rad/s, small course rate allowed for numerical reasons; not a physical course rate
+roll_bounds = (
+    -5,
+    5,
+)  # deg, small roll allowed for numerical reasons; not a physical roll
+
+DEFAULT_GUESS_QS = np.array(
+    [40.0, 0.0, 0.0, 0.0, 0.0]
+)  # [kite_speed, roll, pitch, yaw, course_rate_body
 
 
 def initialize(
@@ -78,13 +97,16 @@ def plot_vsm_geometry(body_aero):
 def run_vsm_package(
     body_aero,
     solver,
+    system_model,
+    center_of_gravity,
     le_arr,
     te_arr,
-    va_vector,
+    # va_vector,
     aero_input_type="reuse_initial_polar_data",
     initial_polar_data=None,
-    yaw_rate=0.0,
+    reference_point=[0.0, 0.0, 0.0],
     is_with_plot=False,
+    current_guess=None,
 ):
     """
     Run the VSM simulation with updated geometry and velocity.
@@ -115,10 +137,39 @@ def run_vsm_package(
     # set again where velocity vector is coming from
     # The VSM va setter accepts keyword arguments but properties don't support that in Python
     # So we call the underlying setter method directly using the descriptor protocol
-    type(body_aero).va.fset(body_aero, va_vector, yaw_rate=yaw_rate)
+    # type(body_aero).va.fset(body_aero, va_vector)
+
+    bounds_lower = np.array(
+        [
+            kite_speed_bounds[0],
+            roll_bounds[0],
+            pitch_bounds[0],
+            yaw_bounds[0],
+            course_rate_bounds[0],
+        ]
+    )
+    bounds_upper = np.array(
+        [
+            kite_speed_bounds[1],
+            roll_bounds[1],
+            pitch_bounds[1],
+            yaw_bounds[1],
+            course_rate_bounds[1],
+        ]
+    )
+    if current_guess is None:
+        current_guess = DEFAULT_GUESS_QS
+    # solve the problem
+    results, body_aero = solve_quasi_steady_state(
+        body_aero=body_aero,
+        center_of_gravity=center_of_gravity,
+        reference_point=reference_point,
+        system_model=system_model,
+        x_guess=current_guess,
+        solver=solver,
+        bounds_lower=bounds_lower,
+        bounds_upper=bounds_upper,
+    )
     if is_with_plot:
         plot_vsm_geometry(body_aero)
-
-    # solve the problem
-    results = solver.solve(body_aero)
     return np.array(results["F_distribution"]), body_aero, results

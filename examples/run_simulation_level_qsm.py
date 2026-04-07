@@ -1,0 +1,292 @@
+import numpy as np
+from pathlib import Path
+from kitesim.logging_config import *
+from datetime import datetime
+from kitesim.utils import (
+    load_and_save_config_files,
+    load_yaml,
+    load_sim_output,
+    save_results,
+    printing_rest_lengths,
+    rotate_geometry,
+)
+from kitesim import (
+    aero2struc_level_1,
+    aerodynamic_vsm,
+    aerostructural_coupled_solver_qsm,
+    read_struc_geometry_yaml_level_1,
+    structural_pss,
+)
+from awetrim.system.system_model import SystemModel
+
+
+def _resolve_initial_geometry_rotation_kwargs(config):
+    """
+    Build rotate_geometry kwargs from config while keeping legacy behavior.
+
+    New keys (optional):
+      - initial_geometry_rotation_angles_deg: [ax, ay, az]
+      - initial_geometry_rotation_angles_rad: [ax, ay, az]
+      - initial_geometry_rotation_point: [px, py, pz]
+      - initial_geometry_rotation_axes: [a1, a2, a3]
+
+    Legacy key fallback:
+      - initial_geometry_rotation_deg (single Y-axis angle in degrees)
+    """
+    angle_deg = config.get("initial_geometry_rotation_angles_deg")
+    angle_rad = config.get("initial_geometry_rotation_angles_rad")
+    if angle_deg is not None and angle_rad is not None:
+        raise ValueError(
+            "Provide only one of `initial_geometry_rotation_angles_deg` or "
+            "`initial_geometry_rotation_angles_rad`."
+        )
+
+    if angle_deg is None and angle_rad is None:
+        angle_deg = [0.0, float(config.get("initial_geometry_rotation_deg", 0.0)), 0.0]
+
+    return {
+        "angle_deg": angle_deg,
+        "angle_rad": angle_rad,
+        "point": config.get("initial_geometry_rotation_point", [0.0, 0.0, 0.0]),
+        "axes": config.get("initial_geometry_rotation_axes", ["x", "y", "z"]),
+    }
+
+
+# Import modules
+def main():
+    """Main function"""
+    PROJECT_DIR = Path(__file__).resolve().parents[1]
+    kite_name = "TUDELFT_V3_KITE"  # the dir name with the relevant .yaml files
+    # kite_name = "3plate_kite"  # the dir name with the relevant .yaml files
+    # load config.yaml & geometry.yaml, save both, and return them as dicts
+    config_path = Path(PROJECT_DIR) / "data" / f"{kite_name}" / "config_level_1.yaml"
+    struc_geometry_path = (
+        Path(PROJECT_DIR)
+        / "data"
+        / f"{kite_name}"
+        # / "struc_geometry_level_1_manual.yaml"
+        # / "struc_geometry_level_1_manual_JULIA.yaml"
+        / "struc_geometry_level_1_converged.yaml"
+    )
+    aero_geometry_path = (
+        Path(PROJECT_DIR) / "data" / f"{kite_name}" / "aero_geometry.yaml"
+    )
+
+    results_dir = (
+        Path(PROJECT_DIR)
+        / "results"
+        / f"{kite_name}"
+        / f'{datetime.now().strftime("%Y_%m_%d_%H%M")}h'
+    )
+    config, struc_geometry, aero_geometry, results_dir = load_and_save_config_files(
+        config_path, struc_geometry_path, aero_geometry_path, results_dir
+    )
+    logging.info(f"config files saved in {results_dir}\n")
+
+    ###################
+    ### AERODYNAMIC ###
+    ###################
+    n_wing_struc_nodes = len(struc_geometry["wing_particles"]["data"])
+    n_struc_ribs = n_wing_struc_nodes / 2
+    n_panels_aero = (n_struc_ribs - 1) * config["aerodynamic"][
+        "n_aero_panels_per_struc_section"
+    ]
+    body_aero, vsm_solver, vel_app, initial_polar_data = aerodynamic_vsm.initialize(
+        aero_geometry_path,
+        config,
+        n_panels_aero,
+    )
+
+    ##################
+    ### STRUCTURAL ###
+    ##################
+    (
+        # node level
+        struc_nodes,
+        m_arr,
+        struc_node_le_indices,
+        struc_node_te_indices,
+        power_tape_index,
+        steering_tape_indices,
+        pulley_node_indices,
+        # element level
+        kite_connectivity_arr,
+        bridle_connectivity_arr,
+        bridle_diameter_arr,
+        l0_arr,
+        k_arr,
+        c_arr,
+        linktype_arr,
+        pulley_line_indices,
+        pulley_line_to_other_node_pair_dict,
+    ) = read_struc_geometry_yaml_level_1.main(struc_geometry)
+
+    #####################################################
+    ### rotating the initial geometry by some angle,
+    ### to enable the wind to be horizontal
+    #####################################################
+    struc_nodes = rotate_geometry(
+        struc_nodes,
+        **_resolve_initial_geometry_rotation_kwargs(config),
+    )
+
+    # logging initial conditions
+    logging.info(f"\n\nINITIAL CONDITIONS, NODES \n")
+    for idx, (node_i, m_i) in enumerate(zip(struc_nodes, m_arr)):
+        logging.info(f"node_idx: {idx}: node: {node_i}, mass: {m_i}")
+
+    logging.info(f"\n\nINITIAL CONDITIONS, ELEMENTS \n")
+    for idx, conn in enumerate(kite_connectivity_arr):
+        logging.info(
+            f"conn_idx: {idx}: conn: {conn}, l0: {l0_arr[idx]}, k: {k_arr[idx]}, c: {c_arr[idx]}, linktype: {linktype_arr[idx]}"
+        )
+
+    if config["structural_solver"] == "pss":
+        ## pss -- https://github.com/awegroup/Particle_System_Simulator
+        ##TODO: Fix the comment below, it SHOULD read l0
+        # Note: ParticleSystem doesn’t read l0_arr. SpringDamper sets l0
+        # from the initial particle positions.
+        # So l0_arr is a bookkeeping array for you, not used at instantiation.
+        (psystem, pss_initial_conditions, pss_params, struc_nodes_initial) = (
+            structural_pss.instantiate(
+                # yaml files
+                config,
+                # node level
+                struc_nodes,
+                m_arr,
+                # element_level
+                kite_connectivity_arr,
+                l0_arr,
+                k_arr,
+                c_arr,
+                linktype_arr,
+                pulley_line_to_other_node_pair_dict,
+            )
+        )
+        if config["is_with_initial_structure_plot"]:
+            structural_pss.plot_3d_kite_structure(
+                struc_nodes,
+                kite_connectivity_arr,
+                power_tape_index,
+                k_arr=k_arr,
+                c_arr=c_arr,
+                linktype_arr=linktype_arr,
+                pulley_nodes=pulley_node_indices,
+            )
+        # setting kite_fem related output to None
+        kite_fem_structure = None
+    else:
+        raise ValueError(
+            "Invalid structural solver specified, only pss is available in qsm couplded simulation for now."
+        )
+
+    ##################
+    ### AERO2STRUC ###
+    ##################
+    aero2struc_mapping = aero2struc_level_1.initialize_mapping(
+        body_aero.panels,
+        struc_nodes,
+        struc_node_le_indices,
+        struc_node_te_indices,
+    )
+
+    #################
+    ### ACTUATION ###
+    #################
+    initial_length_power_tape = l0_arr[power_tape_index]
+    power_tape_extension_step = config["power_tape_extension_step"]
+    power_tape_final_extension = config["power_tape_final_extension"]
+    if power_tape_extension_step != 0:
+        n_power_tape_steps = int(power_tape_final_extension / power_tape_extension_step)
+    else:
+        n_power_tape_steps = 0
+    logging.info(f"Initial depower tape length: {l0_arr[power_tape_index]:.3f}m")
+    logging.info(
+        f"Desired depower tape length: {initial_length_power_tape + power_tape_final_extension:.3f}m"
+    )
+
+    initial_length_steering_left = l0_arr[steering_tape_indices[0]]
+    initial_length_steering_right = l0_arr[steering_tape_indices[1]]
+    steering_tape_extension_step = config["steering_tape_extension_step"]
+    steering_tape_final_extension = config["steering_tape_final_extension"]
+    if steering_tape_extension_step != 0:
+        aerostructural_coupled_solver_qsm.update_steering_tape_actuation(
+            config=config,
+            psystem=psystem,
+            kite_fem_structure=kite_fem_structure,
+            kite_connectivity_arr=kite_connectivity_arr,
+            steering_tape_indices=steering_tape_indices,
+            steering_tape_extension_step=steering_tape_extension_step,
+            initial_length_steering_left=initial_length_steering_left,
+            initial_length_steering_right=initial_length_steering_right,
+            steering_tape_final_extension=steering_tape_final_extension,
+        )
+
+    ########################################
+    # AWETRIM SYSTEM MODEL
+    ########################################
+    system_model = SystemModel()
+    system_model.mass_wing = 0  # np.sum(m_arr)
+    system_model.angle_elevation = np.deg2rad(0)
+    system_model.angle_azimuth = np.deg2rad(0)
+    system_model.angle_course = np.deg2rad(0)
+    system_model.speed_radial = 0.0
+    system_model.distance_radial = 200
+    system_model.wind.speed_wind_ref = 4.0
+    system_model.timeder_speed_tangential = 0.0
+    system_model.timeder_speed_radial = 0.0
+
+    ########################################
+    ### AEROSTUCTURAL COUPLED SIMULATION ###
+    ########################################
+    tracking_data, meta = aerostructural_coupled_solver_qsm.main(
+        m_arr=m_arr,
+        struc_nodes=struc_nodes,
+        struc_nodes_initial=struc_nodes_initial,
+        system_model=system_model,
+        config=config,
+        ### ACTUATION
+        initial_length_power_tape=initial_length_power_tape,
+        n_power_tape_steps=n_power_tape_steps,
+        power_tape_final_extension=power_tape_final_extension,
+        power_tape_extension_step=power_tape_extension_step,
+        ### CONNECTIVITY
+        kite_connectivity_arr=kite_connectivity_arr,
+        bridle_connectivity_arr=bridle_connectivity_arr,
+        pulley_line_indices=pulley_line_indices,
+        pulley_line_to_other_node_pair_dict=pulley_line_to_other_node_pair_dict,
+        ### STRUC --> AERO
+        struc_node_le_indices=struc_node_le_indices,
+        struc_node_te_indices=struc_node_te_indices,
+        ### AERO
+        body_aero=body_aero,
+        vsm_solver=vsm_solver,
+        vel_app=vel_app,
+        initial_polar_data=initial_polar_data,
+        bridle_diameter_arr=bridle_diameter_arr,
+        ### AERO --> STRUC
+        aero2struc_mapping=aero2struc_mapping,
+        power_tape_index=power_tape_index,
+        ### STRUC
+        psystem=psystem,
+        kite_fem_structure=kite_fem_structure,
+    )
+
+    # Save results
+    h5_path = Path(results_dir) / "sim_output.h5"
+    save_results(tracking_data, meta, h5_path)
+
+    # Load results
+    meta_data_dict, tracking_data = load_sim_output(h5_path)
+
+    # logging.info(f"meta_data: {meta_data_dict}")
+    # - here you could add functions to plot the tracking of f_int, f_ext and f_residual over the iterations
+    # - functions that make an animation of the kite going through the iterations
+    # - etc.
+    f_residual = tracking_data["f_int"] - tracking_data["f_ext"]
+
+    printing_rest_lengths(tracking_data, struc_geometry)
+
+
+if __name__ == "__main__":
+    main()
