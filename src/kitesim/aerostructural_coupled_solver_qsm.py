@@ -271,6 +271,68 @@ def update_power_tape_actuation(
     return delta_power_tape, is_actuation_finalized
 
 
+def compute_adaptive_dt(
+    f_residual_list,
+    dt_initial,
+    dt_max,
+    ref_residual_initial=None,
+):
+    """
+    Compute adaptive dt that increases as residual decreases.
+
+    Strategy: dt scales with a factor based on how much the residual has
+    decreased relative to its initial value. Smaller residuals → larger dt.
+
+    Args:
+        f_residual_list: List of residual force norms over iterations
+        dt_initial: Initial dt from config
+        dt_max: Maximum dt (cap to prevent instability)
+        ref_residual_initial: Reference initial residual for normalization
+            (defaults to first residual if not provided)
+
+    Returns:
+        dt: Adaptive timestep value
+    """
+    if len(f_residual_list) < 2:
+        return dt_initial
+
+    if ref_residual_initial is None:
+        ref_residual_initial = f_residual_list[0]
+
+    current_residual = f_residual_list[-1]
+
+    # Avoid division by zero or negative values
+    if ref_residual_initial <= 1e-10 or current_residual <= 1e-10:
+        return dt_initial
+
+    # Compute reduction factor: ratio of current to initial residual
+    # As residual decreases, ratio decreases, so dt increases
+    reduction_factor = current_residual / ref_residual_initial
+    reduction_factor = np.clip(reduction_factor, 1e-6, 1.0)
+
+    # Scale dt adaptively: dt = dt_initial * (1 / reduction_factor)
+    # When reduction_factor is small (high convergence), dt becomes larger
+    dt_adaptive = dt_initial / reduction_factor
+
+    # Cap at max dt to maintain stability
+    dt = min(dt_adaptive, dt_max)
+
+    return dt
+
+
+def distribute_total_force_by_particle_mass(total_force, m_arr):
+    """Distribute a total 3D force over nodes proportional to particle masses."""
+    total_force = np.asarray(total_force, dtype=float).reshape(3)
+    masses = np.asarray(m_arr, dtype=float).reshape(-1)
+    mass_sum = float(np.sum(masses))
+
+    if mass_sum <= 1e-12:
+        raise ValueError("Total particle mass must be positive to distribute force.")
+
+    mass_fraction = masses / mass_sum
+    return mass_fraction[:, None] * total_force[None, :]
+
+
 # TODO: this should also use structural is not converging
 def check_convergence(
     i,
@@ -394,12 +456,7 @@ def main(
     print(f'--> Running structural_solver: {config["structural_solver"]}')
 
     ## PRELOOP
-    if config["is_with_gravity"]:
-        f_ext_gravity = np.array(
-            [np.array(config["grav_constant"]) * m_pt for m_pt in m_arr]
-        )
-    else:
-        f_ext_gravity = np.zeros(struc_nodes.shape)
+    f_ext_gravity = np.zeros(struc_nodes.shape)
 
     if config["structural_solver"] == "kite_fem":
         rest_lengths = kite_fem_structure.modify_get_spring_rest_length()
@@ -419,6 +476,21 @@ def main(
     # Two-phase regularization: phase 1 = with pseudo_dt, phase 2 = without
     reg_phase = 1  # 1 = regularized, 2 = unregularized (polish)
     stagnation_check_start = 0  # iteration at which current phase started
+
+    # Adaptive dt for PSS solver
+    dt_initial = config["structural_pss"]["dt"]
+    dt_max = config["structural_pss"].get(
+        "dt_max", dt_initial * 10.0
+    )  # Default to 10x initial dt
+    bridle_node_pairs = None
+
+    if config["is_with_aero_bridle"]:
+        bridle_node_pairs = (
+            aerodynamic_bridle_line_drag.build_bridle_node_pairs_from_line_system(
+                struc_nodes,
+                getattr(body_aero, "_bridle_line_system", None),
+            )
+        )
 
     # Aitken relaxation state
     omega_relaxation = config["aero_structural_solver"].get("relaxation_factor", 0.3)
@@ -458,6 +530,7 @@ def main(
         # va_vector=vel_app,
         aero_input_type="reuse_initial_polar_data",
         initial_polar_data=initial_polar_data,
+        include_gravity=config["is_with_gravity"],
         is_with_plot=config["is_with_aero_plot_per_iteration"],
     )
     logging.debug(
@@ -494,11 +567,18 @@ def main(
     #     config["aerodynamic_bridle"]["cd_cable"],
     #     config["aerodynamic_bridle"]["cf_cable"],
     # )
-    f_aero_bridle = 0
-    f_ext_gravity = 0
+    f_aero_bridle = np.zeros((len(struc_nodes), 3))
+    f_inertial = distribute_total_force_by_particle_mass(
+        results_aero.get("inertial_force", np.zeros(3)),
+        m_arr,
+    )
+    f_ext_gravity = distribute_total_force_by_particle_mass(
+        results_aero.get("gravity_force", np.zeros(3)),
+        m_arr,
+    )
     f_aero = f_aero_wing + f_aero_bridle
     ## EXTERNAL FORCE
-    f_ext = f_aero + f_ext_gravity
+    f_ext = f_aero + f_inertial + f_ext_gravity
     f_ext = np.round(f_ext, 5)
     f_ext_flat = f_ext.flatten()
 
@@ -516,6 +596,18 @@ def main(
             ########################################################
             begin_time_f_int = time.time()
             if config["structural_solver"] == "pss":
+                # Apply adaptive dt based on convergence progress
+                if len(f_residual_list) > 0:
+                    adaptive_dt = compute_adaptive_dt(
+                        f_residual_list,
+                        dt_initial,
+                        dt_max,
+                    )
+                    config["structural_pss"]["dt"] = adaptive_dt
+                    logging.debug(
+                        f"Adaptive dt updated: {adaptive_dt:.6f} (residual: {f_residual_list[-1]:.3f}N)"
+                    )
+                    print(f"Adaptive dt: {adaptive_dt:.6f} s at iteration {i}")
                 psystem, is_structural_converged, struc_nodes, f_int = (
                     structural_pss.run_pss(
                         psystem,
@@ -590,6 +682,8 @@ def main(
                     kite_connectivity_arr,
                     rest_lengths,
                     f_ext=f_ext,
+                    f_bridle=f_aero_bridle if config["is_with_aero_bridle"] else None,
+                    f_inertial=f_inertial,
                     title=f"i: {i}",
                     body_aero=body_aero,
                     is_with_node_indices=False,
@@ -620,10 +714,17 @@ def main(
                     center_of_gravity=cg,
                     le_arr=le_arr,
                     te_arr=te_arr,
-                    current_guess=results_aero["opt_x"],
+                    current_guess=[
+                        results_aero["opt_x"][0],
+                        0,
+                        0,
+                        0,
+                        results_aero["opt_x"][4],
+                    ],
                     # va_vector=vel_app,
                     aero_input_type="reuse_initial_polar_data",
                     initial_polar_data=initial_polar_data,
+                    include_gravity=config["is_with_gravity"],
                     is_with_plot=config["is_with_aero_plot_per_iteration"],
                 )
             )
@@ -669,13 +770,76 @@ def main(
                     config["rho"],
                     config["aerodynamic_bridle"]["cd_cable"],
                     config["aerodynamic_bridle"]["cf_cable"],
+                    body_aero=body_aero,
+                    bridle_node_pairs=bridle_node_pairs,
+                )
+                bridle_force_total = np.sum(f_aero_bridle, axis=0)
+                bridle_force_total_norm = np.linalg.norm(bridle_force_total)
+                bridle_force_nodal_max = np.max(np.linalg.norm(f_aero_bridle, axis=1))
+                print(
+                    "Bridle aero force: "
+                    f"|sum|={bridle_force_total_norm:.3f}N "
+                    f"sum=[{bridle_force_total[0]:.3f}, {bridle_force_total[1]:.3f}, {bridle_force_total[2]:.3f}]N "
+                    f"max_node={bridle_force_nodal_max:.3f}N"
+                )
+                logging.info(
+                    "Bridle aero force iter %s: |sum|=%.3fN, sum=(%.3f, %.3f, %.3f)N, max_node=%.3fN",
+                    i,
+                    bridle_force_total_norm,
+                    bridle_force_total[0],
+                    bridle_force_total[1],
+                    bridle_force_total[2],
+                    bridle_force_nodal_max,
                 )
             else:
                 f_aero_bridle = np.zeros((len(struc_nodes), 3))
+
+            inertial_force_total = np.asarray(
+                results_aero.get("inertial_force", np.zeros(3)), dtype=float
+            )
+            f_inertial = distribute_total_force_by_particle_mass(
+                inertial_force_total,
+                m_arr,
+            )
+            gravity_force_total = np.asarray(
+                results_aero.get("gravity_force", np.zeros(3)), dtype=float
+            )
+            f_ext_gravity = distribute_total_force_by_particle_mass(
+                gravity_force_total,
+                m_arr,
+            )
+            inertial_force_total_norm = np.linalg.norm(inertial_force_total)
+            print(
+                "Inertial force (QSM): "
+                f"|sum|={inertial_force_total_norm:.3f}N "
+                f"sum=[{inertial_force_total[0]:.3f}, {inertial_force_total[1]:.3f}, {inertial_force_total[2]:.3f}]N"
+            )
+            gravity_force_total_norm = np.linalg.norm(gravity_force_total)
+            print(
+                "Gravity force (QSM): "
+                f"|sum|={gravity_force_total_norm:.3f}N "
+                f"sum=[{gravity_force_total[0]:.3f}, {gravity_force_total[1]:.3f}, {gravity_force_total[2]:.3f}]N"
+            )
+            logging.info(
+                "Inertial force iter %s: |sum|=%.3fN, sum=(%.3f, %.3f, %.3f)N",
+                i,
+                inertial_force_total_norm,
+                inertial_force_total[0],
+                inertial_force_total[1],
+                inertial_force_total[2],
+            )
+            logging.info(
+                "Gravity force iter %s: |sum|=%.3fN, sum=(%.3f, %.3f, %.3f)N",
+                i,
+                gravity_force_total_norm,
+                gravity_force_total[0],
+                gravity_force_total[1],
+                gravity_force_total[2],
+            )
             f_aero = f_aero_wing + f_aero_bridle
 
             ## EXTERNAL FORCE
-            f_ext = f_aero + f_ext_gravity
+            f_ext = f_aero + f_inertial + f_ext_gravity
             f_ext = np.round(f_ext, 5)
             f_ext_flat = f_ext.flatten()
             end_time_f_ext = time.time()
@@ -841,6 +1005,8 @@ def main(
             struc_nodes,
             kite_connectivity_arr,
             f_ext=f_ext,
+            f_bridle=f_aero_bridle if config["is_with_aero_bridle"] else None,
+            f_inertial=f_inertial,
             rest_lengths=rest_lengths,
             struc_nodes_initial=struc_nodes_initial,
             title="Initial vs final",
