@@ -482,6 +482,18 @@ def main(
     dt_max = config["structural_pss"].get(
         "dt_max", dt_initial * 10.0
     )  # Default to 10x initial dt
+
+    # Quasi-steady stagnation stop: if rounded opt_x stops changing for N iterations.
+    qs_stag_decimals = int(
+        config["aero_structural_solver"].get("qs_state_stagnation_decimals", 3)
+    )
+    qs_stag_n_iter = int(
+        config["aero_structural_solver"].get("qs_state_stagnation_n_iter", 0)
+    )
+    qs_opt_prev_rounded = None
+    qs_stag_counter = 0
+    qs_state_should_break = False
+
     bridle_node_pairs = None
 
     if config["is_with_aero_bridle"]:
@@ -738,6 +750,32 @@ def main(
             print(f"  Pitch: {results_aero['opt_x'][2]:.2f} deg")
             print(f"  Yaw: {results_aero['opt_x'][3]:.2f} deg")
             print(f"  Course rate: {results_aero['opt_x'][4]:.2f} rad/s")
+
+            # Stop if quasi-steady state vector has effectively frozen.
+            if qs_stag_n_iter > 0:
+                qs_opt_current = np.asarray(results_aero.get("opt_x", []), dtype=float)
+                if qs_opt_current.size > 0:
+                    qs_opt_current_rounded = np.round(qs_opt_current, qs_stag_decimals)
+                    if (
+                        qs_opt_prev_rounded is not None
+                        and qs_opt_prev_rounded.shape == qs_opt_current_rounded.shape
+                        and np.array_equal(qs_opt_prev_rounded, qs_opt_current_rounded)
+                    ):
+                        qs_stag_counter += 1
+                    else:
+                        qs_stag_counter = 0
+
+                    qs_opt_prev_rounded = qs_opt_current_rounded.copy()
+
+                    if qs_stag_counter >= qs_stag_n_iter:
+                        qs_state_should_break = True
+                        logging.info(
+                            "Stopping: quasi-steady opt_x unchanged up to %s decimals for %s consecutive iterations. "
+                            "opt_x_rounded=%s",
+                            qs_stag_decimals,
+                            qs_stag_n_iter,
+                            qs_opt_current_rounded,
+                        )
             roll, pitch, yaw = results_aero["opt_x"][1:4]
             struc_nodes = rotate_geometry(struc_nodes, angle_deg=[roll, pitch, yaw])
             ### AERO --> STRUC
@@ -914,6 +952,9 @@ def main(
                         "Classic PS non-converging - residual no longer changes"
                     )
                     should_break = True
+
+            if qs_state_should_break:
+                break
 
             ### ACTUATION (only when converged)
             if is_convergence:
