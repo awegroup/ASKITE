@@ -31,9 +31,16 @@ DEFAULT_GUESS_QS = np.array(
 
 
 def _run_vsm_direct_fallback(body_aero, solver, system_model, current_guess):
-    """Fallback used when quasi-steady trim fails: run direct VSM solve."""
+    """
+    Fallback used when quasi-steady trim fails.
+
+    This path bypasses trim optimization and runs a direct aerodynamic solve on the
+    current body geometry. The returned dictionary mirrors the keys expected by the
+    coupled solver pipeline.
+    """
     res = solver.solve(body_aero)
 
+    # Convert AWETrim vectors into the same course-frame convention used by QSM outputs.
     trans = np.asarray(DEFAULT_TRANSFORMATION_C_FROM_VSM, dtype=float)
     inertial_force = -float(system_model.mass_wing) * np.asarray(
         trans @ np.asarray(system_model.acceleration_course_body, dtype=float),
@@ -70,16 +77,16 @@ def initialize(
     bridle_path=None,
 ) -> BodyAerodynamics:
     """
-    Load kite configuration and initialize the VSM BodyAerodynamics object with one Wing instance.
+    Initialize aerodynamic model and VSM solver.
 
     Args:
-        geometry_dict (dict): Kite configuration dictionary.
-        n_panels (int): Number of panels for the wing.
-        spanwise_panel_distribution (str): Type of spanwise distribution.
+        aero_geometry_path: Path to aerodynamic geometry file.
+        config (dict): Main ASKITE configuration dictionary.
+        n_panels_aero (int): Number of aerodynamic panels.
+        bridle_path: Optional structural geometry path used by VSM to build bridle lines.
 
     Returns:
-        BodyAerodynamics: Initialized body aerodynamic model.
-        Solver: Initialized solver object.
+        tuple: (body_aero, vsm_solver, vel_app, initial_polar_data)
     """
     body_aero = BodyAerodynamics.instantiate(
         n_panels=int(n_panels_aero),
@@ -148,25 +155,26 @@ def run_vsm_package(
     current_guess=None,
 ):
     """
-    Run the VSM simulation with updated geometry and velocity.
+    Run quasi-steady aerodynamic solve for the current structural geometry.
 
     Args:
         body_aero (BodyAerodynamics): Aerodynamic body object.
         solver (Solver): VSM solver object.
+        system_model: AWETrim system model used by quasi-steady trim.
+        center_of_gravity (np.ndarray): Current center of gravity in solver frame.
         le_arr (np.ndarray): Leading edge points (n,3).
         te_arr (np.ndarray): Trailing edge points (n,3).
-        va_vector (np.ndarray): Apparent wind vector (3,).
         aero_input_type (str): Type of aerodynamic input.
         initial_polar_data (list or None): Initial polar data for panels.
-        yaw_rate (float): Yaw rate for the simulation.
+        reference_point (list[float]): Reference point for moments and rotations.
+        include_gravity (bool): Include gravity in quasi-steady force/moment balance.
         is_with_plot (bool): If True, plot the geometry.
+        current_guess (np.ndarray or None): Initial guess for quasi-steady optimizer.
 
     Returns:
-        np.ndarray: Aerodynamic force distribution (n_panels,3).
-        BodyAerodynamics: Updated aerodynamic body.
-        dict: Results dictionary from the solver.
+        tuple: (F_distribution, body_aero, results)
     """
-    # redefine the points
+    # Update aerodynamic mesh from the latest structural leading/trailing-edge points.
     body_aero.update_from_points(
         le_arr,
         te_arr,
@@ -198,11 +206,11 @@ def run_vsm_package(
     )
     if current_guess is None:
         current_guess = DEFAULT_GUESS_QS
-    # solve the problem
+
+    # Primary path: quasi-steady trim solve.
     try:
-        body_fallback = copy.deepcopy(
-            body_aero
-        )  # Preserve the original state for fallback
+        # Preserve the pre-trim body state in case we need direct-solve fallback.
+        body_fallback = copy.deepcopy(body_aero)
         results, body_aero = solve_quasi_steady_state(
             body_aero=body_aero,
             center_of_gravity=center_of_gravity,
@@ -214,18 +222,19 @@ def run_vsm_package(
             bounds_upper=bounds_upper,
             include_gravity=include_gravity,
         )
-        # if not results.get("success", False):
-        #     print(
-        #         "Quasi-steady optimization did not converge to a solution within the specified bounds. "
-        #         "Falling back to direct VSM solver.solve(body_aero)."
-        #     )
-        #     results = _run_vsm_direct_fallback(
-        #         body_aero=body_fallback,
-        #         solver=solver,
-        #         system_model=system_model,
-        #         current_guess=current_guess,
-        #     )
+        if not results.get("success", False):
+            print(
+                "Quasi-steady optimization did not converge to a valid trim state. "
+                "Falling back to direct VSM solver.solve(body_aero)."
+            )
+            results = _run_vsm_direct_fallback(
+                body_aero=body_fallback,
+                solver=solver,
+                system_model=system_model,
+                current_guess=current_guess,
+            )
     except ValueError as exc:
+        # Typical case: non-finite residual in initial optimizer point.
         print(
             f"QSM failed ({type(exc).__name__}: {exc}). "
             "Falling back to direct VSM solver.solve(body_aero)."
