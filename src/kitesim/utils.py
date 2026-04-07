@@ -371,6 +371,47 @@ def calculate_cg(
     return np.array([np.dot(cg_xyz, axis_i) for axis_i in axes_norm], dtype=float)
 
 
+def calculate_inertia(nodes, desired_point=(0.0, 0.0, 0.0)):
+    """
+    Calculate the full 3x3 inertia tensor of point masses about a desired point.
+
+    Parameters:
+        nodes (sequence): Sequence of nodes, where each node is
+            ``[position, mass]`` and position is a 3D coordinate.
+        desired_point (array-like, optional): Point ``[x, y, z]`` about which
+            the inertia tensor is computed. Defaults to the origin.
+
+    Returns:
+        np.ndarray: Inertia tensor with shape ``(3, 3)``.
+    """
+    ref_point = _to_3_vector(desired_point, "desired_point")
+    inertia_tensor = np.zeros((3, 3), dtype=float)
+
+    for i, node in enumerate(nodes):
+        if len(node) != 2:
+            raise ValueError(
+                f"Each node must be [position, mass]. Invalid entry at index {i}: {node}"
+            )
+
+        position = _to_3_vector(node[0], f"nodes[{i}][0]")
+        mass = float(node[1])
+
+        r_x, r_y, r_z = position - ref_point
+        inertia_tensor[0, 0] += mass * (r_y**2 + r_z**2)  # Ixx
+        inertia_tensor[1, 1] += mass * (r_x**2 + r_z**2)  # Iyy
+        inertia_tensor[2, 2] += mass * (r_x**2 + r_y**2)  # Izz
+        inertia_tensor[0, 1] -= mass * r_x * r_y  # Ixy
+        inertia_tensor[0, 2] -= mass * r_x * r_z  # Ixz
+        inertia_tensor[1, 2] -= mass * r_y * r_z  # Iyz
+
+    # Fill the symmetric entries.
+    inertia_tensor[1, 0] = inertia_tensor[0, 1]
+    inertia_tensor[2, 0] = inertia_tensor[0, 2]
+    inertia_tensor[2, 1] = inertia_tensor[1, 2]
+
+    return inertia_tensor
+
+
 def calculate_moments_of_inertia(
     struc_nodes,
     m_arr,
@@ -378,7 +419,7 @@ def calculate_moments_of_inertia(
     axes=((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0)),
 ):
     """
-    Compute moments of inertia around axes through a reference point.
+    Compute scalar moments of inertia around three axes through a reference point.
 
     Args:
         struc_nodes (array-like): Structural node positions with shape (n_nodes, 3).
@@ -391,19 +432,13 @@ def calculate_moments_of_inertia(
         np.ndarray: Moments of inertia for the three axes, shape (3,).
     """
     nodes, masses = _validate_struct_nodes_and_masses(struc_nodes, m_arr)
-    ref_point = _to_3_vector(point, "point")
     axes_norm = _normalize_axes(axes)
+    point_mass_nodes = [(nodes[i], masses[i]) for i in range(nodes.shape[0])]
+    inertia_tensor = calculate_inertia(point_mass_nodes, desired_point=point)
 
-    rel = nodes - ref_point
-    rel_sq = np.einsum("ij,ij->i", rel, rel)
-
-    inertia_arr = []
-    for axis_i in axes_norm:
-        along_axis = rel @ axis_i
-        perp_dist_sq = np.maximum(0.0, rel_sq - along_axis**2)
-        inertia_arr.append(float(np.sum(masses * perp_dist_sq)))
-
-    return np.array(inertia_arr, dtype=float)
+    return np.array(
+        [float(axis_i @ inertia_tensor @ axis_i) for axis_i in axes_norm], dtype=float
+    )
 
 
 def rotate_geometry(
