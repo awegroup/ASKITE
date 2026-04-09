@@ -5,14 +5,24 @@ acc_kite: !!seq [0, 0, 0]
 
 ## case settings
 structural_solver: !!str 'pss' #"kite_fem" or "pss"
-starting_from_sim_of_date: !!str "2026_04_07_2110h" #"2026_02_12_0848h_fem_udp_03" #"2026_02_11_1729h"
-is_with_gravity: !!bool false
+starting_from_sim_subdir: depower_p0000mm_steer_p0000mm
+is_with_gravity: !!bool true
 is_with_aero_bridle: !!bool true
 is_with_aero_tether: !!bool false
 is_run_only_1_time_step: !!bool false
 is_with_initial_point_velocity: !!bool false
 is_with_forcing_symmetry: !!bool false
 initial_geometry_rotation_deg: !!float 0.0
+
+## system model initial conditions
+angle_elevation_deg: !!float 30.0
+angle_azimuth_deg: !!float 20.0
+angle_course_deg: !!float -90.0
+speed_radial: !!float 0.0
+distance_radial: !!float 200.0
+wind_speed_wind_ref: !!float 4.0
+timeder_speed_tangential: !!float 0.0
+timeder_speed_radial: !!float 0.0
 
 ## actuation settings
 power_tape_extension_step: !!float 0 #0.02 #0.01
@@ -21,7 +31,7 @@ steering_tape_extension_step: !!float 0
 steering_tape_final_extension: !!float 0.0
 
 ## output settings
-is_with_initial_structure_plot: !!bool true
+is_with_initial_structure_plot: !!bool false
 is_with_coupling_plot_per_iteration: !!bool false
 is_with_struc_plot_per_iteration: !!bool false
 is_with_aero_plot_per_iteration: !!bool false
@@ -44,7 +54,7 @@ aerodynamic_bridle:
 ## structural pss
 structural_pss:
   dt: !!float 0.001 #crucial that this remains low
-  dt_max: !!float 0.001
+  dt_max: !!float 0.005
   n_internal_time_steps: !!int 20 #was 20, then 200
   abs_tol: !!float 1.0e-50
   rel_tol: !!float 1.0e-5
@@ -85,9 +95,11 @@ aero_structural_solver:
   it_check: !!int 5
   tol: !!float 5 #N
   is_with_aitken_relaxation: !!bool true
-  relaxation_factor: !!float 0.3 #0.05-0.3
+  relaxation_factor: !!float 1 #0.05-0.3
   n_max_constant_residual_force: !!int 50
   stagnation_tol: !!float 0.1 # N, tolerance for stagnation detection
+  qs_state_stagnation_decimals: !!int 2 # stop if opt_x is unchanged at this rounding
+  qs_state_stagnation_n_iter: !!int 10 # consecutive unchanged iterations required to stop (0 disables)
 
 ## Physical constants
 grav_constant: !!seq [0, 0, -9.81]
@@ -95,8 +107,11 @@ rho: !!float 1.225 # air density in kg/m^3
 mu: !!float 1.789e-05 # dynamic viscosity in kg/(m*s)
 
 
-steering_tape_extension_step: !!float 0.02
-steering_tape_final_extension: !!float 0.4
+steering_tape_extension_step: !!float 0.15
+steering_tape_final_extension: !!float 0.15
+
+power_tape_extension_step: !!float 0.6 #0.01
+power_tape_final_extension: !!float 0.6 #0.05
 
 # power_tape_index:
 # # Stifnesses and damping
@@ -146,8 +161,7 @@ steering_tape_final_extension: !!float 0.4
 # steering
 # delta_ls_ini: !!float 0.00  # <-- NOT USED
 # ## NEW - in meters
-# power_tape_extension_step: !!float 0.00 #0.01
-# power_tape_final_extension: !!float 0.00 #0.05
+
 
 
 # crosswind_max_iter: !!int 50
