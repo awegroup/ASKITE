@@ -3,6 +3,8 @@ from pathlib import Path
 import argparse
 import subprocess
 import sys
+import csv
+from collections.abc import Mapping
 from kitesim.logging_config import *
 from datetime import datetime
 from kitesim.utils import (
@@ -224,6 +226,78 @@ def _resolve_initial_geometry_rotation_kwargs(config):
     }
 
 
+def _configure_system_model_from_config(system_model, config):
+    """Populate the AWETRIM SystemModel from config values."""
+    system_model.angle_elevation = np.deg2rad(
+        float(config.get("angle_elevation_deg", 30.0))
+    )
+    system_model.angle_azimuth = np.deg2rad(
+        float(config.get("angle_azimuth_deg", 20.0))
+    )
+    system_model.angle_course = np.deg2rad(float(config.get("angle_course_deg", 90.0)))
+    system_model.speed_radial = float(config.get("speed_radial", 0.0))
+    system_model.distance_radial = float(config.get("distance_radial", 200.0))
+    system_model.wind.speed_wind_ref = float(config.get("wind_speed_wind_ref", 4.0))
+    system_model.timeder_speed_tangential = float(
+        config.get("timeder_speed_tangential", 0.0)
+    )
+    system_model.timeder_speed_radial = float(config.get("timeder_speed_radial", 0.0))
+
+
+def _build_qsm_csv_row(config, results, case_folder, results_dir):
+    """Flatten one simulation run into a CSV row."""
+    opt_x = np.asarray(results.get("opt_x", []), dtype=float).reshape(-1)
+    opt_names = [
+        "kite_speed",
+        "roll_deg",
+        "pitch_deg",
+        "yaw_deg",
+        "course_rate_body",
+    ]
+    row = {
+        "case_folder": case_folder,
+        "results_dir": str(results_dir),
+        "is_with_gravity": bool(config.get("is_with_gravity", False)),
+        "is_with_aero_bridle": bool(config.get("is_with_aero_bridle", False)),
+        "depower_tape_final_extension_m": float(
+            config.get("power_tape_final_extension", 0.0)
+        ),
+        "steering_tape_final_extension_m": float(
+            config.get("steering_tape_final_extension", 0.0)
+        ),
+        "angle_elevation_deg": float(config.get("angle_elevation_deg", 30.0)),
+        "angle_azimuth_deg": float(config.get("angle_azimuth_deg", 20.0)),
+        "angle_course_deg": float(config.get("angle_course_deg", 90.0)),
+        "speed_radial": float(config.get("speed_radial", 0.0)),
+        "distance_radial": float(config.get("distance_radial", 200.0)),
+        "wind_speed_wind_ref": float(config.get("wind_speed_wind_ref", 4.0)),
+        "timeder_speed_tangential": float(config.get("timeder_speed_tangential", 0.0)),
+        "timeder_speed_radial": float(config.get("timeder_speed_radial", 0.0)),
+        "aero_roll_deg": float(results.get("aero_roll_deg", np.nan)),
+        "aoa_deg": float(results.get("aoa_deg", np.nan)),
+        "side_slip_deg": float(results.get("side_slip_deg", np.nan)),
+    }
+
+    for idx, name in enumerate(opt_names):
+        row[f"opt_{name}"] = float(opt_x[idx]) if idx < opt_x.size else np.nan
+
+    return row
+
+
+def _append_row_to_csv(csv_path, row):
+    """Append one row to a CSV file, creating the header if needed."""
+    csv_path = Path(csv_path)
+    csv_path.parent.mkdir(parents=True, exist_ok=True)
+
+    file_exists = csv_path.exists()
+    fieldnames = list(row.keys())
+    with csv_path.open("a", newline="", encoding="utf-8") as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
+        if not file_exists:
+            writer.writeheader()
+        writer.writerow(row)
+
+
 # Import modules
 def main():
     """Main function"""
@@ -437,14 +511,7 @@ def main():
     print(
         f"Total mass of the wing (sum of particle masses): {system_model.mass_wing:.3f} kg"
     )
-    system_model.angle_elevation = np.deg2rad(0)
-    system_model.angle_azimuth = np.deg2rad(0)
-    system_model.angle_course = np.deg2rad(90)
-    system_model.speed_radial = 0.0
-    system_model.distance_radial = 200
-    system_model.wind.speed_wind_ref = 4.0
-    system_model.timeder_speed_tangential = 0.0
-    system_model.timeder_speed_radial = 0.0
+    _configure_system_model_from_config(system_model, config)
 
     ########################################
     ### AEROSTUCTURAL COUPLED SIMULATION ###
@@ -485,6 +552,16 @@ def main():
     # Save results
     h5_path = Path(results_dir) / "sim_output.h5"
     save_results(tracking_data, meta, h5_path)
+
+    summary_csv_name = config.get("qsm_summary_csv_name", "qsm_summary.csv")
+    summary_csv_path = Path(PROJECT_DIR) / "results" / kite_name / summary_csv_name
+    summary_row = _build_qsm_csv_row(
+        config=config,
+        results=meta,
+        case_folder=case_folder,
+        results_dir=results_dir,
+    )
+    _append_row_to_csv(summary_csv_path, summary_row)
 
     # Load results
     meta_data_dict, tracking_data = load_sim_output(h5_path)

@@ -1059,6 +1059,11 @@ def main(
         "total_time_s": time.time() - start_time,
         "n_iter": i + 2,  # +2: 1 for pre-loop initial state + (i+1) loop entries
         "converged": is_convergence,
+        "qs_success": bool(results_aero.get("success", False)),
+        "opt_x": np.asarray(results_aero.get("opt_x", np.full(5, np.nan)), dtype=float),
+        "aero_roll_deg": float(results_aero.get("aero_roll_deg", np.nan)),
+        "aoa_deg": float(results_aero.get("aoa_deg", np.nan)),
+        "side_slip_deg": float(results_aero.get("side_slip_deg", np.nan)),
         "rest_lengths": rest_lengths,  # ensure numeric array
         # Convert kite_connectivity to a numeric array for HDF5 compatibility
         "kite_connectivity": np.array(

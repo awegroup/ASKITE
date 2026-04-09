@@ -26,7 +26,7 @@ roll_bounds = (
 )  # deg, small roll allowed for numerical reasons; not a physical roll
 
 DEFAULT_GUESS_QS = np.array(
-    [30.0, 0.0, 0.0, 0.0, -0.05]
+    [25.0, 0.0, 0.0, 0.0, -0.0]
 )  # [kite_speed, roll, pitch, yaw, course_rate_body]
 
 
@@ -221,6 +221,7 @@ def run_vsm_package(
             bounds_lower=bounds_lower,
             bounds_upper=bounds_upper,
             include_gravity=include_gravity,
+            use_gamma_warm_start=False,
         )
         if not results.get("success", False):
             print(
