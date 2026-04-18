@@ -17,8 +17,8 @@ kite_speed_bounds = (10.0, 50.0)  # m/s
 pitch_bounds = (-4, 4)  # deg
 yaw_bounds = (-4, 4)  # deg
 course_rate_bounds = (
-    -2,
-    2,
+    -3,
+    3,
 )  # rad/s, small course rate allowed for numerical reasons; not a physical course rate
 roll_bounds = (
     -4,
@@ -26,7 +26,7 @@ roll_bounds = (
 )  # deg, small roll allowed for numerical reasons; not a physical roll
 
 DEFAULT_GUESS_QS = np.array(
-    [25.0, 0.0, 0.0, 0.0, -0.0]
+    [30.0, 0.0, 0.0, 0.0, -0.0]
 )  # [kite_speed, roll, pitch, yaw, course_rate_body]
 
 

@@ -72,6 +72,72 @@ def _resolve_starting_struc_nodes(
     return struc_nodes_loaded
 
 
+def _resolve_starting_rest_lengths(
+    config,
+    project_dir,
+    kite_name,
+    l0_arr_default,
+):
+    """
+    Optionally load final rest_lengths from a previous simulation result.
+
+    If config["starting_from_sim_of_date"] is set, load the rest_lengths from the
+    corresponding H5 file. Otherwise return l0_arr_default.
+
+    Args:
+        config: Configuration dictionary
+        project_dir: Path to project root
+        kite_name: Name of the kite
+        l0_arr_default: Default rest length array from YAML geometry
+
+    Returns:
+        np.ndarray: Updated rest lengths (or defaults if not recovering)
+    """
+    sim_date = str(config.get("starting_from_sim_of_date", "")).strip()
+    if sim_date == "":
+        return l0_arr_default
+
+    start_dir = Path(project_dir) / "results" / kite_name / sim_date
+    if not start_dir.exists() or not start_dir.is_dir():
+        # No previous sim found, return defaults
+        return l0_arr_default
+
+    h5_path = start_dir / "sim_output.h5"
+    if not h5_path.exists():
+        logging.warning(
+            f"No sim_output.h5 found in {start_dir}, using default rest lengths"
+        )
+        return l0_arr_default
+
+    # Load rest_lengths from metadata
+    try:
+        metadata, _ = load_sim_output(h5_path)
+        if "rest_lengths" in metadata:
+            rest_lengths_loaded = np.asarray(metadata["rest_lengths"], dtype=float)
+            if rest_lengths_loaded.shape == np.asarray(l0_arr_default).shape:
+                logging.info(
+                    f"Loaded final rest lengths from previous simulation: {start_dir}"
+                )
+                return rest_lengths_loaded
+            else:
+                logging.warning(
+                    f"Loaded rest_lengths shape {rest_lengths_loaded.shape} "
+                    f"does not match current geometry {np.asarray(l0_arr_default).shape}, "
+                    f"using defaults"
+                )
+                return l0_arr_default
+        else:
+            logging.warning(
+                f"No 'rest_lengths' in {h5_path} metadata, using default rest lengths"
+            )
+            return l0_arr_default
+    except Exception as e:
+        logging.warning(
+            f"Error loading rest_lengths from {h5_path}: {e}, using defaults"
+        )
+        return l0_arr_default
+
+
 def _resolve_initial_geometry_rotation_kwargs(config):
     """
     Build rotate_geometry kwargs from config while keeping legacy behavior.
@@ -186,6 +252,13 @@ def main():
         project_dir=PROJECT_DIR,
         kite_name=kite_name,
         struc_nodes_default=struc_nodes,
+    )
+    # Also recover the final rest_lengths (element l0 values) from previous simulation if available
+    l0_arr = _resolve_starting_rest_lengths(
+        config=config,
+        project_dir=PROJECT_DIR,
+        kite_name=kite_name,
+        l0_arr_default=l0_arr,
     )
 
     # logging initial conditions
