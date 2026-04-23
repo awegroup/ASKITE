@@ -1,14 +1,10 @@
-## inflow conditions
-vel_wind: !!seq [35, 0, 0]
-vel_kite: !!seq [0, 0, 0]
-acc_kite: !!seq [0, 0, 0]
-
 ## case settings
 structural_solver: !!str 'pss' #"kite_fem" or "pss"
+kcu_mass: !!float 8.4
 starting_from_sim_subdir: depower_p0000mm_steer_p0000mm
 is_with_gravity: !!bool false
 is_with_aero_bridle: !!bool true
-is_with_aero_tether: !!bool false
+is_with_aero_tether: !!bool true
 is_run_only_1_time_step: !!bool false
 is_with_initial_point_velocity: !!bool false
 is_with_forcing_symmetry: !!bool false
@@ -18,16 +14,16 @@ initial_geometry_rotation_deg: !!float 0.0
 angle_elevation_deg: !!float 0.0
 angle_azimuth_deg: !!float 0.0
 angle_course_deg: !!float 90.0
-speed_radial: !!float 1.0
-distance_radial: !!float 200.0
-wind_speed_wind_ref: !!float 6.0
+speed_radial: !!float 1
+distance_radial: !!float 220.0
+wind_speed_wind_ref: !!float 6
 timeder_speed_tangential: !!float 0.0
 timeder_speed_radial: !!float 0.0
 
 ## actuation settings
-power_tape_extension_step: !!float 0 #0.02 #0.01
-power_tape_final_extension: !!float 0 #0.3 #0.05
-steering_tape_extension_step: !!float 0
+power_tape_extension_step: !!float 0.05 #0.02 #0.01
+power_tape_final_extension: !!float 0.0 #0.3 #0.05
+steering_tape_extension_step: !!float 0.05
 steering_tape_final_extension: !!float 0.0
 
 ## output settings
@@ -65,11 +61,11 @@ quasi_steady_trim:
   # These define the feasible region for the optimizer to explore.
   # Narrower bounds = fewer evaluations, faster convergence, but risk missing solutions.
   # Wider bounds = more thorough search but slower optimization.
-  kite_speed_bounds_ms: !!seq [10.0, 50.0]      # m/s - apparent wind relative speed
+  kite_speed_bounds_ms: !!seq [5.0, 50.0]      # m/s - apparent wind relative speed
   roll_bounds_deg: !!seq [-4.0, 4.0]            # degrees - wing roll angle
   pitch_bounds_deg: !!seq [-4.0, 4.0]           # degrees - pitch angle
   yaw_bounds_deg: !!seq [-4.0, 4.0]             # degrees - yaw angle
-  course_rate_bounds_rad_s: !!seq [-2.0, 2.0]   # rad/s - angular velocity about vertical axis
+  course_rate_bounds_rad_s: !!seq [-2.5, 2.5]   # rad/s - angular velocity about vertical axis
 
 ## aerodynamic bridle
 aerodynamic_bridle:
@@ -78,9 +74,9 @@ aerodynamic_bridle:
 
 ## structural pss
 structural_pss:
-  dt: !!float 0.001 #crucial that this remains low
-  dt_max: !!float 0.001
-  n_internal_time_steps: !!int 50 #was 20, then 200
+  dt: !!float 0.005 #crucial that this remains low
+  dt_max: !!float 0.01
+  n_internal_time_steps: !!int 100 #was 20, then 200
   abs_tol: !!float 1.0e-50
   rel_tol: !!float 1.0e-5
   max_iter: !!int 500
@@ -116,17 +112,18 @@ aero2struc:
 
 ## coupled
 aero_structural_solver:
-  max_iter: !!int 250
+  max_iter: !!int 100
   it_check: !!int 5
-  tol: !!float 2 #N
+  tol: !!float 5 #N
   is_with_aitken_relaxation: !!bool true
-  relaxation_factor: !!float 0.3 #0.05-0.3
+  relaxation_factor: !!float 0.5 #0.05-0.3
   n_max_constant_residual_force: !!int 10
   stagnation_tol: !!float 2 # N, tolerance for stagnation detection
   qs_state_stagnation_decimals: !!int 2 # stop if opt_x is unchanged at this rounding
-  qs_state_stagnation_n_iter: !!int 5 # consecutive unchanged iterations required to stop (0 disables)
+  qs_state_stagnation_n_iter: !!int 30 # consecutive unchanged iterations required to stop (0 disables)
   aero_update_interval: !!int 1 # run aero every N structural iterations (1 = every iter, 5 = every 5th)
-  node_displacement_tol: !!float 0 # stop if max nodal displacement < this [m] (0 = disabled, e.g. 1e-4)
+  steering_actuation_interval_iters: !!int 2 # apply steering actuation every N coupled iterations
+  node_displacement_tol: !!float 0.0001 # stop if max nodal displacement < this [m] (0 = disabled, e.g. 1e-4)
   aero_solve_type: !!str 'qsm' # 'qsm' = quasi-steady optimization with system_model; 'level_1' = direct VSM with va_vector
 
 ## Physical constants
@@ -135,11 +132,9 @@ rho: !!float 1.225 # air density in kg/m^3
 mu: !!float 1.789e-05 # dynamic viscosity in kg/(m*s)
 
 
-steering_tape_extension_step: !!float 0.05
-steering_tape_final_extension: !!float 0.05
-
-power_tape_extension_step: !!float 0 #0.01
-power_tape_final_extension: !!float 0 #0.05
+tether: # set to zero, if you don't want tether force
+  diameter: !!float 0.01  # 
+#   density: !!float 1.0    # <-- NOT USED
 
 # power_tape_index:
 # # Stifnesses and damping
@@ -196,10 +191,7 @@ power_tape_final_extension: !!float 0 #0.05
 # crosswind_tol: !!float 0.01
 # crosswind_relax_factor: !!float 0.5
 
-tether: # set to zero, if you don't want tether force
-  diameter: !!float 0.01  # <-- NOT USED
-#   length: !!float 100.0   # <-- NOT USED
-#   density: !!float 1.0    # <-- NOT USED
+
 
 ## output_settings:
 # is_print_mid_results: !!bool true

@@ -51,8 +51,8 @@ from awetrim.system.tether import RigidLumpedTether
 # ── Sweep parameters ─────────────────────────────────────────────────────────
 # Wind speed is taken from config file (wind_speed_wind_ref)
 
-STEERING_START_M: float = 0.05  # m
-STEERING_END_M: float = 0.35  # m
+STEERING_START_M: float = 0.0  # m
+STEERING_END_M: float = 0.25  # m
 STEERING_STEP_M: float = 0.05  # m
 
 # Depower tape extension applied to every run in the sweep.
@@ -94,6 +94,8 @@ CSV_FIELDNAMES: list = [
     "opt_pitch_deg",
     "opt_yaw_deg",
     "opt_course_rate_body",
+    "va",
+    "tether_force",
 ]
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -269,6 +271,13 @@ def _build_csv_row(
     for idx, name in enumerate(opt_names):
         row[f"opt_{name}"] = float(opt_x[idx]) if idx < opt_x.size else np.nan
 
+    # Apparent wind speed magnitude
+    row["va"] = float(meta.get("va", np.nan))
+
+    # Tether force: resultant force in radial (Z) direction
+    # This is computed from aero, gravity, and inertial forces at equilibrium
+    row["tether_force"] = float(meta.get("tether_force", np.nan))
+
     return row
 
 
@@ -374,7 +383,7 @@ def main() -> None:
         linktype_arr,
         pulley_line_indices,
         pulley_line_to_other_node_pair_dict,
-    ) = read_struc_geometry_yaml_level_1.main(struc_geometry)
+    ) = read_struc_geometry_yaml_level_1.main(struc_geometry, config=base_config)
 
     # Apply initial geometry rotation once
     struc_nodes_base = rotate_geometry(

@@ -13,7 +13,7 @@ from VSM.quasi_steady_state import (
 
 
 # Bounds and defaults (aoa, sideslip, course_rate_body)
-kite_speed_bounds = (10.0, 50.0)  # m/s
+kite_speed_bounds = (1.0, 50.0)  # m/s
 pitch_bounds = (-4, 4)  # deg
 yaw_bounds = (-4, 4)  # deg
 course_rate_bounds = (
@@ -106,7 +106,10 @@ def initialize(
         rho=config["rho"],
     )
 
-    vel_app = np.array(config["vel_wind"]) - np.array(config["vel_kite"])
+    # For QSM, wind speed comes from system model configuration (wind_speed_wind_ref).
+    # Kite velocity is computed by the optimizer, so we initialize with wind direction.
+    wind_speed_ref = float(config.get("wind_speed_wind_ref", 6.0))
+    vel_app = np.array([wind_speed_ref, 0.0, 0.0])
     body_aero.va = vel_app
     wing = body_aero.wings[0]
     new_sections = wing.refine_aerodynamic_mesh()
@@ -221,7 +224,6 @@ def run_vsm_package(
             bounds_lower=bounds_lower,
             bounds_upper=bounds_upper,
             include_gravity=include_gravity,
-            use_gamma_warm_start=False,
         )
         if not results.get("success", False):
             print(

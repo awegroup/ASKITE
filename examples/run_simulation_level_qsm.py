@@ -524,7 +524,7 @@ def main():
         linktype_arr,
         pulley_line_indices,
         pulley_line_to_other_node_pair_dict,
-    ) = read_struc_geometry_yaml_level_1.main(struc_geometry)
+    ) = read_struc_geometry_yaml_level_1.main(struc_geometry, config=config)
 
     #####################################################
     ### rotating the initial geometry by some angle,
@@ -627,25 +627,14 @@ def main():
     initial_length_steering_right = l0_arr[steering_tape_indices[1]]
     steering_tape_extension_step = config["steering_tape_extension_step"]
     steering_tape_final_extension = config["steering_tape_final_extension"]
-    # Apply steering if final extension != 0 (step=0 means single application, step>0 means gradual)
-    if abs(float(steering_tape_final_extension)) > 1e-9:
-        # Use step size from config, or final extension for single application (step=0)
-        effective_step = (
-            float(steering_tape_extension_step)
-            if steering_tape_extension_step != 0
-            else steering_tape_final_extension
-        )
-        aerostructural_coupled_solver_qsm.update_steering_tape_actuation(
-            config=config,
-            psystem=psystem,
-            kite_fem_structure=kite_fem_structure,
-            kite_connectivity_arr=kite_connectivity_arr,
-            steering_tape_indices=steering_tape_indices,
-            steering_tape_extension_step=effective_step,
-            initial_length_steering_left=initial_length_steering_left,
-            initial_length_steering_right=initial_length_steering_right,
-            steering_tape_final_extension=steering_tape_final_extension,
-        )
+    logging.info(
+        f"Initial steering tape lengths: left={initial_length_steering_left:.3f}m, "
+        f"right={initial_length_steering_right:.3f}m"
+    )
+    logging.info(
+        f"Desired steering extension target: {steering_tape_final_extension:.3f}m "
+        f"with internal step {steering_tape_extension_step:.3f}m"
+    )
 
     ########################################
     # AWETRIM SYSTEM MODEL
@@ -674,6 +663,11 @@ def main():
         n_power_tape_steps=n_power_tape_steps,
         power_tape_final_extension=power_tape_final_extension,
         power_tape_extension_step=power_tape_extension_step,
+        initial_length_steering_left=initial_length_steering_left,
+        initial_length_steering_right=initial_length_steering_right,
+        steering_tape_indices=steering_tape_indices,
+        steering_tape_final_extension=steering_tape_final_extension,
+        steering_tape_extension_step=steering_tape_extension_step,
         ### CONNECTIVITY
         kite_connectivity_arr=kite_connectivity_arr,
         bridle_connectivity_arr=bridle_connectivity_arr,

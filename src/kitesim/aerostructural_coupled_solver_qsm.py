@@ -189,7 +189,7 @@ def update_power_tape_actuation(
     power_tape_extension_step,
     initial_length_power_tape,
     power_tape_final_extension,
-    is_residual_below_tol,
+    should_apply_update,
     n_power_tape_steps,
     rest_lengths=None,
 ):
@@ -205,36 +205,49 @@ def update_power_tape_actuation(
         power_tape_extension_step: Increment for power tape extension
         initial_length_power_tape: Initial length of power tape
         power_tape_final_extension: Final desired power tape extension
-        is_residual_below_tol: Flag indicating if residual is below tolerance
+        should_apply_update: Flag indicating if a depower step should be applied now
         n_power_tape_steps: Number of power tape extension steps
         rest_lengths: Current rest lengths array (for kite_fem solver)
 
     Returns:
-        tuple: (delta_power_tape, is_actuation_finalized)
+        tuple: (delta_power_tape, is_actuation_finalized, did_update)
             - delta_power_tape: Current change in power tape length
             - is_actuation_finalized: True if actuation is complete, False otherwise
+            - did_update: True if a depower step was applied this iteration
     """
     is_actuation_finalized = True
+    did_update = False
 
     ## Calculate delta tape lengths based on structural solver
     if config["structural_solver"] == "pss":
         current_length = float(psystem.extract_rest_length[power_tape_index])
         delta_power_tape = current_length - initial_length_power_tape
+        _, should_update = _compute_power_tape_increment(
+            delta_power_tape=delta_power_tape,
+            power_tape_final_extension=power_tape_final_extension,
+            power_tape_extension_step=power_tape_extension_step,
+        )
+        is_actuation_finalized = not should_update
 
-        if is_residual_below_tol:
-            increment, should_update = _compute_power_tape_increment(
+        if should_apply_update and should_update:
+            increment, _ = _compute_power_tape_increment(
                 delta_power_tape=delta_power_tape,
                 power_tape_final_extension=power_tape_final_extension,
                 power_tape_extension_step=power_tape_extension_step,
             )
-            if should_update:
-                psystem.update_rest_length(power_tape_index, increment)
-                current_length = float(psystem.extract_rest_length[power_tape_index])
-                delta_power_tape = current_length - initial_length_power_tape
-                logging.info(
-                    f"||--- delta l_d: {delta_power_tape:.3f}m | new l_d: {current_length:.3f}m | Steps required: {n_power_tape_steps}"
-                )
-                is_actuation_finalized = False
+            psystem.update_rest_length(power_tape_index, increment)
+            did_update = True
+            current_length = float(psystem.extract_rest_length[power_tape_index])
+            delta_power_tape = current_length - initial_length_power_tape
+            _, should_update_after = _compute_power_tape_increment(
+                delta_power_tape=delta_power_tape,
+                power_tape_final_extension=power_tape_final_extension,
+                power_tape_extension_step=power_tape_extension_step,
+            )
+            is_actuation_finalized = not should_update_after
+            logging.info(
+                f"||--- delta l_d: {delta_power_tape:.3f}m | new l_d: {current_length:.3f}m | Steps required: {n_power_tape_steps}"
+            )
 
     elif config["structural_solver"] == "kite_fem":
         if kite_connectivity_arr is None:
@@ -249,73 +262,164 @@ def update_power_tape_actuation(
         )
         current_length = float(kite_fem_structure.spring_elements[spring_id].l0)
         delta_power_tape = current_length - initial_length_power_tape
+        _, should_update = _compute_power_tape_increment(
+            delta_power_tape=delta_power_tape,
+            power_tape_final_extension=power_tape_final_extension,
+            power_tape_extension_step=power_tape_extension_step,
+        )
+        is_actuation_finalized = not should_update
 
-        if is_residual_below_tol:
-            increment, should_update = _compute_power_tape_increment(
+        if should_apply_update and should_update:
+            increment, _ = _compute_power_tape_increment(
                 delta_power_tape=delta_power_tape,
                 power_tape_final_extension=power_tape_final_extension,
                 power_tape_extension_step=power_tape_extension_step,
             )
-            if should_update:
-                new_length = current_length + increment
-                kite_fem_structure.modify_get_spring_rest_length(
-                    spring_ids=[spring_id],
-                    new_l0s=[new_length],
-                )
-                delta_power_tape = new_length - initial_length_power_tape
-                logging.info(
-                    f"||--- delta l_d: {delta_power_tape:.3f}m | new l_d: {new_length:.3f}m | Steps required: {n_power_tape_steps}"
-                )
-                is_actuation_finalized = False
+            new_length = current_length + increment
+            kite_fem_structure.modify_get_spring_rest_length(
+                spring_ids=[spring_id],
+                new_l0s=[new_length],
+            )
+            did_update = True
+            delta_power_tape = new_length - initial_length_power_tape
+            _, should_update_after = _compute_power_tape_increment(
+                delta_power_tape=delta_power_tape,
+                power_tape_final_extension=power_tape_final_extension,
+                power_tape_extension_step=power_tape_extension_step,
+            )
+            is_actuation_finalized = not should_update_after
+            logging.info(
+                f"||--- delta l_d: {delta_power_tape:.3f}m | new l_d: {new_length:.3f}m | Steps required: {n_power_tape_steps}"
+            )
 
-    return delta_power_tape, is_actuation_finalized
+    return delta_power_tape, is_actuation_finalized, did_update
+
+
+def update_steering_tape_actuation_progressive(
+    config,
+    psystem,
+    kite_fem_structure,
+    kite_connectivity_arr,
+    steering_tape_indices,
+    steering_tape_extension_step,
+    initial_length_steering_left,
+    initial_length_steering_right,
+    steering_tape_final_extension,
+    should_apply_update,
+):
+    """Progressively apply steering actuation, mirroring depower internal stepping."""
+    if steering_tape_indices is None or len(steering_tape_indices) < 2:
+        return 0.0, True, False
+
+    target = float(steering_tape_final_extension)
+    if np.abs(target) <= 1e-9:
+        return 0.0, True, False
+
+    left_idx = int(steering_tape_indices[0])
+    right_idx = int(steering_tape_indices[1])
+
+    if config["structural_solver"] == "pss":
+        current_left = float(psystem.extract_rest_length[left_idx])
+        current_right = float(psystem.extract_rest_length[right_idx])
+    elif config["structural_solver"] == "kite_fem":
+        if kite_connectivity_arr is None:
+            raise ValueError(
+                "kite_connectivity_arr is required for kite_fem steering actuation."
+            )
+        left_spring_id = _find_kite_fem_spring_id_from_connectivity(
+            kite_fem_structure=kite_fem_structure,
+            kite_connectivity_arr=kite_connectivity_arr,
+            connectivity_idx=left_idx,
+        )
+        right_spring_id = _find_kite_fem_spring_id_from_connectivity(
+            kite_fem_structure=kite_fem_structure,
+            kite_connectivity_arr=kite_connectivity_arr,
+            connectivity_idx=right_idx,
+        )
+        current_left = float(kite_fem_structure.spring_elements[left_spring_id].l0)
+        current_right = float(kite_fem_structure.spring_elements[right_spring_id].l0)
+    else:
+        raise ValueError("Invalid structural solver specified, either pss or kite_fem")
+
+    current_delta_left = float(initial_length_steering_left) - current_left
+    current_delta_right = current_right - float(initial_length_steering_right)
+    current_delta = 0.5 * (current_delta_left + current_delta_right)
+
+    if np.abs(target - current_delta) <= 1e-9:
+        return current_delta, True, False
+
+    if not should_apply_update:
+        return current_delta, False, False
+
+    step = float(steering_tape_extension_step)
+    if np.abs(step) <= 1e-9:
+        increment = target - current_delta
+    else:
+        remaining = target - current_delta
+        increment = np.sign(remaining) * min(np.abs(step), np.abs(remaining))
+
+    next_delta = current_delta + increment
+    update_steering_tape_actuation(
+        config=config,
+        psystem=psystem,
+        kite_fem_structure=kite_fem_structure,
+        kite_connectivity_arr=kite_connectivity_arr,
+        steering_tape_indices=steering_tape_indices,
+        steering_tape_extension_step=step,
+        initial_length_steering_left=initial_length_steering_left,
+        initial_length_steering_right=initial_length_steering_right,
+        steering_tape_final_extension=next_delta,
+    )
+
+    is_finalized = np.abs(target - next_delta) <= 1e-9
+    return next_delta, is_finalized, True
 
 
 def compute_adaptive_dt(
     f_residual_list,
     dt_initial,
     dt_max,
-    ref_residual_initial=None,
+    residual_tol,
 ):
     """
-    Compute adaptive dt that increases as residual decreases.
+    Compute adaptive dt that increases as residual approaches convergence.
 
-    Strategy: dt scales with a factor based on how much the residual has
-    decreased relative to its initial value. Smaller residuals → larger dt.
+    Strategy: dt scales with the absolute residual level relative to the
+    convergence tolerance. Residual near tolerance -> dt approaches dt_max.
 
     Args:
         f_residual_list: List of residual force norms over iterations
         dt_initial: Initial dt from config
         dt_max: Maximum dt (cap to prevent instability)
-        ref_residual_initial: Reference initial residual for normalization
-            (defaults to first residual if not provided)
+        residual_tol: Absolute residual convergence tolerance
 
     Returns:
         dt: Adaptive timestep value
     """
-    if len(f_residual_list) < 2:
+    if len(f_residual_list) < 1:
         return dt_initial
-
-    if ref_residual_initial is None:
-        ref_residual_initial = f_residual_list[0]
 
     current_residual = f_residual_list[-1]
 
-    # Avoid division by zero or negative values
-    if ref_residual_initial <= 1e-10 or current_residual <= 1e-10:
+    # Defensive handling for invalid settings/values.
+    if (
+        residual_tol is None
+        or residual_tol <= 0
+        or not np.isfinite(residual_tol)
+        or not np.isfinite(current_residual)
+        or current_residual < 0
+    ):
         return dt_initial
 
-    # Compute reduction factor: ratio of current to initial residual
-    # As residual decreases, ratio decreases, so dt increases
-    reduction_factor = current_residual / ref_residual_initial
-    reduction_factor = np.clip(reduction_factor, 1e-6, 1.0)
+    # Scale from dt_initial (large residuals) to dt_max (near tolerance).
+    # ratio = 1 at/under tolerance, tends to 0 for large residuals.
+    ratio = np.clip(residual_tol / max(current_residual, 1e-12), 0.0, 1.0)
+    dt_adaptive = dt_initial + (dt_max - dt_initial) * ratio
 
-    # Scale dt adaptively: dt = dt_initial * (1 / reduction_factor)
-    # When reduction_factor is small (high convergence), dt becomes larger
-    dt_adaptive = dt_initial / reduction_factor
-
-    # Cap at max dt to maintain stability
-    dt = min(dt_adaptive, dt_max)
+    # Ensure dt remains bounded regardless of dt ordering.
+    dt_low = min(dt_initial, dt_max)
+    dt_high = max(dt_initial, dt_max)
+    dt = float(np.clip(dt_adaptive, dt_low, dt_high))
 
     return dt
 
@@ -379,14 +483,14 @@ def check_convergence(
         logging.info("Classic PS diverged - residual force is NaN")
         should_break = True
 
-    # if residual forces are not changing anymore (compare start of window vs current)
-    elif (
-        iters_since_start > n_stag
-        and np.abs(f_residual_list[i - n_stag] - f_residual_list[i])
-        < config["aero_structural_solver"]["stagnation_tol"]
-    ):
-        is_convergence = False
-        is_stagnated = True
+    # if residual forces are not changing anymore across the full recent window
+    elif iters_since_start >= n_stag and n_stag > 0:
+        window_vals = np.asarray(f_residual_list[i - n_stag : i + 1], dtype=float)
+        if window_vals.size > 0 and np.isfinite(window_vals).all():
+            residual_span = float(np.max(window_vals) - np.min(window_vals))
+            if residual_span < config["aero_structural_solver"]["stagnation_tol"]:
+                is_convergence = False
+                is_stagnated = True
 
     # if too many iterations are needed
     elif i > config["aero_structural_solver"]["max_iter"]:
@@ -420,6 +524,11 @@ def main(
     n_power_tape_steps=None,
     power_tape_final_extension=None,
     power_tape_extension_step=None,
+    initial_length_steering_left=None,
+    initial_length_steering_right=None,
+    steering_tape_indices=None,
+    steering_tape_final_extension=None,
+    steering_tape_extension_step=None,
     ### CONNECTIVITY
     kite_connectivity_arr=None,
     bridle_connectivity_arr=None,
@@ -468,7 +577,8 @@ def main(
     is_convergence = False
     f_residual_list = []
     f_tether_drag = np.zeros(3)
-    is_residual_below_tol = False
+    is_actuation_finalized = True
+    is_steering_finalized = True
     struc_nodes_prev = None  # Initialize previous points for tracking
     start_time = time.time()
     plotting.set_plot_style()
@@ -490,9 +600,40 @@ def main(
     qs_stag_n_iter = int(
         config["aero_structural_solver"].get("qs_state_stagnation_n_iter", 0)
     )
+    steering_actuation_interval_iters = int(
+        config["aero_structural_solver"].get("steering_actuation_interval_iters", 5)
+    )
+    steering_actuation_interval_iters = max(1, steering_actuation_interval_iters)
+    power_tape_actuation_interval_iters = int(
+        config["aero_structural_solver"].get(
+            "power_tape_actuation_interval_iters", steering_actuation_interval_iters
+        )
+    )
+    power_tape_actuation_interval_iters = max(1, power_tape_actuation_interval_iters)
+    depower_settle_iterations_after_update = int(
+        config["aero_structural_solver"].get(
+            "depower_settle_iterations_after_update", 2
+        )
+    )
+    depower_settle_iterations_after_update = max(
+        0, depower_settle_iterations_after_update
+    )
     qs_opt_prev_rounded = None
     qs_stag_counter = 0
     qs_state_should_break = False
+    depower_settle_counter = 0
+    logging.info(
+        "Steering actuation interval: every %s iterations",
+        steering_actuation_interval_iters,
+    )
+    logging.info(
+        "Depower actuation interval: every %s iterations",
+        power_tape_actuation_interval_iters,
+    )
+    logging.info(
+        "Depower settle iterations after update: %s",
+        depower_settle_iterations_after_update,
+    )
 
     bridle_node_pairs = None
 
@@ -614,6 +755,7 @@ def main(
                         f_residual_list,
                         dt_initial,
                         dt_max,
+                        config["aero_structural_solver"]["tol"],
                     )
                     config["structural_pss"]["dt"] = adaptive_dt
                     logging.debug(
@@ -936,6 +1078,27 @@ def main(
                 stagnation_check_start=stagnation_check_start,
             )
 
+            should_apply_steering_now = (
+                steering_tape_extension_step != 0
+                and steering_tape_final_extension != 0
+                and ((i + 1) % steering_actuation_interval_iters == 0)
+            )
+
+            delta_steering, is_steering_finalized, did_update_steering = (
+                update_steering_tape_actuation_progressive(
+                    config=config,
+                    psystem=psystem,
+                    kite_fem_structure=kite_fem_structure,
+                    kite_connectivity_arr=kite_connectivity_arr,
+                    steering_tape_indices=steering_tape_indices,
+                    steering_tape_extension_step=steering_tape_extension_step,
+                    initial_length_steering_left=initial_length_steering_left,
+                    initial_length_steering_right=initial_length_steering_right,
+                    steering_tape_final_extension=steering_tape_final_extension,
+                    should_apply_update=should_apply_steering_now,
+                )
+            )
+
             # Two-phase regularization: on stagnation in phase 1, disable
             # pseudo_dt and continue to let the solver polish to true equilibrium.
             if is_stagnated:
@@ -954,38 +1117,59 @@ def main(
                     should_break = True
 
             if qs_state_should_break:
-                break
+                # Do not allow quasi-steady stagnation stopping to interrupt
+                # progressive actuation before targets are fully applied.
+                if (
+                    is_actuation_finalized
+                    and is_steering_finalized
+                    and depower_settle_counter == 0
+                ):
+                    break
+                qs_state_should_break = False
 
-            ### ACTUATION (only when converged)
-            if is_convergence:
-                # Update residual flag for actuation function
-                is_residual_below_tol = is_convergence
+            ### ACTUATION (depower & steering checked every iteration; applied at enforced cadence)
+            should_apply_depower_now = (
+                power_tape_extension_step != 0
+                and power_tape_final_extension != 0
+                and ((i + 1) % power_tape_actuation_interval_iters == 0)
+            )
+            (
+                delta_power_tape,
+                is_actuation_finalized,
+                did_update_depower,
+            ) = update_power_tape_actuation(
+                config=config,
+                psystem=psystem,
+                kite_fem_structure=kite_fem_structure,
+                kite_connectivity_arr=kite_connectivity_arr,
+                power_tape_index=power_tape_index,
+                power_tape_extension_step=power_tape_extension_step,
+                initial_length_power_tape=initial_length_power_tape,
+                power_tape_final_extension=power_tape_final_extension,
+                should_apply_update=should_apply_depower_now,
+                n_power_tape_steps=n_power_tape_steps,
+                rest_lengths=(
+                    rest_lengths if config["structural_solver"] == "kite_fem" else None
+                ),
+            )
 
-                delta_power_tape, is_actuation_finalized = update_power_tape_actuation(
-                    config=config,
-                    psystem=psystem,
-                    kite_fem_structure=kite_fem_structure,
-                    kite_connectivity_arr=kite_connectivity_arr,
-                    power_tape_index=power_tape_index,
-                    power_tape_extension_step=power_tape_extension_step,
-                    initial_length_power_tape=initial_length_power_tape,
-                    power_tape_final_extension=power_tape_final_extension,
-                    is_residual_below_tol=is_residual_below_tol,
-                    n_power_tape_steps=n_power_tape_steps,
-                    rest_lengths=(
-                        rest_lengths
-                        if config["structural_solver"] == "kite_fem"
-                        else None
-                    ),
-                )
+            if did_update_depower:
+                depower_settle_counter = depower_settle_iterations_after_update
+            elif depower_settle_counter > 0:
+                depower_settle_counter -= 1
 
-                # If actuation not finalized, continue to next iteration
-                if not is_actuation_finalized:
-                    # ACTUATION PHASE: Continue until power tape reaches final extension
-                    continue
+            # If either actuation is not finalized, continue actuation phase.
+            if (
+                (not is_actuation_finalized)
+                or (not is_steering_finalized)
+                or (depower_settle_counter > 0)
+            ):
+                continue
 
             # Check if we should exit the loop
-            if should_break or (is_convergence and is_actuation_finalized):
+            if should_break or (
+                is_convergence and is_actuation_finalized and is_steering_finalized
+            ):
                 break
     ######################################################################
     ## END OF SIMULATION FOR LOOP
@@ -1055,15 +1239,84 @@ def main(
             pulley_line_to_other_node_pair_dict=pulley_line_to_other_node_pair_dict,
             vel_app=vel_app,
         )
+
+    # Calculate cl, cd, tether force, and va for output
+    opt_x = np.asarray(results_aero.get("opt_x", np.full(5, np.nan)), dtype=float)
+    kite_speed = opt_x[0] if opt_x.size > 0 else np.nan
+
+    # Apparent wind speed from quasi-steady kinematics (opt_x[0]).
+    # Fallback to body_aero.va for backward compatibility.
+    if opt_x.size > 0 and np.isfinite(opt_x[0]):
+        va = float(opt_x[0])
+    else:
+        try:
+            va_vec = np.asarray(body_aero.va, dtype=float)
+            va = float(np.linalg.norm(va_vec))
+        except:
+            va = np.nan
+
+    # Extract Cl and Cd from VSM solution
+    # Try from results_aero dict first (cl_distribution, cd_distribution)
+    cl = np.nan
+    cd = np.nan
+
+    try:
+        cl_dist = np.asarray(results_aero.get("cl", []), dtype=float).ravel()
+        cd_dist = np.asarray(results_aero.get("cd", []), dtype=float).ravel()
+        if cl_dist.size > 0 and np.isfinite(cl_dist).any():
+            cl = float(np.nanmean(cl_dist))  # Wing-averaged Cl
+        if cd_dist.size > 0 and np.isfinite(cd_dist).any():
+            cd = float(np.nanmean(cd_dist))  # Wing-averaged Cd
+    except Exception as e:
+        logging.warning(
+            f"Could not extract cl/cd from cl_distribution/cd_distribution: {e}"
+        )
+
+    # Fallback: try to extract from body_aero panels after solve
+    if np.isnan(cl) or np.isnan(cd):
+        try:
+            panels = body_aero.panels
+            if panels and len(panels) > 0:
+                # Try to access cl/cd attributes from panels
+                cl_vals = [
+                    p.cl for p in panels if hasattr(p, "cl") and np.isfinite(p.cl)
+                ]
+                cd_vals = [
+                    p.cd for p in panels if hasattr(p, "cd") and np.isfinite(p.cd)
+                ]
+                if cl_vals:
+                    cl = float(np.mean(cl_vals))
+                if cd_vals:
+                    cd = float(np.mean(cd_vals))
+                logging.info(f"Extracted Cl={cl:.4f}, Cd={cd:.4f} from panel objects")
+        except Exception as e:
+            logging.warning(f"Could not extract cl/cd from panel objects: {e}")
+
+    # Also debug: log what's in results_aero
+    logging.debug(f"results_aero keys: {list(results_aero.keys())}")
+
+    # Tether force: sum of all forces in Z direction at equilibrium
+    try:
+        f_aero_total = np.sum(f_aero_wing, axis=0)  # f_aero_wing is shape (n_nodes, 3)
+        tether_force = float(
+            f_aero_total[2] + gravity_force_total[2] + inertial_force_total[2]
+        )
+    except:
+        tether_force = np.nan
+
     meta = {
         "total_time_s": time.time() - start_time,
         "n_iter": i + 2,  # +2: 1 for pre-loop initial state + (i+1) loop entries
         "converged": is_convergence,
         "qs_success": bool(results_aero.get("success", False)),
-        "opt_x": np.asarray(results_aero.get("opt_x", np.full(5, np.nan)), dtype=float),
+        "opt_x": opt_x,
         "aero_roll_deg": float(results_aero.get("aero_roll_deg", np.nan)),
         "aoa_deg": float(results_aero.get("aoa_deg", np.nan)),
         "side_slip_deg": float(results_aero.get("side_slip_deg", np.nan)),
+        "va": va,
+        "cl": float(cl),
+        "cd": float(cd),
+        "tether_force": float(tether_force),
         "rest_lengths": rest_lengths,  # ensure numeric array
         # Convert kite_connectivity to a numeric array for HDF5 compatibility
         "kite_connectivity": np.array(
