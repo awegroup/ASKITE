@@ -2,6 +2,24 @@ import numpy as np
 import logging
 
 
+def _resolve_kcu_mass(struc_geometry, config=None):
+    """Resolve KCU mass with config override and geometry fallback."""
+    if isinstance(config, dict):
+        kcu_cfg = config.get("kcu", {})
+        if isinstance(kcu_cfg, dict) and "mass" in kcu_cfg:
+            return float(kcu_cfg["mass"])
+        if "kcu_mass" in config:
+            return float(config["kcu_mass"])
+
+    if "kcu_mass" in struc_geometry:
+        return float(struc_geometry["kcu_mass"])
+
+    logging.warning(
+        "KCU mass not found in config or structural geometry; defaulting to 0.0 kg."
+    )
+    return 0.0
+
+
 def initialize_particles(struc_geometry, struc_nodes, m_arr):
     """
     Initialize particles for the kite structure.
@@ -706,13 +724,13 @@ def initialize_bridle_line_system(
     )
 
 
-def main(struc_geometry):
+def main(struc_geometry, config=None):
 
     ### First append the bridle_point_node, as this node (KCU) should have index 0
     struc_nodes = []
     m_arr = []
     struc_nodes.append(np.array(struc_geometry["bridle_point_node"]))
-    m_arr.append(0)
+    m_arr.append(_resolve_kcu_mass(struc_geometry, config=config))
 
     # initialize element level lists
     kite_connectivity_arr = []

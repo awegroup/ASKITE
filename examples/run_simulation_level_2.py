@@ -2,6 +2,8 @@ import numpy as np
 from pathlib import Path
 from kitesim.logging_config import *
 from datetime import datetime
+from awetrim.system.system_model import SystemModel
+from awetrim.system.tether import RigidLumpedTether
 from kitesim.utils import (
     load_and_save_config_files,
     load_yaml,
@@ -50,6 +52,24 @@ def _resolve_initial_geometry_rotation_kwargs(config):
         "point": config.get("initial_geometry_rotation_point", [0.0, 0.0, 0.0]),
         "axes": config.get("initial_geometry_rotation_axes", ["x", "y", "z"]),
     }
+
+
+def _configure_system_model_from_config(system_model, config):
+    """Populate the AWETRIM SystemModel from config values."""
+    system_model.angle_elevation = np.deg2rad(
+        float(config.get("angle_elevation_deg", 30.0))
+    )
+    system_model.angle_azimuth = np.deg2rad(
+        float(config.get("angle_azimuth_deg", 20.0))
+    )
+    system_model.angle_course = np.deg2rad(float(config.get("angle_course_deg", 90.0)))
+    system_model.speed_radial = float(config.get("speed_radial", 0.0))
+    system_model.distance_radial = float(config.get("distance_radial", 200.0))
+    system_model.wind.speed_wind_ref = float(config.get("wind_speed_wind_ref", 4.0))
+    system_model.timeder_speed_tangential = float(
+        config.get("timeder_speed_tangential", 0.0)
+    )
+    system_model.timeder_speed_radial = float(config.get("timeder_speed_radial", 0.0))
 
 
 # Import modules
@@ -121,7 +141,7 @@ def main():
         linktype_arr,
         pulley_line_indices,
         pulley_line_to_other_node_pair_dict,
-    ) = read_struc_geometry_yaml_level_2.main(struc_geometry)
+    ) = read_struc_geometry_yaml_level_2.main(struc_geometry, config=config)
 
     #####################################################
     ### rotating the initial geometry by some angle,
@@ -229,12 +249,22 @@ def main():
         #     raise ValueError("kite_fem solver is not implemented yet")
 
     ########################################
+    # AWETRIM SYSTEM MODEL
+    ########################################
+    tether_config = config.get("tether", {}) or {}
+    tether = RigidLumpedTether(diameter=float(tether_config.get("diameter", 0.04)))
+    system_model = SystemModel(tether=tether)
+    system_model.mass_wing = float(np.sum(m_arr))
+    _configure_system_model_from_config(system_model, config)
+
+    ########################################
     ### AEROSTUCTURAL COUPLED SIMULATION ###
     ########################################
     tracking_data, meta = aerostructural_coupled_solver_level_2.main(
         m_arr=m_arr,
         struc_nodes=struc_nodes,
         struc_nodes_initial=struc_nodes_initial,
+        system_model=system_model,
         config=config,
         ### ACTUATION
         initial_length_power_tape=initial_length_power_tape,

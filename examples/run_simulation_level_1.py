@@ -237,7 +237,7 @@ def main():
         linktype_arr,
         pulley_line_indices,
         pulley_line_to_other_node_pair_dict,
-    ) = read_struc_geometry_yaml_level_1.main(struc_geometry)
+    ) = read_struc_geometry_yaml_level_1.main(struc_geometry, config=config)
 
     #####################################################
     ### rotating the initial geometry by some angle,

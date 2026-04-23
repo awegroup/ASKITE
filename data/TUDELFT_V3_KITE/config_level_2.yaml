@@ -1,10 +1,6 @@
-## inflow conditions
-vel_wind: !!seq [12, 0, 0]
-vel_kite: !!seq [0, 0, 0]
-acc_kite: !!seq [0, 0, 0]
-
 ## case settings
 structural_solver: !!str "kite_fem" #"kite_fem" or "pss"
+kcu_mass: !!float 8.4
 is_with_gravity: !!bool true
 is_with_aero_bridle: !!bool false
 is_with_aero_tether: !!bool false
@@ -12,6 +8,16 @@ is_run_only_1_time_step: !!bool false
 is_with_initial_point_velocity: !!bool false
 is_with_forcing_symmetry: !!bool false
 initial_geometry_rotation_deg: !!float 10.0
+
+## system model initial conditions
+angle_elevation_deg: !!float 0.0
+angle_azimuth_deg: !!float 0.0
+angle_course_deg: !!float 90.0
+speed_radial: !!float 1.0
+distance_radial: !!float 200.0
+wind_speed_wind_ref: !!float 4.0
+timeder_speed_tangential: !!float 0.0
+timeder_speed_radial: !!float 0.0
 
 
 ## actuation settings
@@ -23,7 +29,7 @@ steering_tape_final_extension: !!float 0.0
 ## output settings
 is_with_initial_structure_plot: !!bool false
 is_with_coupling_plot_per_iteration: !!bool false
-is_with_struc_plot_per_iteration: !!bool false
+is_with_struc_plot_per_iteration: !!bool true
 is_with_aero_plot_per_iteration: !!bool false
 is_with_final_plot: !!bool true
 
@@ -35,6 +41,16 @@ aerodynamic:
   allowed_error: !!float 1e-6
   relaxation_factor: !!float 0.01
   reference_point: !!seq [0.0, 0.0, 0.0]
+
+## quasi-steady trim optimization (used by aero_structural_solver with aero_solve_type='qsm')
+quasi_steady_trim:
+  moment_tolerance: !!float 1e-4
+  force_residual_scale: !!float 1
+  kite_speed_bounds_ms: !!seq [10.0, 50.0]
+  roll_bounds_deg: !!seq [-4.0, 4.0]
+  pitch_bounds_deg: !!seq [-4.0, 4.0]
+  yaw_bounds_deg: !!seq [-4.0, 4.0]
+  course_rate_bounds_rad_s: !!seq [-2.0, 2.0]
 
 ## aerodynamic bridle
 aerodynamic_bridle:
@@ -55,19 +71,19 @@ structural_kite_fem:
   max_iterations: !!int 500
   tolerance: !!float 0.01 
   step_limit: !!float 0.1
-  relax_init: !!float 0.1
+  relax_init: !!float 0.05
   relax_update: !!float 0.99
   k_update: !!int 1
-  I_stiffness: !!int 15 #V3 kite: 25
+  I_stiffness: !!int 25 #V3 kite: 25
   # Regularizes K for Newton-Raphson stability. Does NOT affect
   # the equilibrium (fe=fi is independent of I_stiffness).
   # if pseudo_dt != 0 it overrides I_stiffness when set.
-  pseudo_dt: !!float 0.2 #0.05 # pseudo-transient timestep [s] for mass-proportional regularization.
+  pseudo_dt: !!float 0.1 #0.05 # pseudo-transient timestep [s] for mass-proportional regularization.
   k_reg_min: !!float 200.0 # minimum regularization stiffness [N/m] floor for light bridle/steering nodes
   # Bridle relaxation preload on origin node(s), typically node 0 (KCU), in +z/-z solver coordinates.
   # Keep negative here to pull down in the current setup.
-  relaxbridles_pull_down_force_z: !!float -1600.0 #roughly the aero dynamic loading at 12m/s
-  relaxbridles_settle_force_z: !!float -10.0
+  relaxbridles_pull_down_force_z: !!float -0.0 #roughly the aero dynamic loading at 12m/s
+  relaxbridles_settle_force_z: !!float -0.0 #force at which to consider the bridle relaxed and settled, for switching from relax_init to relax_update
   print_info: !!bool false
   update_stiffness: !!bool true #Stiffen each spring with elongations higher than 1% on each iteration
   max_stiffness: !!int 50000 #Maximum value of spring stiffness, when updated using update_stiffness
@@ -84,9 +100,15 @@ aero_structural_solver:
   it_check: !!int 5
   tol: !!float 10
   is_with_aitken_relaxation: !!bool true
-  relaxation_factor: !!float 0.3 #0.05-0.3
+  relaxation_factor: !!float 0.05 #0.05-0.3
   n_max_constant_residual_force: !!int 50
   stagnation_tol: !!float 0.1 # N, tolerance for stagnation detection
+  qs_state_stagnation_decimals: !!int 2 # stop if opt_x is unchanged at this rounding
+  qs_state_stagnation_n_iter: !!int 10 # consecutive unchanged iterations required to stop (0 disables)
+  aero_update_interval: !!int 1 # run aero every N structural iterations (1 = every iter, 5 = every 5th)
+  steering_actuation_interval_iters: !!int 5 # apply steering actuation every N coupled iterations
+  node_displacement_tol: !!float 0 # stop if max nodal displacement < this [m] (0 = disabled, e.g. 1e-4)
+  aero_solve_type: !!str 'qsm' # 'qsm' = quasi-steady optimization with system_model
 
 ## Physical constants
 grav_constant: !!seq [0, 0, -9.81]
