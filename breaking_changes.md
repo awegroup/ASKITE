@@ -1,0 +1,1 @@
+- In the read_struc_geometry_yaml.py script, needed to adjust "Power Tape" to "depower_tape" and "Steering Tape" to "steering_tape" to match the updated YAML file names. 

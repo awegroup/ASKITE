@@ -1,5 +1,5 @@
 ## inflow conditions
-vel_wind: !!seq [35, 0, 0]
+vel_wind: !!seq [10, 0, 0]
 vel_kite: !!seq [0, 0, 0]
 acc_kite: !!seq [0, 0, 0]
 

@@ -287,4 +287,24 @@ if __name__ == "__main__":
         Path(PROJECT_DIR)
         / "results/TUDELFT_V3_KITE/2026_02_12_1025h_pss/struc_geometry.yaml"
     )
+
+    example_yaml_path = (
+        Path(PROJECT_DIR)
+        / "data"
+        / "TUDELFT_V3_KITE"
+        / "organizing_yaml_files_15_05_2026"
+        / "results"
+        / "struc_geometry_PSM_reduced_stretched_mapped_to_FEM_stretched.yaml"
+        # / "struc_geometry_FEM_full_stretched.yaml"
+    )
+
+    example_yaml_path = (
+        Path(PROJECT_DIR)
+        / "data"
+        / "TUDELFT_V3_KITE"
+        / "organizing_yaml_files_15_05_2026"
+        / "final_files"
+        / "struc_geometry_FEM_full.yaml"
+    )
+
     plot_struct_geometry_all_in_surfplan_yaml(example_yaml_path)

@@ -3,7 +3,7 @@
 
 bridle_point_node: [0, 0, 0]
 ## Mass':
-pulley_mass: 0.1
+pulley_mass: 0.033
 kcu_mass: 8.4
 # properties kite
 pressure: 0.3      #[bar]
@@ -12,7 +12,7 @@ mass_without_bridles: 11 #kg
 
 ## Material properties':
 dyneema:
-  density: 724
+  density: 1390
   youngs_modulus: 550000000
   damping_per_stiffness: 0.0
 

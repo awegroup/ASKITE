@@ -120,6 +120,14 @@ def main():
         # / "struc_geometry_level_1_manual_JULIA.yaml"
         / "struc_geometry_level_1_converged.yaml"
     )
+    struc_geometry_path = (
+        Path(PROJECT_DIR)
+        / "data"
+        / "TUDELFT_V3_KITE"
+        / "organizing_yaml_files_15_05_2026"
+        / "final_files"
+        / "struc_geometry_PSM_reduced_photogrammetry_adjusted.yaml"
+    )
     aero_geometry_path = (
         Path(PROJECT_DIR) / "data" / f"{kite_name}" / "aero_geometry.yaml"
     )
@@ -205,7 +213,7 @@ def main():
         # Note: ParticleSystem doesn’t read l0_arr. SpringDamper sets l0
         # from the initial particle positions.
         # So l0_arr is a bookkeeping array for you, not used at instantiation.
-        (psystem, pss_initial_conditions, pss_params, struc_nodes_initial) = (
+        psystem, pss_initial_conditions, pss_params, struc_nodes_initial = (
             structural_pss.instantiate(
                 # yaml files
                 config,

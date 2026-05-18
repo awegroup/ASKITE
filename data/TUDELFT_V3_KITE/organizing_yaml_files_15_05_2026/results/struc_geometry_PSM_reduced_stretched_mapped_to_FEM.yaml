@@ -1,0 +1,257 @@
+##############################
+## General ###################
+##############################
+bridle_point_node: [0, 0, 0] #[x,y,z] --> location of kcu
+
+## Mass
+pulley_mass: !!float 0.09 #[kg] # 0.54 kg measured pulley mass / 6 modeled pulleys
+kcu_mass: !!float 8.4 #[kg]
+
+## Material properties
+dyneema:
+  # (M.B. Ruppert) [Pa]
+  density: 1484.327612 #[kg/m^3] equivalent reduced-bridle density -> m = density * A * l0
+  youngs_modulus: 550000000 #550000000 #[Pa] -> k = E A / l0
+  damping_per_stiffness: 0.0 # [/s] -> c = damping_per_stiffness * k
+
+fixed_point_indices: !!seq [0] # node indices that are fixed in space (0-based)
+
+###########################
+## Wing ###################
+###########################
+
+wing_particles:
+  # id, x [m], y [m], z [m]
+  headers: [id, x, y, z]
+  data:
+    - [1, -0.183243, 4.085799, 8.60281422] #TODO: x shifted +0.009110 from -0.16686417 to align PSM x_min to FEM; y changed from 4.07190711 to 4.152601 to match FEM tip
+    - [2, 0.78924041, 4.14097577, 8.37834584] #TODO: x shifted +0.009110 from 1.03606618; y changed from 4.23504033 to 4.152601 to match FEM tip; x changed from 0.8950856 to 1.03606618 to match FEM
+    - [3, -0.69202671, 3.96785328, 9.23962118] #TODO: x shifted +0.009110 from -0.66385373
+    - [4, 0.83974271, 3.9567532, 9.23623652] #TODO: x shifted +0.009110 from 1.04472348
+    - [5, -0.90689676, 3.13415919, 10.24457117] #TODO: x shifted +0.009110 from -1.00179344
+    - [6, 1.08688134, 3.1185112, 10.22454171] #TODO: x shifted +0.009110 from 1.23676674
+    - [7, -1.05040929, 1.95959758, 10.84657947] #TODO: x shifted +0.009110 from -1.11933902
+    - [8, 1.16914236, 1.9479012, 10.81349371] #TODO: x shifted +0.009110 from 1.37326009
+    - [9, -1.12202594, 0.66421669, 11.10668685] #TODO: x shifted +0.009110 from -1.16537227
+    - [10, 1.20543178, 0.6610741, 11.06660392] #TODO: x shifted +0.009110 from 1.44917908
+    - [11, -1.12202594, -0.66421669, 11.10668685] #TODO: x shifted +0.009110 from -1.16537227
+    - [12, 1.20543178, -0.6610741, 11.06660392] #TODO: x shifted +0.009110 from 1.44917908
+    - [13, -1.05040929, -1.95959758, 10.84657947] #TODO: x shifted +0.009110 from -1.11933902
+    - [14, 1.16914236, -1.9479012, 10.81349371] #TODO: x shifted +0.009110 from 1.37326009
+    - [15, -0.90689676, -3.13415919, 10.24457117] #TODO: x shifted +0.009110 from -1.00179344
+    - [16, 1.08688134, -3.1185112, 10.22454171] #TODO: x shifted +0.009110 from 1.23676674
+    - [17, -0.69202671, -3.96785328, 9.23962118] #TODO: x shifted +0.009110 from -0.66385373
+    - [18, 0.83974271, -3.9567532, 9.23623652] #TODO: x shifted +0.009110 from 1.04472348
+    - [19, -0.183243, -4.085799, 8.60281422] #TODO: x shifted +0.009110 from -0.16686417; y changed from -4.07190711 to -4.152601 to match FEM tip
+    - [20, 0.78924041, -4.14097577, 8.37834584] #TODO: x shifted +0.009110 from 1.03606618; y changed from -4.23504033 to -4.152601 to match FEM tip; x changed from 0.8950856 to 1.03606618 to match FEM
+
+wing_connections:
+  # name, ci, cj
+  headers: [name, ci, cj]
+  data:
+    # Panel 1 (1-2 | 3-4)
+    - [strut_1, 1, 2]
+    - [le_1, 1, 3]
+    - [te_1, 2, 4]
+    - [dia_1a, 1, 4]
+    - [dia_1b, 2, 3]
+
+    # Panel 2 (3-4 | 5-6)
+    - [strut_2, 3, 4]
+    - [le_2, 3, 5]
+    - [te_2, 4, 6]
+    - [dia_2a, 3, 6]
+    - [dia_2b, 4, 5]
+
+    # Panel 3 (5-6 | 7-8)
+    - [strut_3, 5, 6]
+    - [le_3, 5, 7]
+    - [te_3, 6, 8]
+    - [dia_3a, 5, 8]
+    - [dia_3b, 6, 7]
+
+    # Panel 4 (7-8 | 9-10)
+    - [strut_4, 7, 8]
+    - [le_4, 7, 9]
+    - [te_4, 8, 10]
+    - [dia_4a, 7, 10]
+    - [dia_4b, 8, 9]
+
+    # Panel 5 (9-10 | 11-12) — center
+    - [strut_5, 9, 10]
+    - [le_5, 9, 11]
+    - [te_5, 10, 12]
+    - [dia_5a, 9, 12]
+    - [dia_5b, 10, 11]
+
+    # Panel 6 (11-12 | 13-14) — mirror of Panel 4
+    - [strut_5, 11, 12]
+    - [le_4, 11, 13]
+    - [te_4, 12, 14]
+    - [dia_4b, 11, 14]
+    - [dia_4a, 12, 13]
+
+    # Panel 7 (13-14 | 15-16) — mirror of Panel 3
+    - [strut_4, 13, 14]
+    - [le_3, 13, 15]
+    - [te_3, 14, 16]
+    - [dia_3b, 13, 16]
+    - [dia_3a, 14, 15]
+
+    # Panel 8 (15-16 | 17-18) — mirror of Panel 2
+    - [strut_3, 15, 16]
+    - [le_2, 15, 17]
+    - [te_2, 16, 18]
+    - [dia_2b, 15, 18]
+    - [dia_2a, 16, 17]
+
+    # Panel 9 (17-18 | 19-20) — mirror of Panel 1 (strut only per logic)
+    - [strut_2, 17, 18]
+    - [le_1, 17, 19]
+    - [te_1, 18, 20]
+    - [dia_1b, 17, 20]
+    - [dia_1a, 18, 19]
+    - [strut_1, 19, 20]
+
+wing_elements:
+  # line name, measured rest length "l0" [m], stiffness "k" [N/m], damping "c" [N.s/m], mass "m" [kg], linktype
+  headers: [name, l0, k, c, m, linktype]
+  data:
+    # leading-edge tube (LE[i] -- LE[i+1])
+    - [le_1, 0.823587, 1e4, 0, 0.198246, 'default']
+    - [le_2, 1.323306, 1e4, 0, 0.283456, 'default']
+    - [le_3, 1.327631, 1e4, 0, 0.352104, 'default']
+    - [le_4, 1.323177, 1e4, 0, 0.33133, 'default']
+    - [le_5, 1.328433, 2e4, 0, 0.570114, 'default']
+
+    # struts (chords)
+    - [strut_1, 0.999577, 2e3, 0, 0.110969, 'default']
+    - [strut_2, 1.531813, 2e3, 0, 0.177951, 'default']
+    - [strut_3, 1.993940, 2e3, 0, 0.250388, 'default']
+    - [strut_4, 2.219829, 2e3, 0, 0.293164, 'default']
+    - [strut_5, 2.327805, 2e3, 0, 0.222268, 'default']
+
+    # trailing-edge wire (TE[i] -- TE[i+1])
+    - [te_1, 0.878900, 1e3, 0, 0.090673, 'default']
+    - [te_2, 1.319270, 1e3, 0, 0.144882, 'default']
+    - [te_3, 1.312996, 1e3, 0, 0.191448, 'default']
+    - [te_4, 1.311985, 1e3, 0, 0.184103, 'default']
+    - [te_5, 1.322148, 1e3, 0, 0.31896, 'default']
+
+    # diagonal springs (both directions per panel)
+    - [dia_1a, 1.210114, 1e3, 0, 0.14446, 'default']
+    - [dia_1b, 1.722184, 1e3, 0, 0.14446, 'default']
+    - [dia_2a, 2.203625, 1e3, 0, 0.21417, 'default']
+    - [dia_2b, 2.178107, 1e3, 0, 0.21417, 'default']
+    - [dia_3a, 2.457808, 1e3, 0, 0.271776, 'default']
+    - [dia_3b, 2.509586, 1e3, 0, 0.271776, 'default']
+    - [dia_4a, 2.612162, 1e3, 0, 0.257716, 'default']
+    - [dia_4b, 2.642586, 1e3, 0, 0.257716, 'default']
+    - [dia_5a, 2.678631, 1e3, 0, 0.444536, 'default']
+    - [dia_5b, 2.678631, 1e3, 0, 0.444536, 'default']
+
+#############################
+## Bridle ###################
+#############################
+
+bridle_particles:
+  headers: [id, x, y, z]
+  data:
+    - [21, -0.62297785, 2.23451233, 6.87642125] # leading-edge
+    - [22, -0.75170937, 1.0593999, 7.40779936] # trailing-edge
+    - [23, -0.75170937, -1.0593999, 7.40779936] # leading-edge
+    - [24, -0.62297785, -2.23451233, 6.87642125] # trailinge-edge
+    - [25, -0.35394689, 1.00406255, 3.75839751]
+    - [26, -0.35394689, -1.00406255, 3.75839751]
+    - [27, 0.7431463, 1.95721129, 6.44700145]
+    - [28, 0.8285517, 1.14214113, 6.87674259]
+    - [29, 0.8285517, -1.14214113, 6.87674259]
+    - [30, 0.7431463, -1.95721129, 6.44700145]
+    - [31, 0.47084637, 1.06062602, 4.63109708]
+    - [32, 0.47084637, -1.06062602, 4.63109708]
+    - [33, 0.38951571, 0.8020655, 4.0855418]
+    - [34, 0.15875769, 0, 1.8472926]
+    - [35, 0.38951571, -0.8020655, 4.0855418]
+    - [36, 0.12802276, 0.22729467, 1.55885595]
+    - [37, 0.12802276, -0.22729467, 1.55885595]
+    - [38, 0.37873708, 0.77654803, 4.02214514] #TODO: new node for Br_main_e, offset from node 33 by FEM Br_main_e vector
+    - [39, 0.37873708, -0.77654803, 4.02214514] #TODO: new node for Br_main_e, offset from node 35 by FEM Br_main_e vector
+
+bridle_connections:
+  # name, ci, cj, ck (this is the third node, only exist when a pulley)
+  headers: [name, ci, cj, ck]
+  data:
+    # front lines
+    - [a5_equiv, 25, 1, 33] # pulley
+    - [A4_equiv, 3, 21]
+    - [A3_equiv, 5, 21]
+    - [A2_equiv, 7, 22]
+    - [A1_equiv, 9, 22]
+    - [A1_equiv, 11, 23]
+    - [A2_equiv, 13, 23]
+    - [A3_equiv, 15, 24]
+    - [A4_equiv, 17, 24]
+    - [a5_equiv, 26, 19, 35] # pulley
+    - [AII, 21, 25]
+    - [AI, 22, 25]
+    - [AI, 23, 26]
+    - [AII, 24, 26]
+    - [A_main, 25, 0]
+    - [A_main, 26, 0]
+    # rear lines
+    - [br_5_equiv, 33, 2, 36] # pulley
+    - [br_4, 4, 27]
+    - [br_3, 6, 27]
+    - [br_2, 8, 28]
+    - [br_1, 10, 28]
+    - [br_1, 12, 29]
+    - [br_2, 14, 29]
+    - [br_3, 16, 30]
+    - [br_4, 18, 30]
+    - [br_5_equiv, 35, 20, 37] # pulley
+    - [Br_II, 27, 31]
+    - [Br_I, 28, 31]
+    - [Br_I, 29, 32]
+    - [Br_II, 30, 32]
+    - [Br_main_1, 31, 33]
+    - [Br_main_1, 32, 35]
+    - [Br_main_e, 33, 38] #TODO: new connection
+    - [Br_main_e, 35, 39] #TODO: new connection
+    - [M, 36, 38, 34] # pulley #TODO: change connection from [M, 36, 33, 34] to [M, 36, 38, 34]
+    - [M, 34, 39, 37] # pulley #TODO: change connection from [M, 34, 35, 37] to [M, 34, 39, 37]
+    - [steering_tape, 36, 0]
+    - [depower_tape, 34, 0]
+    - [steering_tape, 37, 0]
+
+bridle_elements:
+  # line name, measured rest length "l0" [m], stiffness "k" [N/m], damping "c" [N.s/m], diameter "d" [m], density "rho" [kg/m^3]
+  # dyneema has rho = 970
+  # diameters follow bridle_line_measurements.yaml where available
+  # br_5_equiv uses an equivalent round diameter for Br_5 + 2*br_5_e + br_5
+  # steering_tape/depower_tape use equivalent round diameter for 0.012 x 0.0015 m tape
+  headers: [name, l0, d, material, linktype]
+  data:
+    # front lines
+    # equivalent reduced pulley branch: AIII + 2*a5_e + a5 = 11.420 + 2*0.115 + 0.278 = 11.928 m
+    - [a5_equiv, 11.928, 0.002, dyneema, 'pulley'] #TODO: changed from 11.372 to 11.928m to match measurement
+    - [A4_equiv, 2.910, 0.003, dyneema, 'noncompressive'] #TODO: changed from 2.782 to 2.910m to match measurements
+    - [A3_equiv, 3.450, 0.003, dyneema, 'noncompressive'] #TODO: changed from 3.253 to 3.450m to match measurements
+    - [A2_equiv, 3.530, 0.003, dyneema, 'noncompressive'] #TODO: changed from 3.352 to 3.530m to match measurements
+    - [A1_equiv, 3.708, 0.003, dyneema, 'noncompressive'] #TODO: changed from 3.520 to 3.708m to match measurements
+    - [AII, 3.360, 0.005, dyneema, 'noncompressive'] #TODO: changed from 3.188 to 3.360m to match FEM
+    - [AI, 3.670, 0.005, dyneema, 'noncompressive'] #TODO: changed from 3.420 to 3.670m to match FEM
+    - [A_main, 3.903, 0.006, dyneema, 'noncompressive'] #TODO: changed from 4.297 to 3.903m to match FEM
+    # rear lines
+    - [br_1, 4.407, 0.002, dyneema, 'noncompressive'] #TODO: changed from 4.448 to 4.407m to match FEM
+    - [br_2, 4.180, 0.002, dyneema, 'noncompressive'] #TODO: changed from 4.300 to 4.180m to match FEM
+    - [br_3, 4.094, 0.002, dyneema, 'noncompressive'] #TODO: changed from 4.560 to 4.094m to match FEM
+    - [br_4, 3.550, 0.002, dyneema, 'noncompressive'] #TODO: changed from 4.047 to 3.550m to match FEM
+    # equivalent reduced pulley branch: Br_5 + 2*br_5_e + br_5 = 12.168 + 2*0.115 + 1.420 = 13.818 m
+    - [br_5_equiv, 13.818, 0.002, dyneema, 'pulley'] #TODO: changed from 14.172 to 13.818m to match measurement
+    - [Br_I, 2.333, 0.002, dyneema, 'noncompressive'] #TODO: changed from 2.388 to 2.333m to match FEM
+    - [Br_II, 2.045, 0.002, dyneema, 'noncompressive'] #TODO: changed from 1.890 to 2.045m to match FEM
+    - [Br_main_1, 0.610, 0.002, dyneema, 'noncompressive'] #TODO: changed from 0.874 to 0.610m to match FEM
+    - [Br_main_e, 0.07, 0.004, dyneema, 'noncompressive'] #TODO: new line from FEM
+    - [M, 4.856, 0.004, dyneema, 'pulley'] #TODO: changed from 2.196 to 4.856m to match FEM
+    - [steering_tape, 1.6, 0.004787307, dyneema, 'noncompressive'] #TODO: changed from 1.506 to 1.6m to match FEM
+    - [depower_tape, 1.9, 0.004787307, dyneema, 'noncompressive'] #TODO: changed from 3.129 to 1.9m to match FEM

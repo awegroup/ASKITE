@@ -178,23 +178,27 @@ def instantiate(
         beam_matrix=beam_matrix,
     )
 
-    # Relax the bridle lines
-    canopy_nodes = list(
-        set([node for section in canopy_sections + strut_sections for node in section])
+    is_with_relaxbridles = config.get("structural_kite_fem", {}).get(
+        "is_with_relaxbridles", True
     )
-    pull_down_force_z = config.get("structural_kite_fem", {}).get(
-        "relaxbridles_pull_down_force_z", -100.0
-    )
-    settle_force_z = config.get("structural_kite_fem", {}).get(
-        "relaxbridles_settle_force_z", -1.0
-    )
-    kite_fem_structure = relaxbridles(
-        kite_fem_structure,
-        canopy_nodes,
-        [0],
-        pull_down_force_z=pull_down_force_z,
-        settle_force_z=settle_force_z,
-    )
+    if is_with_relaxbridles:
+        # Relax the bridle lines
+        canopy_nodes = list(
+            set([node for section in canopy_sections + strut_sections for node in section])
+        )
+        pull_down_force_z = config.get("structural_kite_fem", {}).get(
+            "relaxbridles_pull_down_force_z", -100.0
+        )
+        settle_force_z = config.get("structural_kite_fem", {}).get(
+            "relaxbridles_settle_force_z", -1.0
+        )
+        kite_fem_structure = relaxbridles(
+            kite_fem_structure,
+            canopy_nodes,
+            [0],
+            pull_down_force_z=pull_down_force_z,
+            settle_force_z=settle_force_z,
+        )
     struc_nodes_initial = kite_fem_structure.coords_init.reshape(-1, 3)
 
     if config.get("is_with_initial_structure_plot", False):

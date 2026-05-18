@@ -262,10 +262,10 @@ def initialize_bridle_line_system(
                 "bridle_connections should have 2 or 3 connections (ci,cj,ck), not more or less"
             )
 
-        if conn_name == "Power Tape":
+        if conn_name == "depower_tape":
             power_tape_index = conn_idx_counter
 
-        if conn_name == "Steering Tape":
+        if conn_name == "steering_tape":
             steering_tape_indices.append(conn_idx_counter)
 
         ## increasing the counter

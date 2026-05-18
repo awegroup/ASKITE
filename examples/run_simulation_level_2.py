@@ -66,6 +66,14 @@ def main():
         / f"{kite_name}"
         / "struc_geometry_level_2_manual.yaml"
     )
+    struc_geometry_path = (
+        Path(PROJECT_DIR)
+        / "data"
+        / "TUDELFT_V3_KITE"
+        / "organizing_yaml_files_15_05_2026"
+        / "final_files"
+        / "struc_geometry_FEM_full.yaml"
+    )
     aero_geometry_path = (
         Path(PROJECT_DIR) / "data" / f"{kite_name}" / "aero_geometry.yaml"
     )

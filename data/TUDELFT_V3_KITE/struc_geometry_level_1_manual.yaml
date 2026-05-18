@@ -4,13 +4,13 @@
 bridle_point_node: [0, 0, 0] #[x,y,z] --> location of kcu
 
 ## Mass
-pulley_mass: !!float 0.1 #[kg] #TODO: would be better to define these per pulley
+pulley_mass: !!float 0.16 #[kg] #TODO: would be better to define these per pulley
 kcu_mass: !!float 8.4 #[kg]
 
 ## Material properties
 dyneema:
   # (M.B. Ruppert) [Pa]
-  density: 724 #[kg/m^3] -> m = density * A * l0
+  density: 1390 #[kg/m^3] -> m = density * A * l0
   youngs_modulus: 550000000 #[Pa] -> k = E A / l0
   damping_per_stiffness: 0.0 # [/s] -> c = damping_per_stiffness * k
 
