@@ -14,6 +14,7 @@ from kitesim import (
     plotting,
     aerodynamic_bridle_line_drag,
 )
+from kitesim.utils import calculate_cg, rotate_geometry
 
 
 def build_symmetry_mapping(struc_nodes, tol=1e-5):
@@ -229,6 +230,62 @@ def update_power_tape_actuation(
     return delta_power_tape, is_actuation_finalized
 
 
+def distribute_total_force_by_particle_mass(total_force, m_arr):
+    """Distribute a total 3D force over nodes proportional to positive masses."""
+    total_force = np.asarray(total_force, dtype=float).reshape(3)
+    masses = np.asarray(m_arr, dtype=float).reshape(-1)
+    masses_pos = np.clip(masses, 0.0, None)
+    mass_sum = float(np.sum(masses_pos))
+
+    # If no positive masses are available, avoid injecting undefined nodal loads.
+    if mass_sum <= 1e-12:
+        return np.zeros((len(masses), 3), dtype=float)
+
+    mass_fraction = masses_pos / mass_sum
+    return mass_fraction[:, None] * total_force[None, :]
+
+
+def log_top_external_force_nodes(
+    struc_nodes,
+    m_arr,
+    f_ext,
+    f_aero,
+    f_inertial,
+    f_ext_gravity,
+    top_n=5,
+    tag="",
+):
+    """Log nodes with largest total external force and component breakdown."""
+    f_ext = np.asarray(f_ext, dtype=float).reshape(-1, 3)
+    f_aero = np.asarray(f_aero, dtype=float).reshape(-1, 3)
+    f_inertial = np.asarray(f_inertial, dtype=float).reshape(-1, 3)
+    f_ext_gravity = np.asarray(f_ext_gravity, dtype=float).reshape(-1, 3)
+    masses = np.asarray(m_arr, dtype=float).reshape(-1)
+
+    norms = np.linalg.norm(f_ext, axis=1)
+    if len(norms) == 0:
+        return
+
+    top_n = int(max(1, min(top_n, len(norms))))
+    top_idx = np.argsort(norms)[-top_n:][::-1]
+
+    header = f"Top external-force nodes {tag}".strip()
+    logging.info(header)
+    for idx in top_idx:
+        logging.info(
+            "  node=%d pos=[%.3f, %.3f, %.3f] m=%.4fkg |f_ext|=%.3fN |f_aero|=%.3fN |f_inertial|=%.3fN |f_gravity|=%.3fN",
+            int(idx),
+            float(struc_nodes[idx][0]),
+            float(struc_nodes[idx][1]),
+            float(struc_nodes[idx][2]),
+            float(masses[idx]) if idx < len(masses) else float("nan"),
+            float(np.linalg.norm(f_ext[idx])),
+            float(np.linalg.norm(f_aero[idx])),
+            float(np.linalg.norm(f_inertial[idx])),
+            float(np.linalg.norm(f_ext_gravity[idx])),
+        )
+
+
 # TODO: this should also use structural is not converging
 def check_convergence(
     i,
@@ -307,6 +364,7 @@ def main(
     m_arr=None,
     struc_nodes=None,
     struc_nodes_initial=None,
+    system_model=None,
     config=None,
     ### ACTUATION
     initial_length_power_tape=None,
@@ -353,11 +411,11 @@ def main(
 
     ## PRELOOP
     if config["is_with_gravity"]:
-        f_ext_gravity = np.array(
+        f_ext_gravity_default = np.array(
             [np.array(config["grav_constant"]) * m_pt for m_pt in m_arr]
         )
     else:
-        f_ext_gravity = np.zeros(struc_nodes.shape)
+        f_ext_gravity_default = np.zeros(struc_nodes.shape)
 
     if config["structural_solver"] == "kite_fem":
         rest_lengths = kite_fem_structure.modify_get_spring_rest_length()
@@ -408,21 +466,27 @@ def main(
         config["aerodynamic"]["n_aero_panels_per_struc_section"],
     )
 
+    cg = calculate_cg(struc_nodes=struc_nodes, m_arr=m_arr)
+
     ### AERO
     f_aero_wing_vsm_format, body_aero, results_aero = aerodynamic_vsm.run_vsm_package(
         body_aero=body_aero,
         solver=vsm_solver,
+        system_model=system_model,
+        center_of_gravity=cg,
         le_arr=le_arr,
         te_arr=te_arr,
-        va_vector=vel_app,
         aero_input_type="reuse_initial_polar_data",
         initial_polar_data=initial_polar_data,
+        include_gravity=config["is_with_gravity"],
         is_with_plot=config["is_with_aero_plot_per_iteration"],
     )
 
     logging.debug(
         f"Aero symmetry check, f_aero_y: {np.sum([force[1] for force in f_aero_wing_vsm_format])}"
     )
+    roll, pitch, yaw = results_aero["opt_x"][1:4]
+    struc_nodes = rotate_geometry(struc_nodes, angle_deg=[roll, pitch, yaw])
 
     # # TODO: debuggin here
     # # print out the cp locations as % of le to te for debugging purposes
@@ -499,11 +563,42 @@ def main(
         config["aerodynamic_bridle"]["cd_cable"],
         config["aerodynamic_bridle"]["cf_cable"],
     )
+    inertial_force_total = np.asarray(
+        results_aero.get("inertial_force", np.zeros(3)), dtype=float
+    )
+    f_inertial = distribute_total_force_by_particle_mass(inertial_force_total, m_arr)
+    if config["is_with_gravity"] and ("gravity_force" in results_aero):
+        gravity_force_total = np.asarray(
+            results_aero.get("gravity_force", np.zeros(3)), dtype=float
+        )
+        f_ext_gravity = distribute_total_force_by_particle_mass(
+            gravity_force_total, m_arr
+        )
+    else:
+        f_ext_gravity = np.array(f_ext_gravity_default, copy=True)
     f_aero = f_aero_wing + f_aero_bridle
     ## EXTERNAL FORCE
-    f_ext = f_aero + f_ext_gravity
+    f_ext = f_aero + f_inertial + f_ext_gravity
     f_ext = np.round(f_ext, 5)
     f_ext_flat = f_ext.flatten()
+
+    if config.get("aero_structural_solver", {}).get(
+        "log_top_external_force_nodes", False
+    ):
+        log_top_external_force_nodes(
+            struc_nodes=struc_nodes,
+            m_arr=m_arr,
+            f_ext=f_ext,
+            f_aero=f_aero,
+            f_inertial=f_inertial,
+            f_ext_gravity=f_ext_gravity,
+            top_n=int(
+                config.get("aero_structural_solver", {}).get(
+                    "log_top_external_force_nodes_n", 5
+                )
+            ),
+            tag="(pre-loop)",
+        )
 
     ######################################################################
     # SIMULATION LOOP
@@ -513,6 +608,8 @@ def main(
         for i in range(max_iter):
             if i > 0:
                 struc_nodes_prev = struc_nodes.copy()
+
+            iter_start_time = time.time()
 
             ########################################################
             ############## INTERNAL FORCE CALCULATION ##############
@@ -593,6 +690,7 @@ def main(
                     kite_connectivity_arr,
                     rest_lengths,
                     f_ext=f_ext,
+                    f_inertial=f_inertial,
                     title=f"i: {i}",
                     body_aero=body_aero,
                     is_with_node_indices=False,
@@ -611,22 +709,43 @@ def main(
                 config["aerodynamic"]["n_aero_panels_per_struc_section"],
             )
 
+            cg = calculate_cg(struc_nodes=struc_nodes, m_arr=m_arr)
+
             ### AERO
+            begin_time_aero_model = time.time()
             f_aero_wing_vsm_format, body_aero, results_aero = (
                 aerodynamic_vsm.run_vsm_package(
                     body_aero=body_aero,
                     solver=vsm_solver,
+                    system_model=system_model,
+                    center_of_gravity=cg,
                     le_arr=le_arr,
                     te_arr=te_arr,
-                    va_vector=vel_app,
+                    current_guess=[
+                        results_aero["opt_x"][0],
+                        0,
+                        0,
+                        0,
+                        results_aero["opt_x"][4],
+                    ],
                     aero_input_type="reuse_initial_polar_data",
                     initial_polar_data=initial_polar_data,
+                    include_gravity=config["is_with_gravity"],
                     is_with_plot=config["is_with_aero_plot_per_iteration"],
                 )
             )
+            end_time_aero_model = time.time()
             logging.debug(
                 f"Aero symmetry check, f_aero_y: {np.sum([force[1] for force in f_aero_wing_vsm_format])}"
             )
+            print("Quasi-steady state solver info:")
+            print(f"  Kite_speed: {results_aero['opt_x'][0]:.2f} m/s")
+            print(f"  Roll: {results_aero['opt_x'][1]:.2f} deg")
+            print(f"  Pitch: {results_aero['opt_x'][2]:.2f} deg")
+            print(f"  Yaw: {results_aero['opt_x'][3]:.2f} deg")
+            print(f"  Course rate: {results_aero['opt_x'][4]:.2f} rad/s")
+            roll, pitch, yaw = results_aero["opt_x"][1:4]
+            struc_nodes = rotate_geometry(struc_nodes, angle_deg=[roll, pitch, yaw])
             ### AERO --> STRUC
             f_aero_wing, aero_mapping_debug = aero2struc_level_2.main(
                 config["aero2struc"]["coupling_method"],
@@ -665,13 +784,48 @@ def main(
                 )
             else:
                 f_aero_bridle = np.zeros((len(struc_nodes), 3))
+            inertial_force_total = np.asarray(
+                results_aero.get("inertial_force", np.zeros(3)), dtype=float
+            )
+            f_inertial = distribute_total_force_by_particle_mass(
+                inertial_force_total,
+                m_arr,
+            )
+            if config["is_with_gravity"] and ("gravity_force" in results_aero):
+                gravity_force_total = np.asarray(
+                    results_aero.get("gravity_force", np.zeros(3)), dtype=float
+                )
+                f_ext_gravity = distribute_total_force_by_particle_mass(
+                    gravity_force_total,
+                    m_arr,
+                )
+            else:
+                f_ext_gravity = np.array(f_ext_gravity_default, copy=True)
             f_aero = f_aero_wing + f_aero_bridle
 
             ## EXTERNAL FORCE
-            f_ext = f_aero + f_ext_gravity
+            f_ext = f_aero + f_inertial + f_ext_gravity
             f_ext = np.round(f_ext, 5)
             f_ext_flat = f_ext.flatten()
             end_time_f_ext = time.time()
+
+            if config.get("aero_structural_solver", {}).get(
+                "log_top_external_force_nodes", False
+            ):
+                log_top_external_force_nodes(
+                    struc_nodes=struc_nodes,
+                    m_arr=m_arr,
+                    f_ext=f_ext,
+                    f_aero=f_aero,
+                    f_inertial=f_inertial,
+                    f_ext_gravity=f_ext_gravity,
+                    top_n=int(
+                        config.get("aero_structural_solver", {}).get(
+                            "log_top_external_force_nodes_n", 5
+                        )
+                    ),
+                    tag=f"(iter={i})",
+                )
 
             ### FORCING SYMMETRY
             if config["is_with_forcing_symmetry"]:
@@ -711,8 +865,10 @@ def main(
             pbar.set_postfix(
                 {
                     "res": f"{np.linalg.norm(f_residual):.3f}N",
-                    "aero": f"{end_time_f_ext-begin_time_f_ext:.2f}s",
-                    "struc": f"{end_time_f_int-begin_time_f_int:.2f}s",
+                    "aero_model": f"{end_time_aero_model-begin_time_aero_model:.2f}s",
+                    "struc_model": f"{end_time_f_int-begin_time_f_int:.2f}s",
+                    "ext_total": f"{end_time_f_ext-begin_time_f_ext:.2f}s",
+                    "iter": f"{time.time()-iter_start_time:.2f}s",
                 }
             )
             pbar.update(1)
@@ -828,6 +984,7 @@ def main(
             struc_nodes,
             kite_connectivity_arr,
             f_ext=f_ext,
+            f_inertial=f_inertial,
             rest_lengths=rest_lengths,
             struc_nodes_initial=struc_nodes_initial,
             title="Initial vs final",

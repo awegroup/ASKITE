@@ -366,7 +366,7 @@ def main(
     )
 
     ### AERO
-    f_aero_wing_vsm_format, body_aero, results_aero = aerodynamic_vsm.run_vsm_package(
+    f_aero_wing_vsm_format, body_aero, results_aero = aerodynamic_vsm.run_vsm_direct(
         body_aero=body_aero,
         solver=vsm_solver,
         le_arr=le_arr,
@@ -524,7 +524,7 @@ def main(
 
             ### AERO
             f_aero_wing_vsm_format, body_aero, results_aero = (
-                aerodynamic_vsm.run_vsm_package(
+                aerodynamic_vsm.run_vsm_direct(
                     body_aero=body_aero,
                     solver=vsm_solver,
                     le_arr=le_arr,

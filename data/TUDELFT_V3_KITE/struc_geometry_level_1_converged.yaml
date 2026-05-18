@@ -5,12 +5,12 @@ bridle_point_node: [0, 0, 0]
 
 ## Mass
 pulley_mass: !!float 0.1
-kcu_mass: !!float 23.25
+kcu_mass: !!float 0
 
 ## Material properties
 dyneema:
   density: 724
-  youngs_modulus: 50000000000 #100GPa
+  youngs_modulus: 20000000000 #100GPa
   #actual_value: 112000000000
   damping_per_stiffness: 0
 
