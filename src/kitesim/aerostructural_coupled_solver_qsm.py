@@ -13,6 +13,7 @@ from kitesim import (
     tracking,
     plotting,
     aerodynamic_bridle_line_drag,
+    analysis_metrics,
 )
 from kitesim.utils import calculate_cg, calculate_inertia, load_yaml, rotate_geometry
 
@@ -437,6 +438,22 @@ def distribute_total_force_by_particle_mass(total_force, m_arr):
     return mass_fraction[:, None] * total_force[None, :]
 
 
+def _resolve_qsm_apparent_wind_vector(results_aero, body_aero, fallback_vel_app):
+    """Return the apparent-wind vector used for coefficient normalization."""
+    try:
+        va_vec = np.asarray(body_aero.va, dtype=float).reshape(3)
+        if np.isfinite(va_vec).all() and np.linalg.norm(va_vec) > 1e-12:
+            return va_vec
+    except Exception:
+        pass
+
+    opt_x = np.asarray(results_aero.get("opt_x", []), dtype=float).reshape(-1)
+    if opt_x.size > 0 and np.isfinite(opt_x[0]) and opt_x[0] > 1e-12:
+        return np.array([float(opt_x[0]), 0.0, 0.0])
+
+    return np.asarray(fallback_vel_app, dtype=float).reshape(3)
+
+
 # TODO: this should also use structural is not converging
 def check_convergence(
     i,
@@ -574,6 +591,12 @@ def main(
     # Keep index 0 for the pre-loop initial state and reserve max_iter loop slots.
     t_vector = np.linspace(0, max_iter, max_iter + 1)
     tracking_data = tracking.setup_tracking_arrays(len(struc_nodes), t_vector)
+    s_ref_m2, s_ref_source = analysis_metrics.resolve_reference_area(
+        config,
+        struc_nodes,
+        struc_node_le_indices,
+        struc_node_te_indices,
+    )
     is_convergence = False
     f_residual_list = []
     f_tether_drag = np.zeros(3)
@@ -741,8 +764,9 @@ def main(
     ## propagating the simulation for each timestep and saving results
     with tqdm(total=max_iter, desc="Simulating", leave=True) as pbar:
         for i in range(max_iter):
+            struc_nodes_before_update = struc_nodes.copy()
             if i > 0:
-                struc_nodes_prev = struc_nodes.copy()
+                struc_nodes_prev = struc_nodes_before_update
 
             ########################################################
             ############## INTERNAL FORCE CALCULATION ##############
@@ -1023,6 +1047,36 @@ def main(
             f_ext = np.round(f_ext, 5)
             f_ext_flat = f_ext.flatten()
             end_time_f_ext = time.time()
+            vel_app_for_metrics = _resolve_qsm_apparent_wind_vector(
+                results_aero,
+                body_aero,
+                vel_app,
+            )
+            aero_metrics = analysis_metrics.compute_global_coefficients(
+                f_wing_total=np.sum(f_aero_wing_vsm_format, axis=0),
+                f_bridle_total=np.sum(f_aero_bridle, axis=0),
+                vel_app=vel_app_for_metrics,
+                rho=config["rho"],
+                s_ref_m2=s_ref_m2,
+            )
+            if i == 0:
+                aero_force_update_norm = 0.0
+            else:
+                aero_force_update_norm = np.linalg.norm(
+                    aero_metrics["aero_force_total"]
+                    - tracking_data["aero_force_total"][i]
+                )
+            geometry_update_norm = np.linalg.norm(
+                struc_nodes - struc_nodes_before_update
+            )
+            geometry_update_rel_norm = geometry_update_norm / max(
+                np.linalg.norm(struc_nodes), 1e-12
+            )
+            geometry_metrics = analysis_metrics.compute_geometry_metrics(
+                struc_nodes,
+                struc_node_le_indices,
+                struc_node_te_indices,
+            )
 
             ### FORCING SYMMETRY
             if config["is_with_forcing_symmetry"]:
@@ -1055,7 +1109,18 @@ def main(
                 i + 1,
                 struc_nodes,
                 f_ext_flat,
-                f_residual,
+                f_int,
+                f_residual_flat=f_residual,
+                **aero_metrics,
+                **geometry_metrics,
+                geometry_update_norm=geometry_update_norm,
+                geometry_update_rel_norm=geometry_update_rel_norm,
+                aero_force_update_norm=aero_force_update_norm,
+                omega_aitken=omega_relaxation,
+                regularization_phase=reg_phase,
+                is_structural_converged=float(is_structural_converged),
+                is_aero_converged=float(results_aero.get("success", False)),
+                qs_success=float(results_aero.get("success", False)),
             )
 
             ### PROGRESS BAR
@@ -1205,12 +1270,13 @@ def main(
     cross = np.cross(vec_chord_2d, vec_wind_2d)
 
     angle = np.arctan2(cross, dot)
-    alpha_at_ac_mid = np.ravel(results_aero["alpha_at_ac"])[mid_idx]
-
     print(f"alpha = {np.degrees(angle):.2f}° (va vs mid-span chord)")
-    print(
-        f'alpha = {np.rad2deg(alpha_at_ac_mid):.2f}° (incl. induced velocity, from results_aero["alpha_at_ac"])'
-    )
+    alpha_at_ac_values = np.ravel(results_aero.get("alpha_at_ac", []))
+    if alpha_at_ac_values.size > mid_idx:
+        alpha_at_ac_mid = alpha_at_ac_values[mid_idx]
+        print(
+            f'alpha = {np.rad2deg(alpha_at_ac_mid):.2f}° (incl. induced velocity, from results_aero["alpha_at_ac"])'
+        )
     # print(
     #     f'results_aero["alpha_uncorrected"]: {float(np.rad2deg(results_aero["alpha_uncorrected"][mid_idx])):.2f}°'
     # )
@@ -1304,6 +1370,30 @@ def main(
     except:
         tether_force = np.nan
 
+    final_idx = min(i + 1, len(tracking_data["positions"]) - 1)
+    final_geom_metrics = analysis_metrics.compute_geometry_metrics(
+        struc_nodes,
+        struc_node_le_indices,
+        struc_node_te_indices,
+    )
+    final_depower_tape_length_m = (
+        float(rest_lengths[power_tape_index])
+        if power_tape_index is not None and len(rest_lengths) > power_tape_index
+        else np.nan
+    )
+    final_power_tape_extension_m = (
+        final_depower_tape_length_m - float(initial_length_power_tape)
+        if np.isfinite(final_depower_tape_length_m)
+        and initial_length_power_tape is not None
+        else np.nan
+    )
+    final_cl_wing = float(tracking_data["C_L_wing"][final_idx])
+    final_cd_wing = float(tracking_data["C_D_wing"][final_idx])
+    if np.isfinite(final_cl_wing):
+        cl = final_cl_wing
+    if np.isfinite(final_cd_wing):
+        cd = final_cd_wing
+
     meta = {
         "total_time_s": time.time() - start_time,
         "n_iter": i + 2,  # +2: 1 for pre-loop initial state + (i+1) loop entries
@@ -1317,12 +1407,49 @@ def main(
         "cl": float(cl),
         "cd": float(cd),
         "tether_force": float(tether_force),
+        "final_residual_norm": float(tracking_data["residual_norm"][final_idx]),
+        "final_geometry_update_norm": float(
+            tracking_data["geometry_update_norm"][final_idx]
+        ),
+        "final_C_L_wing": final_cl_wing,
+        "final_C_D_wing": final_cd_wing,
+        "final_glide_ratio_wing": float(
+            tracking_data["glide_ratio_wing"][final_idx]
+        ),
+        "final_C_L_total_aero": float(tracking_data["C_L_total_aero"][final_idx]),
+        "final_C_D_total_aero": float(tracking_data["C_D_total_aero"][final_idx]),
+        "final_glide_ratio_total_aero": float(
+            tracking_data["glide_ratio_total_aero"][final_idx]
+        ),
+        "final_V_a": float(tracking_data["V_a"][final_idx])
+        if "V_a" in tracking_data
+        else float(va),
+        "S_ref_m2": float(s_ref_m2),
+        "S_ref_source": str(s_ref_source),
+        "rho": float(config["rho"]),
+        "coefficient_force_source": "wing_only_panel_forces_and_optional_bridle_total",
+        "wind_axis_convention": "drag_positive_along_apparent_wind_lift_positive_z_component",
+        "final_depower_tape_length_m": final_depower_tape_length_m,
+        "final_u_dp": (final_depower_tape_length_m - 0.2) / 5.0
+        if np.isfinite(final_depower_tape_length_m)
+        else np.nan,
+        "final_power_tape_extension_m": final_power_tape_extension_m,
+        "final_pitch_or_trim_deg": float(opt_x[2]) if opt_x.size > 2 else np.nan,
+        "final_center_or_midspan_alpha_deg": float(np.rad2deg(alpha_at_ac_values[mid_idx]))
+        if alpha_at_ac_values.size > mid_idx
+        else np.nan,
+        "final_projected_span_m": float(final_geom_metrics["projected_span_m"]),
+        "final_projected_area_m2": float(final_geom_metrics["projected_area_m2"]),
+        "final_mean_twist_deg": float(final_geom_metrics["mean_twist_deg"]),
+        "final_max_abs_twist_deg": float(final_geom_metrics["max_abs_twist_deg"]),
         "rest_lengths": rest_lengths,  # ensure numeric array
         # Convert kite_connectivity to a numeric array for HDF5 compatibility
         "kite_connectivity": np.array(
             [[int(row[0]), int(row[1])] for row in np.array(kite_connectivity_arr)],
             dtype=np.int32,
         ),
+        "struc_node_le_indices": np.asarray(struc_node_le_indices, dtype=np.int32),
+        "struc_node_te_indices": np.asarray(struc_node_te_indices, dtype=np.int32),
     }
 
     return tracking_data, meta

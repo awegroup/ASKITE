@@ -2,14 +2,19 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 import copy
+import logging
 from VSM.core.BodyAerodynamics import BodyAerodynamics
 from VSM.core.WingGeometry import Wing
 from VSM.core.Solver import Solver
 from VSM.plot_geometry_matplotlib import plot_geometry
-from VSM.quasi_steady_state import (
-    solve_quasi_steady_state,
-    DEFAULT_TRANSFORMATION_C_FROM_VSM,
-)
+try:
+    from VSM.quasi_steady_state import (
+        solve_quasi_steady_state,
+        DEFAULT_TRANSFORMATION_C_FROM_VSM,
+    )
+except ModuleNotFoundError:
+    solve_quasi_steady_state = None
+    DEFAULT_TRANSFORMATION_C_FROM_VSM = np.eye(3)
 
 
 # Bounds and defaults (aoa, sideslip, course_rate_body)
@@ -88,14 +93,32 @@ def initialize(
     Returns:
         tuple: (body_aero, vsm_solver, vel_app, initial_polar_data)
     """
-    body_aero = BodyAerodynamics.instantiate(
-        n_panels=int(n_panels_aero),
-        file_path=aero_geometry_path,
-        spanwise_panel_distribution=config["aerodynamic"][
-            "spanwise_panel_distribution"
-        ],
-        bridle_path=bridle_path,
-    )
+    try:
+        body_aero = BodyAerodynamics.instantiate(
+            n_panels=int(n_panels_aero),
+            file_path=aero_geometry_path,
+            spanwise_panel_distribution=config["aerodynamic"][
+                "spanwise_panel_distribution"
+            ],
+            bridle_path=bridle_path,
+        )
+    except KeyError as exc:
+        if bridle_path is None or str(exc).strip("'\"") != "bridle_lines":
+            raise
+        logging.warning(
+            "VSM BodyAerodynamics expected 'bridle_lines' in %s; retrying wing "
+            "initialization without VSM bridle geometry. ASKITE bridle drag can "
+            "still be included separately.",
+            bridle_path,
+        )
+        body_aero = BodyAerodynamics.instantiate(
+            n_panels=int(n_panels_aero),
+            file_path=aero_geometry_path,
+            spanwise_panel_distribution=config["aerodynamic"][
+                "spanwise_panel_distribution"
+            ],
+            bridle_path=None,
+        )
 
     vsm_solver = Solver(
         max_iterations=config["aerodynamic"]["max_iterations"],
@@ -142,6 +165,41 @@ def plot_vsm_geometry(body_aero):
     )
 
 
+def run_vsm_direct(
+    body_aero,
+    solver,
+    le_arr,
+    te_arr,
+    va_vector,
+    aero_input_type="reuse_initial_polar_data",
+    initial_polar_data=None,
+    is_with_plot=False,
+):
+    """
+    Run the direct virtual-wind-tunnel VSM solve for a prescribed apparent wind.
+
+    This is the level-1 path used for controlled VWT studies where the apparent
+    velocity is an input rather than an optimized quasi-steady state.
+    """
+    body_aero.update_from_points(
+        le_arr,
+        te_arr,
+        aero_input_type=aero_input_type,
+        initial_polar_data=initial_polar_data,
+    )
+    body_aero.va = np.asarray(va_vector, dtype=float).reshape(3)
+
+    results = solver.solve(body_aero)
+    results = dict(results)
+    results.setdefault("success", True)
+    results.setdefault("opt_x", np.array([np.linalg.norm(body_aero.va), 0, 0, 0, 0]))
+
+    if is_with_plot:
+        plot_vsm_geometry(body_aero)
+
+    return np.array(results["F_distribution"]), body_aero, results
+
+
 def run_vsm_package(
     body_aero,
     solver,
@@ -177,6 +235,13 @@ def run_vsm_package(
     Returns:
         tuple: (F_distribution, body_aero, results)
     """
+    if solve_quasi_steady_state is None:
+        raise ImportError(
+            "VSM.quasi_steady_state is not available in the installed VSM package. "
+            "Use solver_mode='level_1' for prescribed-apparent-wind runs or install "
+            "a VSM version that provides quasi_steady_state for QSM mode."
+        )
+
     # Update aerodynamic mesh from the latest structural leading/trailing-edge points.
     body_aero.update_from_points(
         le_arr,

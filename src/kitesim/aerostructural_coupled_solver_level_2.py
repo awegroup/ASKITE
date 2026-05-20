@@ -968,9 +968,11 @@ def main(
     angle = np.arctan2(cross, dot)
 
     print(f"alpha = {np.degrees(angle):.2f}° (va vs mid-span chord)")
-    print(
-        f'alpha = {float(np.rad2deg(results_aero["alpha_at_ac"][mid_idx])):.2f}° (incl. induced velocity, from results_aero["alpha_at_ac"])'
-    )
+    alpha_at_ac_values = np.ravel(results_aero.get("alpha_at_ac", []))
+    if alpha_at_ac_values.size > mid_idx:
+        print(
+            f'alpha = {float(np.rad2deg(alpha_at_ac_values[mid_idx])):.2f}° (incl. induced velocity, from results_aero["alpha_at_ac"])'
+        )
 
     if config["structural_solver"] == "pss":
         rest_lengths = psystem.extract_rest_length

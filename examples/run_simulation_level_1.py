@@ -33,7 +33,10 @@ def _resolve_starting_struc_nodes(
     Otherwise load results/<kite_name>/<date>/sim_output.h5 and return the final
     node positions from tracking["positions"][-1].
     """
-    sim_date = str(config.get("starting_from_sim_of_date", "")).strip()
+    sim_date_raw = config.get("starting_from_sim_of_date", "")
+    sim_date = "" if sim_date_raw is None else str(sim_date_raw).strip()
+    if sim_date.lower() in {"false", "none", "null"}:
+        sim_date = ""
     if sim_date == "":
         return struc_nodes_default
 
@@ -93,7 +96,10 @@ def _resolve_starting_rest_lengths(
     Returns:
         np.ndarray: Updated rest lengths (or defaults if not recovering)
     """
-    sim_date = str(config.get("starting_from_sim_of_date", "")).strip()
+    sim_date_raw = config.get("starting_from_sim_of_date", "")
+    sim_date = "" if sim_date_raw is None else str(sim_date_raw).strip()
+    if sim_date.lower() in {"false", "none", "null"}:
+        sim_date = ""
     if sim_date == "":
         return l0_arr_default
 
@@ -177,7 +183,7 @@ def main():
     kite_name = "TUDELFT_V3_KITE"  # the dir name with the relevant .yaml files
     # kite_name = "3plate_kite"  # the dir name with the relevant .yaml files
     # load config.yaml & geometry.yaml, save both, and return them as dicts
-    config_path = Path(PROJECT_DIR) / "data" / f"{kite_name}" / "config_level_1.yaml"
+    config_path = Path(PROJECT_DIR) / "data" / f"{kite_name}" / "config.yaml"
     struc_geometry_path = (
         Path(PROJECT_DIR)
         / "data"

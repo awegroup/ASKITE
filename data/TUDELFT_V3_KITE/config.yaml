@@ -1,19 +1,20 @@
 ## inflow conditions
-vel_wind: !!seq [10, 0, 0]
+vel_wind: !!seq [15, 0, 0]
 vel_kite: !!seq [0, 0, 0]
 acc_kite: !!seq [0, 0, 0]
 
 ## case settings
 structural_solver: !!str 'pss' #"kite_fem" or "pss"
 kcu_mass: !!float 8.4
-starting_from_sim_subdir: depower_p0000mm_steer_p0000mm
+starting_from_sim_subdir: !!bool false #should add string with dir name if you want this
 is_with_gravity: !!bool false
 is_with_aero_bridle: !!bool true
 is_with_aero_tether: !!bool true
 is_run_only_1_time_step: !!bool false
 is_with_initial_point_velocity: !!bool false
 is_with_forcing_symmetry: !!bool false
-initial_geometry_rotation_deg: !!float 0.0
+#CRUCIAL that initial_rot is not 0, 10 is good value
+initial_geometry_rotation_deg: !!float 10.0
 
 ## system model initial conditions
 angle_elevation_deg: !!float 0.0
@@ -26,9 +27,19 @@ timeder_speed_tangential: !!float 0.0
 timeder_speed_radial: !!float 0.0
 
 ## actuation settings
-power_tape_extension_step: !!float 0.05 #0.02 #0.01
+## baseline is 1.9m
+## l_dp=0.2+udp*5
+## udp(0.1) = 0.2+0.1*5 = 0.7m --> -1.2m extension
+## udp(0.2) = 0.2+0.2*5 = 1.2m --> -0.7m extension
+## udp(0.22) = 0.2+0.22*5 = 1.3m --> -0.6m extension
+## udp(0.25) = 0.2+0.25*5 = 1.45m --> -0.45m extension
+## udp(0.3) = 0.2+0.3*5 = 1.7m --> -0.2m extension
+## udp(0.4) = 0.2+0.4*5 = 2.2m --> +0.3m extension
+## udp(0.5) = 0.2+0.5*5 = 2.7m --> +0.8m extension
+## limit seems to be udp=0.22 ~ 0.4
+power_tape_extension_step: !!float -0.05 #0.02 #0.01
 power_tape_final_extension: !!float 0.0 #0.3 #0.05
-steering_tape_extension_step: !!float 0.05
+steering_tape_extension_step: !!float 0.0
 steering_tape_final_extension: !!float 0.0
 
 ## output settings
@@ -116,19 +127,24 @@ aero2struc:
 
 ## coupled
 aero_structural_solver:
-  max_iter: !!int 100
+  max_iter: !!int 500
   it_check: !!int 5
-  tol: !!float 5 #N
+  tol: !!float 0.5 #N
   is_with_aitken_relaxation: !!bool true
-  relaxation_factor: !!float 0.5 #0.05-0.3
-  n_max_constant_residual_force: !!int 10
-  stagnation_tol: !!float 2 # N, tolerance for stagnation detection
+  relaxation_factor: !!float 0.3 #0.05-0.3 (capped at 0.3?)
+  n_max_constant_residual_force: !!int 20
+  stagnation_tol: !!float 0.5 # N, tolerance for stagnation detection
   qs_state_stagnation_decimals: !!int 2 # stop if opt_x is unchanged at this rounding
   qs_state_stagnation_n_iter: !!int 30 # consecutive unchanged iterations required to stop (0 disables)
   aero_update_interval: !!int 1 # run aero every N structural iterations (1 = every iter, 5 = every 5th)
   steering_actuation_interval_iters: !!int 2 # apply steering actuation every N coupled iterations
   node_displacement_tol: !!float 0.0001 # stop if max nodal displacement < this [m] (0 = disabled, e.g. 1e-4)
   aero_solve_type: !!str 'qsm' # 'qsm' = quasi-steady optimization with system_model; 'level_1' = direct VSM with va_vector
+  is_with_elongation_stiffness_control: !!bool true # After residual convergence, require every element elongation to be < +1%.
+  max_positive_elongation_ratio: !!float 0.01
+  elongation_stiffness_increase_factor: !!float 1.1
+  elongation_stiffness_max_factor: !!float 100.0
+  is_printing_elongations: !!bool true
 
 ## Physical constants
 grav_constant: !!seq [0, 0, -9.81]

@@ -21,7 +21,7 @@ def main():
 
     # load files
     results_dir = (
-        Path(PROJECT_DIR) / "results" / f"TUDELFT_V3_KITE" / f"2026_02_13_1820h"
+        Path(PROJECT_DIR) / "results" / f"TUDELFT_V3_KITE" / f"2026_05_19_1745h"
     )
     # results_dir = (
     #     Path(PROJECT_DIR) / "results" / f"TUDELFT_V3_KITE" / f"2026_02_10_1128h"

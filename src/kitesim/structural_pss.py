@@ -214,17 +214,17 @@ def run_pss(psystem, f_ext, config_structural_pss):
     logging.debug(f"Running PS simulation, f_int: {psystem.f_int}")
 
     # And run the simulation
-    for step_internal in t_vector_internal:
+    for internal_iter, step_internal in enumerate(t_vector_internal, start=1):
         psystem.kin_damp_sim(f_ext)
 
         E_kin.append(np.linalg.norm(psystem.x_v_current[1] ** 2))
         f_int.append(np.linalg.norm(psystem.f_int))
 
         is_structural_converged = False
-        if step_internal > 10:
+        if internal_iter > 10:
             if np.max(E_kin[-10:-1]) <= E_kin_tol:
                 is_structural_converged = True
-        if is_structural_converged and step_internal > 1:
+        if is_structural_converged:
             # print("Kinetic damping PS is_converged", step_internal)
             break
 
