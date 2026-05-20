@@ -11,13 +11,15 @@ from kitesim.utils import (
     rotate_geometry,
 )
 from kitesim import (
-    aero2struc_level_1,
+    aero2struc_level_1_old_pre_20_05_2026,
     aerodynamic_vsm,
     aerostructural_coupled_solver_level_1,
     read_struc_geometry_yaml_level_1,
     structural_kite_fem_level_1,
     structural_pss,
 )
+
+PROJECT_DIR = Path(__file__).resolve().parents[1]
 
 
 def _resolve_starting_struc_nodes(
@@ -177,29 +179,34 @@ def _resolve_initial_geometry_rotation_kwargs(config):
 
 
 # Import modules
+"""Main function"""
+
+
 def main():
-    """Main function"""
-    PROJECT_DIR = Path(__file__).resolve().parents[1]
     kite_name = "TUDELFT_V3_KITE"  # the dir name with the relevant .yaml files
     # kite_name = "3plate_kite"  # the dir name with the relevant .yaml files
     # load config.yaml & geometry.yaml, save both, and return them as dicts
-    config_path = Path(PROJECT_DIR) / "data" / f"{kite_name}" / "config.yaml"
+    # config_path = Path(PROJECT_DIR) / "data" / f"{kite_name}" / "config.yaml"
+
+    # struc_geometry_path = (
+    #     Path(PROJECT_DIR)
+    #     / "data"
+    #     / f"{kite_name}"
+    #     # / "struc_geometry_level_1_manual.yaml"
+    #     # / "struc_geometry_level_1_manual_JULIA.yaml"
+    #     / "struc_geometry_level_1_converged.yaml"
+    # )
+
+    ##testing
+    config_path = Path(PROJECT_DIR) / "data" / "ch9" / "config_2019.yaml"
     struc_geometry_path = (
         Path(PROJECT_DIR)
         / "data"
-        / f"{kite_name}"
-        # / "struc_geometry_level_1_manual.yaml"
-        # / "struc_geometry_level_1_manual_JULIA.yaml"
-        / "struc_geometry_level_1_converged.yaml"
-    )
-    struc_geometry_path = (
-        Path(PROJECT_DIR)
-        / "data"
-        / "TUDELFT_V3_KITE"
-        / "organizing_yaml_files_15_05_2026"
-        / "final_files"
+        / "ch9"
         / "struc_geometry_PSM_reduced_photogrammetry_adjusted.yaml"
+        # / "struc_geometry_PSM_reduced_with_tether.yaml"
     )
+
     aero_geometry_path = (
         Path(PROJECT_DIR) / "data" / f"{kite_name}" / "aero_geometry.yaml"
     )
@@ -352,7 +359,7 @@ def main():
     ##################
     ### AERO2STRUC ###
     ##################
-    aero2struc_mapping = aero2struc_level_1.initialize_mapping(
+    aero2struc_mapping = aero2struc_level_1_old_pre_20_05_2026.initialize_mapping(
         body_aero.panels,
         struc_nodes,
         struc_node_le_indices,

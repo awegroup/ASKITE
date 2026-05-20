@@ -69,13 +69,23 @@ def build_parser():
     parser.add_argument("--max-cases", type=int, default=None)
     parser.add_argument("--max-iter", type=int, default=None)
     parser.add_argument("--include-gravity", action="store_true")
-    parser.add_argument("--include-bridle-drag", action="store_true")
+    parser.add_argument(
+        "--include-bridle-drag",
+        action="store_true",
+        default=True,
+        help="Deprecated: Ch. 9 validation always includes bridle drag.",
+    )
     parser.add_argument("--include-tether-drag", action="store_true")
-    parser.add_argument("--include-kcu-drag", action="store_true")
+    parser.add_argument(
+        "--include-kcu-drag",
+        action="store_true",
+        default=True,
+        help="Deprecated: Ch. 9 validation always includes KCU drag.",
+    )
     parser.add_argument(
         "--force-source-for-comparison",
         choices=["wing_only", "aero_total", "reaction_total"],
-        default="wing_only",
+        default="aero_total",
     )
     return parser
 
@@ -108,7 +118,8 @@ def _target_depower(row):
 def _config_overrides(row, args):
     overrides = {
         "is_with_gravity": bool(args.include_gravity),
-        "is_with_aero_bridle": bool(args.include_bridle_drag),
+        "is_with_aero_bridle": True,
+        "is_with_aero_kcu": True,
         "is_with_aero_tether": bool(args.include_tether_drag),
     }
     if args.mode == "wind_tether_state_prescribed":
@@ -181,13 +192,28 @@ def _failure_row(case_id, case_dir, args, row, exc):
             )
         ),
         "measured_CL_ekf": finite_or_nan(
-            _row_value(row, ["C_L", "CL", "CL_ekf"], np.nan)
+            _row_value(row, ["C_L_kite", "CL_kite_ekf", "C_L", "CL", "CL_ekf"], np.nan)
         ),
         "measured_CD_ekf": finite_or_nan(
-            _row_value(row, ["C_D", "CD", "CD_ekf"], np.nan)
+            _row_value(row, ["C_D_kite", "CD_kite_ekf", "C_D", "CD", "CD_ekf"], np.nan)
         ),
         "measured_L_over_D_ekf": finite_or_nan(
-            _row_value(row, ["L_over_D_ekf", "L_over_D", "CL_over_CD"], np.nan)
+            _row_value(
+                row,
+                [
+                    "L_over_D_kite_ekf",
+                    "L_over_D_ekf",
+                    "L_over_D",
+                    "CL_over_CD",
+                ],
+                np.nan,
+            )
+        ),
+        "measured_CL_wing_ekf": finite_or_nan(
+            _row_value(row, ["C_L_wing", "CL_wing_ekf", "CL_ekf"], np.nan)
+        ),
+        "measured_CD_wing_ekf": finite_or_nan(
+            _row_value(row, ["C_D_wing", "CD_wing_ekf", "CD_ekf"], np.nan)
         ),
         "sim_tether_or_reaction_force_N": np.nan,
         "sim_wing_force_N": np.nan,
@@ -197,6 +223,9 @@ def _failure_row(case_id, case_dir, args, row, exc):
         "sim_CL_total": np.nan,
         "sim_CD_total": np.nan,
         "sim_L_over_D_total": np.nan,
+        "sim_CL_kite": np.nan,
+        "sim_CD_kite": np.nan,
+        "sim_L_over_D_kite": np.nan,
         "projected_span_m": np.nan,
         "projected_area_m2": np.nan,
         "midspan_pitch_deg": np.nan,
@@ -259,13 +288,36 @@ def _summary_row(case_id, case_dir, args, ekf_row, meta, tracking):
                 )
             ),
             "measured_CL_ekf": finite_or_nan(
-                _row_value(ekf_row, ["C_L", "CL", "CL_ekf"], np.nan)
+                _row_value(
+                    ekf_row,
+                    ["C_L_kite", "CL_kite_ekf", "C_L", "CL", "CL_ekf"],
+                    np.nan,
+                )
             ),
             "measured_CD_ekf": finite_or_nan(
-                _row_value(ekf_row, ["C_D", "CD", "CD_ekf"], np.nan)
+                _row_value(
+                    ekf_row,
+                    ["C_D_kite", "CD_kite_ekf", "C_D", "CD", "CD_ekf"],
+                    np.nan,
+                )
             ),
             "measured_L_over_D_ekf": finite_or_nan(
-                _row_value(ekf_row, ["L_over_D_ekf", "L_over_D", "CL_over_CD"], np.nan)
+                _row_value(
+                    ekf_row,
+                    [
+                        "L_over_D_kite_ekf",
+                        "L_over_D_ekf",
+                        "L_over_D",
+                        "CL_over_CD",
+                    ],
+                    np.nan,
+                )
+            ),
+            "measured_CL_wing_ekf": finite_or_nan(
+                _row_value(ekf_row, ["C_L_wing", "CL_wing_ekf", "CL_ekf"], np.nan)
+            ),
+            "measured_CD_wing_ekf": finite_or_nan(
+                _row_value(ekf_row, ["C_D_wing", "CD_wing_ekf", "CD_ekf"], np.nan)
             ),
             "force_source_for_comparison": args.force_source_for_comparison,
             "include_kcu_drag_requested": bool(args.include_kcu_drag),

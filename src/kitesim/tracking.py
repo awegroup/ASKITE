@@ -35,6 +35,7 @@ VECTOR_TRACKING_FIELDS = [
     "f_residual",
     "aero_force_wing_total",
     "aero_force_bridle_total",
+    "aero_force_kcu_total",
     "aero_force_total",
 ]
 

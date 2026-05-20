@@ -44,18 +44,22 @@ def wind_axis_basis(vel_app):
 def compute_global_coefficients(
     f_wing_total,
     f_bridle_total=None,
+    f_kcu_total=None,
     vel_app=None,
     rho=1.225,
     s_ref_m2=1.0,
 ):
     """
-    Compute integrated force coefficients from total wing and optional bridle force.
+    Compute integrated force coefficients from wing plus optional bridle/KCU forces.
     """
     f_wing_total = np.asarray(f_wing_total, dtype=float).reshape(3)
     if f_bridle_total is None:
         f_bridle_total = np.zeros(3)
     f_bridle_total = np.asarray(f_bridle_total, dtype=float).reshape(3)
-    f_total = f_wing_total + f_bridle_total
+    if f_kcu_total is None:
+        f_kcu_total = np.zeros(3)
+    f_kcu_total = np.asarray(f_kcu_total, dtype=float).reshape(3)
+    f_total = f_wing_total + f_bridle_total + f_kcu_total
     vel_app = np.asarray(vel_app, dtype=float).reshape(3)
     speed = _safe_norm(vel_app)
     s_ref_m2 = float(s_ref_m2)
@@ -91,6 +95,7 @@ def compute_global_coefficients(
     return {
         "aero_force_wing_total": f_wing_total,
         "aero_force_bridle_total": f_bridle_total,
+        "aero_force_kcu_total": f_kcu_total,
         "aero_force_total": f_total,
         "lift_wing": lift,
         "drag_wing": drag,

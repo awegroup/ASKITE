@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 import copy
 from kitesim import (
+    aero2struc_level_1_old_pre_20_05_2026,
     aero2struc_level_1,
     aerodynamic_vsm,
     struc2aero,
@@ -13,6 +14,7 @@ from kitesim import (
     tracking,
     plotting,
     aerodynamic_bridle_line_drag,
+    aerodynamic_kcu_drag,
     analysis_metrics,
 )
 
@@ -527,6 +529,7 @@ def increase_stiffness_after_stagnation(
     psystem,
     kite_fem_structure,
     initial_stiffnesses,
+    kite_connectivity_arr=None,
 ):
     """
     Increase structural stiffness globally after residual stagnation.
@@ -546,8 +549,6 @@ def increase_stiffness_after_stagnation(
         return f"{value:.2f}x"
 
     def stagnation_control_diagnostics():
-        kite_connectivity_arr = config.get("kite_connectivity_arr", None)
-
         try:
             rows = _element_elongation_rows(
                 config,
@@ -774,8 +775,41 @@ def main(
         config["aerodynamic"]["n_aero_panels_per_struc_section"],
     )
 
+    # ### AERO
+    # f_aero_wing_vsm_format, body_aero, results_aero = aerodynamic_vsm.run_vsm_package(
+    #     body_aero=body_aero,
+    #     solver=vsm_solver,
+    #     le_arr=le_arr,
+    #     te_arr=te_arr,
+    #     va_vector=vel_app,
+    #     aero_input_type="reuse_initial_polar_data",
+    #     initial_polar_data=initial_polar_data,
+    #     is_with_plot=config["is_with_aero_plot_per_iteration"],
+    # )
+    # logging.debug(
+    #     f"Aero symmetry check, f_aero_y: {np.sum([force[1] for force in f_aero_wing_vsm_format])}"
+    # )
+    # ### AERO --> STRUC
+    # f_aero_wing = aero2struc_level_1_old_pre_20_05_2026.main(
+    #     config["aero2struc"]["coupling_method"],
+    #     f_aero_wing_vsm_format,
+    #     struc_nodes,
+    #     np.array(results_aero["panel_cp_locations"]),
+    #     aero2struc_mapping,
+    #     config["is_with_coupling_plot_per_iteration"],
+    #     config["aero2struc"],
+    # )
+
+    # # Check moment preservation of aero→struc mapping (pre-loop)
+    # aero2struc_level_1_old_pre_20_05_2026.check_moment_preservation(
+    #     f_aero_panel=f_aero_wing_vsm_format,
+    #     panel_cps=np.array(results_aero["panel_cp_locations"]),
+    #     f_aero_mapped=f_aero_wing,
+    #     struc_nodes=struc_nodes,
+    # )
+
     ### AERO
-    f_aero_wing_vsm_format, body_aero, results_aero = aerodynamic_vsm.run_vsm_direct(
+    f_aero_wing_vsm_format, body_aero, results_aero = aerodynamic_vsm.run_vsm_package(
         body_aero=body_aero,
         solver=vsm_solver,
         le_arr=le_arr,
@@ -788,7 +822,11 @@ def main(
     logging.debug(
         f"Aero symmetry check, f_aero_y: {np.sum([force[1] for force in f_aero_wing_vsm_format])}"
     )
+
     ### AERO --> STRUC
+    ref_point = np.array(config["aerodynamic"]["reference_point"])
+
+    moment_aero_panel = results_aero.get("M_distribution")
     f_aero_wing = aero2struc_level_1.main(
         config["aero2struc"]["coupling_method"],
         f_aero_wing_vsm_format,
@@ -797,14 +835,17 @@ def main(
         aero2struc_mapping,
         config["is_with_coupling_plot_per_iteration"],
         config["aero2struc"],
+        moment_aero_panel=moment_aero_panel,
+        ref_point=ref_point,
     )
-
-    # Check moment preservation of aero→struc mapping (pre-loop)
+    print(f"i: pre-loop")
     aero2struc_level_1.check_moment_preservation(
         f_aero_panel=f_aero_wing_vsm_format,
         panel_cps=np.array(results_aero["panel_cp_locations"]),
         f_aero_mapped=f_aero_wing,
         struc_nodes=struc_nodes,
+        ref_point=ref_point,
+        moment_aero_panel=moment_aero_panel,  # <-- add this
     )
 
     ### BRIDLE AERO
@@ -817,7 +858,17 @@ def main(
         config["aerodynamic_bridle"]["cd_cable"],
         config["aerodynamic_bridle"]["cf_cable"],
     )
-    f_aero = f_aero_wing + f_aero_bridle
+    if config.get("is_with_aero_kcu", False):
+        f_aero_kcu = aerodynamic_kcu_drag.main(
+            struc_nodes,
+            bridle_connectivity_arr,
+            vel_app,
+            config["rho"],
+            config.get("aerodynamic_kcu", {}),
+        )
+    else:
+        f_aero_kcu = np.zeros((len(struc_nodes), 3))
+    f_aero = f_aero_wing + f_aero_bridle + f_aero_kcu
     ## EXTERNAL FORCE
     f_ext = f_aero + f_ext_gravity
     f_ext = np.round(f_ext, 5)
@@ -934,7 +985,7 @@ def main(
 
             ### AERO
             f_aero_wing_vsm_format, body_aero, results_aero = (
-                aerodynamic_vsm.run_vsm_direct(
+                aerodynamic_vsm.run_vsm_package(
                     body_aero=body_aero,
                     solver=vsm_solver,
                     le_arr=le_arr,
@@ -948,7 +999,9 @@ def main(
             logging.debug(
                 f"Aero symmetry check, f_aero_y: {np.sum([force[1] for force in f_aero_wing_vsm_format])}"
             )
+
             ### AERO --> STRUC
+            moment_aero_panel = results_aero.get("M_distribution")
             f_aero_wing = aero2struc_level_1.main(
                 config["aero2struc"]["coupling_method"],
                 f_aero_wing_vsm_format,
@@ -957,15 +1010,20 @@ def main(
                 aero2struc_mapping,
                 config["is_with_coupling_plot_per_iteration"],
                 config["aero2struc"],
+                moment_aero_panel=moment_aero_panel,
+                ref_point=ref_point,
             )
 
             # Check moment preservation (only first coupling iteration to limit log spam)
-            if i == 1:
+            if i == 1 or i == 2:
+                print(f"i: {i}")
                 aero2struc_level_1.check_moment_preservation(
                     f_aero_panel=f_aero_wing_vsm_format,
                     panel_cps=np.array(results_aero["panel_cp_locations"]),
                     f_aero_mapped=f_aero_wing,
                     struc_nodes=struc_nodes,
+                    ref_point=ref_point,
+                    moment_aero_panel=moment_aero_panel,  # <-- add this
                 )
 
             ### BRIDLE AERO
@@ -981,7 +1039,17 @@ def main(
                 )
             else:
                 f_aero_bridle = np.zeros((len(struc_nodes), 3))
-            f_aero = f_aero_wing + f_aero_bridle
+            if config.get("is_with_aero_kcu", False):
+                f_aero_kcu = aerodynamic_kcu_drag.main(
+                    struc_nodes,
+                    bridle_connectivity_arr,
+                    vel_app,
+                    config["rho"],
+                    config.get("aerodynamic_kcu", {}),
+                )
+            else:
+                f_aero_kcu = np.zeros((len(struc_nodes), 3))
+            f_aero = f_aero_wing + f_aero_bridle + f_aero_kcu
 
             ## EXTERNAL FORCE
             f_ext = f_aero + f_ext_gravity
@@ -991,6 +1059,7 @@ def main(
             aero_metrics = analysis_metrics.compute_global_coefficients(
                 f_wing_total=np.sum(f_aero_wing_vsm_format, axis=0),
                 f_bridle_total=np.sum(f_aero_bridle, axis=0),
+                f_kcu_total=np.sum(f_aero_kcu, axis=0),
                 vel_app=vel_app,
                 rho=config["rho"],
                 s_ref_m2=s_ref_m2,
@@ -1097,6 +1166,7 @@ def main(
                     psystem=psystem,
                     kite_fem_structure=kite_fem_structure,
                     initial_stiffnesses=initial_stiffnesses,
+                    kite_connectivity_arr=kite_connectivity_arr,
                 )
 
                 if stiffness_updated:
@@ -1298,7 +1368,7 @@ def main(
         "S_ref_m2": float(s_ref_m2),
         "S_ref_source": str(s_ref_source),
         "rho": float(config["rho"]),
-        "coefficient_force_source": "wing_only_panel_forces_and_optional_bridle_total",
+        "coefficient_force_source": "wing_panel_forces_plus_bridle_and_kcu_total",
         "wind_axis_convention": "drag_positive_along_apparent_wind_lift_positive_z_component",
         "final_depower_tape_length_m": final_depower_tape_length_m,
         "final_u_dp": (

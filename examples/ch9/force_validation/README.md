@@ -48,8 +48,14 @@ python examples/ch9/force_validation/run_ch9_3_2_vwt_cases.py \
 
 ## Drag Flags
 
-- `--include-bridle-drag` enables ASKITE bridle-line drag.
+- Bridle-line drag is always enabled for Ch. 9 ASKITE validation runs.
 - `--include-tether-drag` sets `is_with_aero_tether`, but no direct ASKITE
   tether-drag force is currently added to the coupled external force vector.
-- `--include-kcu-drag` is recorded in output metadata only; it does not apply a
-  KCU drag force.
+- KCU drag is always enabled for Ch. 9 ASKITE validation runs. The KCU is added
+  as a separate finite-cylinder drag vector at the KCU/bridle node.
+
+The force-coefficient validation is kite-level: ASKITE uses wing + bridle + KCU
+aerodynamic force for `sim_CL_kite`, `sim_CD_kite`, and `sim_L_over_D_kite`.
+The EKF harvest uses `CL_kite_ekf = CL_ekf` and
+`CD_kite_ekf = CD_ekf + CD_kcu_ekf + CD_bridles_ekf`; tether drag is kept
+separate and is not included in the kite-level coefficient.

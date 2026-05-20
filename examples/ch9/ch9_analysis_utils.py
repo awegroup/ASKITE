@@ -13,14 +13,12 @@ from kitesim import (
     aero2struc_level_1,
     aerodynamic_vsm,
     aerostructural_coupled_solver_level_1,
-    aerostructural_coupled_solver_qsm,
     read_struc_geometry_yaml_level_1,
     structural_kite_fem_level_1,
     structural_pss,
 )
 from kitesim.analysis_metrics import compute_geometry_metrics
 from kitesim.utils import load_sim_output, load_yaml, rotate_geometry, save_results
-
 
 PROJECT_DIR = Path(__file__).resolve().parents[2]
 KITE_NAME = "ch9"
@@ -30,6 +28,26 @@ DEFAULT_STRUC_GEOMETRY = DEFAULT_DATA_DIR / "struc_geometry_PSM_reduced.yaml"
 DEFAULT_AERO_GEOMETRY = DEFAULT_DATA_DIR / "aero_geometry.yaml"
 UDP_DEPOWER_OFFSET_M = 0.2
 UDP_DEPOWER_SCALE_M = 5.0
+DEFAULT_AERODYNAMIC_KCU = {
+    "node_index": 0,
+    "length": 1.0,
+    "diameter": 0.48,
+    "cd_perpendicular": 0.69,
+    "cd_parallel": 0.83,
+}
+
+
+def enforce_ch9_parasitic_aero(config):
+    """Ensure Ch. 9 runs include bridle-line and KCU parasitic aerodynamics."""
+    config["is_with_aero_bridle"] = True
+    config["is_with_aero_kcu"] = True
+    kcu_cfg = dict(DEFAULT_AERODYNAMIC_KCU)
+    kcu_cfg.update(config.get("aerodynamic_kcu", {}) or {})
+    config["aerodynamic_kcu"] = kcu_cfg
+    config.setdefault("aerodynamic_bridle", {})
+    config["aerodynamic_bridle"].setdefault("cd_cable", 1.1)
+    config["aerodynamic_bridle"].setdefault("cf_cable", 0.01)
+    return config
 
 
 def udp_to_depower_tape_length_m(udp):
@@ -192,7 +210,9 @@ def _resolve_initial_geometry_rotation_kwargs(config):
 
 
 def _configure_system_model(system_model, config):
-    system_model.angle_elevation = np.deg2rad(float(config.get("angle_elevation_deg", 0.0)))
+    system_model.angle_elevation = np.deg2rad(
+        float(config.get("angle_elevation_deg", 0.0))
+    )
     system_model.angle_azimuth = np.deg2rad(float(config.get("angle_azimuth_deg", 0.0)))
     system_model.angle_course = np.deg2rad(float(config.get("angle_course_deg", 90.0)))
     system_model.speed_radial = float(config.get("speed_radial", 0.0))
@@ -316,6 +336,7 @@ def run_coupled_case(
                 config.setdefault(first, {})[rest] = value
             else:
                 config[key] = value
+    enforce_ch9_parasitic_aero(config)
 
     (
         struc_nodes,
@@ -359,31 +380,29 @@ def run_coupled_case(
     n_panels_aero = (n_struc_ribs - 1) * config["aerodynamic"][
         "n_aero_panels_per_struc_section"
     ]
-    bridle_path = (
-        struc_geometry_path if config.get("is_with_aero_bridle", False) else None
-    )
     body_aero, vsm_solver, vel_app, initial_polar_data = aerodynamic_vsm.initialize(
         aero_geometry_path,
         config,
         n_panels_aero,
-        bridle_path=bridle_path,
     )
     if requested_va_ms is not None:
         vel_app = np.array([float(requested_va_ms), 0.0, 0.0])
 
-    psystem, kite_fem_structure, struc_nodes, struc_nodes_initial = _instantiate_structure(
-        config,
-        struc_geometry,
-        struc_nodes,
-        m_arr,
-        kite_connectivity_arr,
-        l0_arr,
-        k_arr,
-        c_arr,
-        linktype_arr,
-        pulley_line_to_other_node_pair_dict,
-        power_tape_index,
-        pulley_node_indices,
+    psystem, kite_fem_structure, struc_nodes, struc_nodes_initial = (
+        _instantiate_structure(
+            config,
+            struc_geometry,
+            struc_nodes,
+            m_arr,
+            kite_connectivity_arr,
+            l0_arr,
+            k_arr,
+            c_arr,
+            linktype_arr,
+            pulley_line_to_other_node_pair_dict,
+            power_tape_index,
+            pulley_node_indices,
+        )
     )
 
     aero2struc_mapping = aero2struc_level_1.initialize_mapping(
@@ -445,14 +464,16 @@ def run_coupled_case(
         from awetrim.system.system_model import SystemModel
         from awetrim.system.tether import RigidLumpedTether
 
-        tether = RigidLumpedTether(diameter=config.get("tether", {}).get("diameter", 0.01))
+        tether = RigidLumpedTether(
+            diameter=config.get("tether", {}).get("diameter", 0.01)
+        )
         system_model = SystemModel(tether=tether)
         system_model.mass_wing = float(np.sum(m_arr))
         _configure_system_model(system_model, config)
         initial_length_steering_left = float(l0_arr[steering_tape_indices[0]])
         initial_length_steering_right = float(l0_arr[steering_tape_indices[1]])
 
-        tracking_data, meta = aerostructural_coupled_solver_qsm.main(
+        tracking_data, meta = aerostructural_coupled_solver_level_1.main(
             m_arr=m_arr,
             struc_nodes=struc_nodes,
             struc_nodes_initial=struc_nodes_initial,
@@ -466,7 +487,9 @@ def run_coupled_case(
             initial_length_steering_right=initial_length_steering_right,
             steering_tape_indices=steering_tape_indices,
             steering_tape_final_extension=float(steering_tape_final_extension_m),
-            steering_tape_extension_step=float(config.get("steering_tape_extension_step", 0.0)),
+            steering_tape_extension_step=float(
+                config.get("steering_tape_extension_step", 0.0)
+            ),
             kite_connectivity_arr=kite_connectivity_arr,
             bridle_connectivity_arr=bridle_connectivity_arr,
             pulley_line_indices=pulley_line_indices,
@@ -546,6 +569,11 @@ def summary_from_case(
         "sim_CL_total": finite_or_nan(meta.get("final_C_L_total_aero", np.nan)),
         "sim_CD_total": finite_or_nan(meta.get("final_C_D_total_aero", np.nan)),
         "sim_L_over_D_total": finite_or_nan(
+            meta.get("final_glide_ratio_total_aero", np.nan)
+        ),
+        "sim_CL_kite": finite_or_nan(meta.get("final_C_L_total_aero", np.nan)),
+        "sim_CD_kite": finite_or_nan(meta.get("final_C_D_total_aero", np.nan)),
+        "sim_L_over_D_kite": finite_or_nan(
             meta.get("final_glide_ratio_total_aero", np.nan)
         ),
         "projected_span_m": finite_or_nan(meta.get("final_projected_span_m", np.nan)),

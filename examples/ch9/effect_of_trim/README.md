@@ -22,12 +22,3 @@ python examples/ch9/effect_of_trim/run_sensitivity_analysis_va_trim.py \
 python examples/ch9/effect_of_trim/plot_sensitivity_analysis_va_trim.py \
   --plot-format pdf,png
 ```
-
-## Quick Wiring Check
-
-```bash
-python examples/ch9/effect_of_trim/run_sensitivity_analysis_va_trim.py \
-  --max-cases 1 \
-  --max-iter 1 \
-  --output-root /tmp/askite_effect_of_trim_check
-```

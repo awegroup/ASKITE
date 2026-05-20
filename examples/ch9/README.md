@@ -18,11 +18,12 @@ Shared helpers remain in `examples/ch9/ch9_analysis_utils.py`.
 
 ## Drag Accounting
 
-- Bridle drag is applied when `is_with_aero_bridle` is true. The cable force is
+- Bridle drag is always enabled by the Ch. 9 case helper. The cable force is
   computed in `src/kitesim/aerodynamic_bridle_line_drag.py` and added to the
-  aerodynamic force totals in the coupled solvers.
-- KCU drag is not currently applied as a solver force. The force-validation
-  runner records `--include-kcu-drag` as requested metadata only.
+  coupled external force vector and aerodynamic force totals.
+- KCU drag is always enabled by the Ch. 9 case helper. It is computed as a
+  separate finite-cylinder drag vector in `src/kitesim/aerodynamic_kcu_drag.py`
+  and added at the KCU/bridle node.
 - Tether drag is not directly added to ASKITE level-1 or QSM external forces.
   The QSM path creates an AWETrim tether model, but `f_tether_drag` remains a
   zero placeholder in the ASKITE force assembly.
