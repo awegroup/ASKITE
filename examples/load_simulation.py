@@ -116,7 +116,10 @@ def main():
 
     # load files
     results_dir = (
-        Path(PROJECT_DIR) / "results" / f"TUDELFT_V3_KITE" / f"2026_05_20_1707h"
+        Path(PROJECT_DIR)
+        / "results"
+        / f"TUDELFT_V3_KITE"
+        / f"_segmented_bridles_udp_041"
     )
     # results_dir = (
     #     Path(PROJECT_DIR) / "results" / f"TUDELFT_V3_KITE" / f"2026_02_10_1128h"
