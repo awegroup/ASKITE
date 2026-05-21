@@ -16,6 +16,10 @@ input is the EKF case/statistics folder used by force validation:
 
 Shared helpers remain in `examples/ch9/ch9_analysis_utils.py`.
 
+Run scripts write fresh data under `results/ch9/<workflow>/processed_data/`.
+Plot scripts read those processed-data outputs and write figures directly under
+`results/ch9/<workflow>/`.
+
 ## Drag Accounting
 
 - Bridle drag is always enabled by the Ch. 9 case helper. The cable force is

@@ -2,8 +2,8 @@
 
 python examples/ch9/force_validation/plot_ch9_3_2_validation.py \
     --ekf-dir /home/jellepoland/ownCloud/phd/code/EKF-AWE/data/ch9_3_2_straight_vwt \
-    --askite-summary results/ch9/force_validation/ch9_3_2_askite_case_summary.csv \
-    --output-dir results/ch9/force_validation/plots \
+    --askite-summary results/ch9/force_validation/processed_data/ch9_3_2_askite_case_summary.csv \
+    --output-dir results/ch9/force_validation \
     --format pdf,png
 """
 
@@ -54,12 +54,13 @@ def build_parser():
         / "results"
         / "ch9"
         / "force_validation"
+        / "processed_data"
         / "ch9_3_2_askite_case_summary.csv",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=PROJECT_DIR / "results" / "ch9" / "force_validation" / "plots",
+        default=PROJECT_DIR / "results" / "ch9" / "force_validation",
     )
     parser.add_argument("--format", default="pdf")
     parser.add_argument("--campaigns", default="2019,2025")

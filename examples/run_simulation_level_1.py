@@ -198,12 +198,13 @@ def main():
     # )
 
     ##testing
-    config_path = Path(PROJECT_DIR) / "data" / "ch9" / "config_2019.yaml"
+    config_path = Path(PROJECT_DIR) / "data" / "ch9" / "config.yaml"
     struc_geometry_path = (
         Path(PROJECT_DIR)
         / "data"
         / "ch9"
-        / "struc_geometry_PSM_reduced_photogrammetry_adjusted.yaml"
+        # / "struc_geometry_PSM_reduced_photogrammetry_adjusted.yaml"
+        / "struc_geometry_PSM_reduced_photogrammetry_adjusted_bridle_segmented.yaml"
         # / "struc_geometry_PSM_reduced_with_tether.yaml"
     )
 

@@ -15,6 +15,7 @@ from ch9_analysis_utils import (
     PROJECT_DIR,
     parse_float_list,
     depower_tape_length_m_to_udp,
+    reset_processed_data_dir,
     run_coupled_case,
     summary_from_case,
     udp_to_depower_tape_length_m,
@@ -25,9 +26,13 @@ from ch9_analysis_utils import (
 
 # V3 kite velocities during 2019-2025 flight are 10m to 25m/s
 # so 17.5 is a good middle way, for the sweep
-DEFAULT_VA_VALUES = "17.5"
+# DEFAULT_VA_VALUES = "17.5"
+DEFAULT_VA_VALUES = "11,13,15,17,19,21,23,25"
 # DEFAULT_UDP_VALUES = "0.22,0.25,0.28,0.31,0.33,0.36, 0.39"
-DEFAULT_UDP_VALUES = "0.18,0.25,0.3,0.35,0.41"
+# DEFAULT_UDP_VALUES = "0.18,0.25,0.3,0.35,0.41"
+# DEFAULT_UDP_VALUES = "0.18,0.3,0.35,0.41"
+# DEFAULT_UDP_VALUES = "0.18,0.2"
+DEFAULT_UDP_VALUES = "0.18,0.22,0.24,0.26,0.28,0.3,0.32,0.34,0.36,0.38,0.4,0.42"
 
 
 def build_parser():
@@ -137,7 +142,7 @@ def _summary_row_for_sensitivity(base_row, sweep_type, va, udp):
 
 def main():
     args = build_parser().parse_args()
-    args.output_root.mkdir(parents=True, exist_ok=True)
+    processed_root = reset_processed_data_dir(args.output_root)
     va_values = parse_float_list(args.va_values)
     udp_values = parse_float_list(args.udp_values)
 
@@ -155,7 +160,7 @@ def main():
     for idx, (sweep_type, va, udp) in enumerate(requested_cases, start=1):
         target_depower_tape_length_m = udp_to_depower_tape_length_m(udp)
         case_id = _case_folder(sweep_type, va, udp)
-        case_dir = args.output_root / case_id
+        case_dir = processed_root / case_id
         if (case_dir / "sim_output.h5").exists() and not args.force:
             try:
                 from ch9_analysis_utils import load_case
@@ -224,15 +229,17 @@ def main():
             f"[{idx}/{len(requested_cases)}] {case_id}: converged={rows[-1]['converged']}"
         )
 
-    csv_path = args.output_root / "sensitivity_va_trim_summary.csv"
+    csv_path = processed_root / "sensitivity_va_trim_summary.csv"
     write_csv(csv_path, rows)
-    write_markdown_table(args.output_root / "sensitivity_va_trim_summary.md", rows)
+    write_markdown_table(processed_root / "sensitivity_va_trim_summary.md", rows)
     write_json(
-        args.output_root / "run_manifest.json",
+        processed_root / "run_manifest.json",
         {
             "sweep": args.sweep,
             "solver_mode": args.solver_mode,
             "n_cases": len(requested_cases),
+            "output_root": str(args.output_root),
+            "processed_data_dir": str(processed_root),
             "config": str(args.config),
             "struc_geometry": str(args.struc_geometry),
             "aero_geometry": str(args.aero_geometry),

@@ -18,6 +18,8 @@ from ch9_analysis_utils import (
     DEFAULT_STRUC_GEOMETRY,
     PROJECT_DIR,
     parse_formats,
+    processed_data_dir,
+    reset_processed_data_dir,
     run_coupled_case,
     save_figure,
     udp_to_depower_tape_length_m,
@@ -104,12 +106,18 @@ def _path_from_case_inputs(case_inputs, key, fallback):
     return candidate if candidate.exists() else Path(fallback)
 
 
-def _build_rerun_case_dir(case_dir, tol, rerun_udp=None):
+def _build_rerun_case_dir(case_dir, tol, rerun_udp=None, output_dir=None):
     tol_tag = str(float(tol)).replace(".", "p")
+    case_name = Path(case_dir).name
     if rerun_udp is None:
-        return Path(f"{case_dir}_rerun_tol_{tol_tag}")
-    udp_tag = f"{int(round(float(rerun_udp) * 1000)):04d}"
-    return Path(f"{case_dir}_rerun_tol_{tol_tag}_udp_{udp_tag}")
+        suffix = f"rerun_tol_{tol_tag}"
+    else:
+        udp_tag = f"{int(round(float(rerun_udp) * 1000)):04d}"
+        suffix = f"rerun_tol_{tol_tag}_udp_{udp_tag}"
+    if output_dir is None:
+        return Path(f"{case_dir}_{suffix}")
+    rerun_name = f"{case_name}_{suffix}"
+    return Path(output_dir) / rerun_name
 
 
 def _rewrite_depower_tape_l0_for_udp(src_struc_geometry_path, dst_case_dir, udp):
@@ -162,13 +170,27 @@ def relative_change(values, window):
 def main():
     args = build_parser().parse_args()
     case_dir = args.case_dir
+    data_output_dir = processed_data_dir(args.output_dir)
+    if args.rerun:
+        source_inside_data_dir = (
+            data_output_dir.resolve() == case_dir.resolve()
+            or data_output_dir.resolve() in case_dir.resolve().parents
+        )
+        if source_inside_data_dir:
+            data_output_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            data_output_dir = reset_processed_data_dir(args.output_dir)
+    else:
+        data_output_dir.mkdir(parents=True, exist_ok=True)
 
     if args.rerun:
         case_inputs = _load_case_inputs(case_dir)
         rerun_case_dir = (
             args.rerun_case_dir
             if args.rerun_case_dir is not None
-            else _build_rerun_case_dir(case_dir, args.tol, args.rerun_udp)
+            else _build_rerun_case_dir(
+                case_dir, args.tol, args.rerun_udp, data_output_dir
+            )
         )
 
         config_path = _path_from_case_inputs(
@@ -343,9 +365,9 @@ def main():
         "S_ref_source": str(meta.get("S_ref_source", "")),
     }
     rows = [summary]
-    write_csv(args.output_dir / "coupled_convergence_summary.csv", rows)
-    write_markdown_table(args.output_dir / "coupled_convergence_summary.md", rows)
-    write_json(args.output_dir / "coupled_convergence_summary.json", summary)
+    write_csv(data_output_dir / "coupled_convergence_summary.csv", rows)
+    write_markdown_table(data_output_dir / "coupled_convergence_summary.md", rows)
+    write_json(data_output_dir / "coupled_convergence_summary.json", summary)
 
 
 if __name__ == "__main__":

@@ -292,11 +292,13 @@ def initialize_mapping(
     for i, panel in enumerate(panels):
         y = panel.aerodynamic_center[1]
 
-        hi_le = int(np.clip(np.searchsorted(le_sorted_y, y), 0, len(le_sorted_y) - 1))
-        lo_le = int(np.clip(hi_le - 1, 0, len(le_sorted_y) - 1))
+        hi_le_raw = np.searchsorted(le_sorted_y, y)
+        lo_le = int(np.clip(hi_le_raw - 1, 0, len(le_sorted_y) - 1))
+        hi_le = int(np.clip(hi_le_raw, 0, len(le_sorted_y) - 1))
 
-        hi_te = int(np.clip(np.searchsorted(te_sorted_y, y), 0, len(te_sorted_y) - 1))
-        lo_te = int(np.clip(hi_te - 1, 0, len(te_sorted_y) - 1))
+        hi_te_raw = np.searchsorted(te_sorted_y, y)
+        lo_te = int(np.clip(hi_te_raw - 1, 0, len(te_sorted_y) - 1))
+        hi_te = int(np.clip(hi_te_raw, 0, len(te_sorted_y) - 1))
 
         mapping[i, :] = [
             le_sorted_idx[lo_le],

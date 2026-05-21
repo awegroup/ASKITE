@@ -2,6 +2,7 @@ import copy
 import json
 import math
 import csv
+import shutil
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -24,8 +25,11 @@ PROJECT_DIR = Path(__file__).resolve().parents[2]
 KITE_NAME = "ch9"
 DEFAULT_DATA_DIR = PROJECT_DIR / "data" / "ch9"
 DEFAULT_CONFIG = DEFAULT_DATA_DIR / "config.yaml"
-DEFAULT_STRUC_GEOMETRY = DEFAULT_DATA_DIR / "struc_geometry_PSM_reduced.yaml"
+DEFAULT_STRUC_GEOMETRY = (
+    DEFAULT_DATA_DIR / "struc_geometry_PSM_reduced_photogrammetry_adjusted.yaml"
+)
 DEFAULT_AERO_GEOMETRY = DEFAULT_DATA_DIR / "aero_geometry.yaml"
+PROCESSED_DATA_DIRNAME = "processed_data"
 UDP_DEPOWER_OFFSET_M = 0.2
 UDP_DEPOWER_SCALE_M = 5.0
 DEFAULT_AERODYNAMIC_KCU = {
@@ -68,6 +72,27 @@ def parse_formats(text):
     if text is None:
         return ["pdf"]
     return [item.strip().lower() for item in str(text).split(",") if item.strip()]
+
+
+def processed_data_dir(result_dir):
+    result_dir = Path(result_dir)
+    if result_dir.name == PROCESSED_DATA_DIRNAME:
+        return result_dir
+    return result_dir / PROCESSED_DATA_DIRNAME
+
+
+def reset_processed_data_dir(result_dir):
+    data_dir = processed_data_dir(result_dir)
+    if data_dir.exists():
+        if not data_dir.is_dir():
+            raise NotADirectoryError(data_dir)
+        for child in data_dir.iterdir():
+            if child.is_dir() and not child.is_symlink():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return data_dir
 
 
 def json_default(value):

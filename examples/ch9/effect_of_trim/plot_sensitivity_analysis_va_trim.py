@@ -24,12 +24,13 @@ def build_parser():
         / "results"
         / "ch9"
         / "effect_of_trim"
+        / "processed_data"
         / "sensitivity_va_trim_summary.csv",
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=PROJECT_DIR / "results" / "ch9" / "effect_of_trim" / "plots",
+        default=PROJECT_DIR / "results" / "ch9" / "effect_of_trim",
     )
     parser.add_argument("--plot-format", default="pdf")
     parser.add_argument("--include-failed", action="store_true")
@@ -43,7 +44,7 @@ def _numeric(df, column):
 
 def _plot_family(df, x_col, x_label, stem, output_dir, formats):
     if df.empty:
-        return
+        return []
     df = df.sort_values(x_col)
     x = _numeric(df, x_col)
     fig, axes = plt.subplots(2, 2, figsize=(7.5, 5.6), sharex=True)
@@ -80,12 +81,12 @@ def _plot_family(df, x_col, x_label, stem, output_dir, formats):
     for ax in axes[1, :]:
         ax.set_xlabel(x_label)
     fig.tight_layout()
-    save_figure(fig, output_dir, stem, formats)
+    return save_figure(fig, output_dir, stem, formats)
 
 
 def _plot_metric_grid(df, x_col, x_label, stem, output_dir, formats):
     if df.empty:
-        return
+        return []
     df = df.sort_values(x_col)
     x = _numeric(df, x_col)
     force_col = (
@@ -114,7 +115,7 @@ def _plot_metric_grid(df, x_col, x_label, stem, output_dir, formats):
     for ax in axes[-1, :]:
         ax.set_xlabel(x_label)
     fig.tight_layout()
-    save_figure(fig, output_dir, stem, formats)
+    return save_figure(fig, output_dir, stem, formats)
 
 
 def _table_rows(df, x_col):
@@ -144,50 +145,63 @@ def main():
     depower_df = (
         df[df["sweep_type"] == "depower"] if "sweep_type" in df else pd.DataFrame()
     )
-    _plot_family(
-        va_df,
-        "requested_va_ms",
-        "$V_a$ [m s$^{-1}$]",
-        "fig_9_3_1_5_effect_of_va",
-        args.output_dir,
-        formats,
+    created_files = []
+    created_files.extend(
+        _plot_family(
+            va_df,
+            "requested_va_ms",
+            "$V_a$ [m s$^{-1}$]",
+            "fig_9_3_1_5_effect_of_va",
+            args.output_dir,
+            formats,
+        )
     )
-    _plot_family(
-        depower_df,
-        "requested_u_dp",
-        "$u_{dp}$ [-]",
-        "fig_9_3_1_6_effect_of_trim_depower",
-        args.output_dir,
-        formats,
+    created_files.extend(
+        _plot_family(
+            depower_df,
+            "requested_u_dp",
+            "$u_{dp}$ [-]",
+            "fig_9_3_1_6_effect_of_trim_depower",
+            args.output_dir,
+            formats,
+        )
     )
-    _plot_metric_grid(
-        va_df,
-        "requested_va_ms",
-        "$V_a$ [m s$^{-1}$]",
-        "fig_9_3_1_5_effect_of_va_3x3",
-        args.output_dir,
-        formats,
+    created_files.extend(
+        _plot_metric_grid(
+            va_df,
+            "requested_va_ms",
+            "$V_a$ [m s$^{-1}$]",
+            "fig_9_3_1_5_effect_of_va_3x3",
+            args.output_dir,
+            formats,
+        )
     )
-    _plot_metric_grid(
-        depower_df,
-        "requested_u_dp",
-        "$u_{dp}$ [-]",
-        "fig_9_3_1_6_effect_of_trim_depower_3x3",
-        args.output_dir,
-        formats,
+    created_files.extend(
+        _plot_metric_grid(
+            depower_df,
+            "requested_u_dp",
+            "$u_{dp}$ [-]",
+            "fig_9_3_1_6_effect_of_trim_depower_3x3",
+            args.output_dir,
+            formats,
+        )
     )
     if not va_df.empty:
+        table_path = args.output_dir / "table_9_3_1_5_va_sweep.md"
         write_markdown_table(
-            args.output_dir / "table_9_3_1_5_va_sweep.md",
+            table_path,
             _table_rows(va_df, "requested_va_ms"),
         )
+        created_files.append(table_path)
     if not depower_df.empty:
+        table_path = args.output_dir / "table_9_3_1_6_trim_sweep.md"
         write_markdown_table(
-            args.output_dir / "table_9_3_1_6_trim_sweep.md",
+            table_path,
             _table_rows(depower_df, "requested_u_dp"),
         )
+        created_files.append(table_path)
 
-    created_files = sorted(Path(args.output_dir).glob("*"))
+    created_files = sorted(created_files)
     if created_files:
         print("created files:")
         for path in created_files:

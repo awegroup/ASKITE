@@ -29,6 +29,7 @@ from ch9_analysis_utils import (
     depower_tape_length_m_to_udp,
     finite_or_nan,
     get_first,
+    reset_processed_data_dir,
     run_coupled_case,
     summary_from_case,
     udp_to_depower_tape_length_m,
@@ -338,11 +339,11 @@ def main():
     if args.max_cases is not None:
         cases = cases.head(args.max_cases)
 
-    args.output_root.mkdir(parents=True, exist_ok=True)
+    processed_root = reset_processed_data_dir(args.output_root)
     rows = []
     for count, (_, ekf_row) in enumerate(cases.iterrows(), start=1):
         case_id = _case_id(ekf_row, count)
-        case_dir = args.output_root / str(case_id)
+        case_dir = processed_root / str(case_id)
         if (case_dir / "sim_output.h5").exists() and not args.force:
             try:
                 from ch9_analysis_utils import load_case
@@ -387,15 +388,17 @@ def main():
             write_json(case_dir / "case_summary.json", row)
         print(f"[{count}/{len(cases)}] {case_id}: converged={rows[-1]['converged']}")
 
-    summary_csv = args.output_root / "ch9_3_2_askite_case_summary.csv"
+    summary_csv = processed_root / "ch9_3_2_askite_case_summary.csv"
     write_csv(summary_csv, rows)
-    write_markdown_table(args.output_root / "ch9_3_2_askite_case_summary.md", rows)
+    write_markdown_table(processed_root / "ch9_3_2_askite_case_summary.md", rows)
     write_json(
-        args.output_root / "ch9_3_2_askite_run_manifest.json",
+        processed_root / "ch9_3_2_askite_run_manifest.json",
         {
             "cases_csv": str(args.cases_csv),
             "mode": args.mode,
             "n_cases": len(cases),
+            "output_root": str(args.output_root),
+            "processed_data_dir": str(processed_root),
             "config": str(args.config),
             "struc_geometry": str(args.struc_geometry),
             "aero_geometry": str(args.aero_geometry),

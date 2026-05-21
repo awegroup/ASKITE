@@ -1,53 +1,21 @@
 # Convergence
 
 Coupled-solver convergence diagnostics for an existing ASKITE case, optionally
-with a rerun. Output defaults to `results/ch9/convergence/`.
+with a rerun.
 
-## Run Fresh Simulation & Plot (1 Command)
+Generated convergence summaries and rerun case data are written to
+`results/ch9/convergence/processed_data/`. Figures are written directly to
+`results/ch9/convergence/`.
 
-<!-- ```bash
-python examples/run_simulation_level_1.py && \
-python examples/ch9/convergence/analyzing_coupled_convergence.py \
-  --case-dir results/TUDELFT_V3_KITE/$(ls -t results/TUDELFT_V3_KITE/ | head -1) \
-  --format pdf,png
-```
-
-This runs a fresh simulation from the default Chapter 9 config, then immediately analyzes and plots the convergence. -->
-
-## Analyze Existing Case (No Rerun)
-
-This requires that `results/<case_dir>/sim_output.h5` already exists from a prior run.
-
-Minimal command:
-```bash
-python examples/ch9/convergence/analyzing_coupled_convergence.py \
-  --case-dir results/ch9/effect_of_trim/va_va_0175_udp_0250
-```
-
-With output format options:
-```bash
-python examples/ch9/convergence/analyzing_coupled_convergence.py \
-  --case-dir results/ch9/effect_of_trim/va_va_0175_udp_0250 \
-  --format pdf,png
-```
-
-If the case directory does not contain `sim_output.h5`, use `--rerun` to generate it (see below).
-
-## Rerun And Analyze
-
-Re-runs the coupled solver from a previous result with optional parameter modifications,
-then analyzes the new convergence:
+## from 11 to 23 m/s
 
 ```bash
 python examples/ch9/convergence/analyzing_coupled_convergence.py \
-  --case-dir results/ch9/effect_of_trim/va_va_0175_udp_0250 \
+  --case-dir data/ch9/convergence_configs/ \
   --rerun \
-  --rerun-udp 0.25 \
-  --tol 0.1 \
-  --rerun-max-iter 750 \
-  --format pdf,png
+  --rerun-udp 0.34 \
+  --tol 0.01 \
+  --rerun-max-iter 500 \
+  --format pdf,png \
+  --output-dir results/ch9/convergence/
 ```
-
-**Note:** `--rerun-udp` rewrites the `depower_tape` `l0` directly in a copied structural YAML for the rerun case.
-This approach can be sensitive to initial state mismatch; if convergence fails, try `--rerun` alone (without `--rerun-udp`)
-to re-equilibrate from the recovered state at its original depower setting first.
