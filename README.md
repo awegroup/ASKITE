@@ -9,6 +9,21 @@ This code is designed for aero-structural coupled simulations, which can be util
 It includes the [TU Delft V3 Kite](https://awegroup.github.io/TUDELFT_V3_KITE/) as an example, and relies for the aerodynamic calculation on the [Vortex-Step-Method](https://github.com/awegroup/Vortex-Step-Method) and for the structural calculation, the user can choose between using the [Particle_System_Simulator](https://github.com/awegroup/Particle_System_Simulator) or [kite-fem](https://github.com/awegroup/kite_fem).
 
 
+## Structural Model
+
+ASKITE can use two structural modelling approaches: the Particle System Model (PSM) and the Finite Element Model (FEM).  
+The PSM represents the kite as a point-mass and spring-based structural model, while kite-fem provides a finite-element representation with explicit inflatable beam modelling.
+
+
+<p align="center">
+  <img src="docs/images/psm_fem_comparison_notext.svg" width="90%" alt="Side-by-side visualization of the PSM and FEM kite models">
+</p>
+
+<p align="center">
+  <em>Side-by-side visualization of the PSM and FEM structural models used in ASKITE with aerodynamic forces.</em>
+</p>
+
+
 ## Main Simulation Workflow
 
 The typical workflow consists of:
