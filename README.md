@@ -20,7 +20,7 @@ The PSM represents the kite as a point-mass and spring-based structural model, w
 </p>
 
 <p align="center">
-  <em>Side-by-side visualization of the PSM and FEM structural models used in ASKITE with aerodynamic forces.</em>
+  <em>Side-by-side visualization of the PSM and FEM structural models used in ASKITE with aerodynamic loading.</em>
 </p>
 
 

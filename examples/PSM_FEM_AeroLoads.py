@@ -1,11 +1,12 @@
-# This example visualizes the initial geometry and aerodynamic loads of the PSM and FE models 
-# It produces 3D renderings of the kite structure with aerodynamic load arrows, colored by element category. 
-# The aerodynamic loads are scaled to have a common resultant magnitude between the two models for better visual comparison. 
+# This example visualizes the initial geometry and aerodynamic loads of the PSM and FE models.
+# It produces 3D renderings of the kite structure with aerodynamic load arrows, colored by element category.
+# The aerodynamic loads are scaled to have a common resultant magnitude between the two models for better visual comparison.
 # The resulting figures are saved in PDF, SVG, and PNG formats in the specified output directory.
 
 
-from pathlib import Path
+import argparse
 import copy
+from pathlib import Path
 
 import matplotlib
 
@@ -22,10 +23,10 @@ from kitesim import read_struc_geometry_yaml_level_1, read_struc_geometry_yaml_l
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
 RESULTS_ROOT = PROJECT_DIR / "results" / "TUDELFT_V3_KITE"
-OUTPUT_DIR = PROJECT_DIR / "results" / "AWEC_2026_initial_load_visuals"
+DEFAULT_OUTPUT_DIR = PROJECT_DIR / "results" / "AWEC_2026_initial_load_visuals"
 
-PSM_RUN = RESULTS_ROOT / "2026_06_01_1049h" / "sim_output.h5"
-FE_RUN = RESULTS_ROOT / "2026_06_01_1055h" / "sim_output.h5"
+DEFAULT_PSM_RUN = RESULTS_ROOT / "2026_06_01_1049h" / "sim_output.h5"
+DEFAULT_FE_RUN = RESULTS_ROOT / "2026_06_01_1055h" / "sim_output.h5"
 
 VIEW_ELEV = 15
 VIEW_AZIM = -120
@@ -495,10 +496,10 @@ def draw_model(ax, data, title, category_order, model_kind, load_arrow_limit=Non
     )
 
 
-def save_figure(fig, stem):
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+def save_figure(fig, stem, output_dir):
+    output_dir.mkdir(parents=True, exist_ok=True)
     for ext in ("pdf", "svg", "png"):
-        output_path = OUTPUT_DIR / f"{stem}.{ext}"
+        output_path = output_dir / f"{stem}.{ext}"
         try:
             fig.savefig(
                 output_path,
@@ -508,7 +509,7 @@ def save_figure(fig, stem):
                 transparent=True,
             )
         except PermissionError:
-            fallback_path = OUTPUT_DIR / f"{stem}_updated.{ext}"
+            fallback_path = output_dir / f"{stem}_updated.{ext}"
             fig.savefig(
                 fallback_path,
                 bbox_inches="tight",
@@ -518,21 +519,78 @@ def save_figure(fig, stem):
             )
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description=(
+            "Visualize the initial geometry and aerodynamic loads of matching PSM "
+            "and FE simulation outputs."
+        )
+    )
+    parser.add_argument(
+        "--psm-run",
+        type=Path,
+        default=DEFAULT_PSM_RUN,
+        help=(
+            "Path to the level 1 / PSM sim_output.h5 file. "
+            f"Default: {DEFAULT_PSM_RUN}"
+        ),
+    )
+    parser.add_argument(
+        "--fe-run",
+        type=Path,
+        default=DEFAULT_FE_RUN,
+        help=(
+            "Path to the level 2 / FE sim_output.h5 file. "
+            f"Default: {DEFAULT_FE_RUN}"
+        ),
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=DEFAULT_OUTPUT_DIR,
+        help=(
+            "Directory for exported PDF, SVG, and PNG files. "
+            f"Default: {DEFAULT_OUTPUT_DIR}"
+        ),
+    )
+    return parser.parse_args()
+
+
+def validate_run_path(path, label):
+    if path.exists():
+        return
+
+    raise FileNotFoundError(
+        f"{label} sim_output.h5 was not found: {path}\n"
+        "Generate the required result files first, then pass their paths explicitly. "
+        "For the PSM run, use examples/run_simulation_level_1.py. "
+        "For the FE run, use examples/run_simulation_level_2.py. "
+        "Example:\n"
+        "  python examples/PSM_FEM_AeroLoads.py "
+        "--psm-run results/TUDELFT_V3_KITE/<level_1_run>/sim_output.h5 "
+        "--fe-run results/TUDELFT_V3_KITE/<level_2_run>/sim_output.h5"
+    )
+
+
 def main():
-    psm = load_initial_geometry_with_first_load(PSM_RUN)
-    fe = load_initial_geometry_with_first_load(FE_RUN)
+    args = parse_args()
+    validate_run_path(args.psm_run, "PSM")
+    validate_run_path(args.fe_run, "FE")
+
+    psm = load_initial_geometry_with_first_load(args.psm_run)
+    fe = load_initial_geometry_with_first_load(args.fe_run)
     equalize_total_force_magnitude(psm, fe)
 
     fig = plt.figure(figsize=(4.8, 4.2))
     ax = fig.add_subplot(111, projection="3d")
     draw_model(ax, psm, "PSM: Particle System Model", PSM_CATEGORY_ORDER, "psm")
-    save_figure(fig, "psm_initial_geometry_with_aero_loads")
+    save_figure(fig, "psm_initial_geometry_with_aero_loads", args.output_dir)
     plt.close(fig)
 
     fig = plt.figure(figsize=(4.8, 4.2))
     ax = fig.add_subplot(111, projection="3d")
     draw_model(ax, fe, "FE: inflatable beam structure", FE_CATEGORY_ORDER, "fe")
-    save_figure(fig, "fe_initial_geometry_with_aero_loads")
+    save_figure(fig, "fe_initial_geometry_with_aero_loads", args.output_dir)
     plt.close(fig)
 
     fig = plt.figure(figsize=(9.6, 4.2))
@@ -541,10 +599,10 @@ def main():
     draw_model(ax1, psm, "PSM: Particle System Model", PSM_CATEGORY_ORDER, "psm")
     draw_model(ax2, fe, "FEM: Finite Element Model", FE_CATEGORY_ORDER, "fe")
     fig.subplots_adjust(left=0.0, right=1.0, bottom=0.0, top=0.92, wspace=0.02)
-    save_figure(fig, "psm_fe_initial_geometry_with_aero_loads")
+    save_figure(fig, "psm_fe_initial_geometry_with_aero_loads", args.output_dir)
     plt.close(fig)
 
-    print(f"Saved AWEC visuals to {OUTPUT_DIR}")
+    print(f"Saved AWEC visuals to {args.output_dir}")
     print(f"PSM loads from timestep {psm['load_step']}; FE loads from timestep {fe['load_step']}.")
     print(
         "Aerodynamic forces scaled to common resultant magnitude: "
