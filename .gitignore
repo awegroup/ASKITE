@@ -184,3 +184,15 @@ results/V3_25/**/**/animation/
 
 # Specific to the V9_60C directory #TODO: this should be removed at some point
 src/initialisation/V9_60C
+
+# Archives, they duplicate the unpacked directory next to them
+*.zip
+
+# Generated plots and output in nested results/ directories
+examples/**/results/
+data/**/results/
+
+# Large photographs and renders, kept locally but not tracked
+data/TUDELFT_V3_KITE/organizing_yaml_files_15_05_2026/visualisation_of_bridle_line_geometric_layout/*.jpg
+data/TUDELFT_V3_KITE/organizing_yaml_files_15_05_2026/visualisation_of_bridle_line_geometric_layout/*.JPG
+docs/images/AI_generated_AWE.png
